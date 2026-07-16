@@ -6,6 +6,7 @@ add_executable(quantum_sim
         src/main.cpp
 
         src/math/Complex.cpp
+        tests/ComplexTests.cpp
 )
 
 target_compile_features(quantum_sim PRIVATE cxx_std_20)
