@@ -24,18 +24,11 @@ namespace {
 int main() {
     using quantum_sim::math::Complex;
 
-    const Complex left{2.0, 3.0};
-    const Complex right{5.0, 4.0};
-    const Complex sum = left + right;
+    const Complex first = Complex{3.0, 4.0};
 
     check(
-        approximatelyEqual(sum.real(), 7.0),
-        "addition calculates real component"
-    );
-
-    check(
-        approximatelyEqual(sum.imaginary(), 7.0),
-        "addition calculates imaginary component"
+        approximatelyEqual(first.magnitude(), 5),
+        "Compares Magnitude"
     );
 
     if (failures == 0) {

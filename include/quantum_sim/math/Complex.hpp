@@ -36,6 +36,12 @@ namespace quantum_sim::math {
         [[nodiscard]] double magnitudeSquared() const noexcept;
 
         /**
+         * @brief Return the square root of the magnitude.
+         * @return √(magnitudeSquared).
+         */
+        [[nodiscard]] double magnitude() const noexcept;
+
+        /**
         * @brief Adds another complex number to this one.
         * @param other The complex number to add.
         * @return A new Complex object representing the sum.

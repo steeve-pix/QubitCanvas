@@ -1,5 +1,7 @@
 #include "quantum_sim/math/Complex.hpp"
 
+#include <cmath>
+
 namespace quantum_sim::math {
     Complex::Complex(double real, double imaginary)
         : real_(real), imaginary_(imaginary) {
@@ -19,6 +21,10 @@ namespace quantum_sim::math {
 
     double Complex::magnitudeSquared() const noexcept {
         return (real_ * real_) + (imaginary_ * imaginary_);
+    }
+
+    double Complex::magnitude() const noexcept {
+        return std::sqrt(magnitudeSquared());
     }
 
     Complex Complex::operator+(const Complex &other) const noexcept {
