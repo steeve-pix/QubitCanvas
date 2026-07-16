@@ -10,6 +10,7 @@ namespace quantum_sim::math {
         [[nodiscard]] double imaginary() const noexcept;
 
         [[nodiscard]] Complex operator+(const Complex &other) const noexcept;
+        [[nodiscard]]Complex operator*(const Complex&other) const noexcept;
 
     private:
         double real_{0.0};

@@ -19,4 +19,11 @@ namespace quantum_sim::math {
             imaginary_ + other.imaginary_
         };
     }
+
+    Complex Complex::operator*(const Complex &other) const noexcept {
+        return Complex{
+            (real_ * other.real_) - (imaginary_ * other.imaginary_),
+            (real_ * other.imaginary_) + (imaginary_ * other.real_)
+        };
+    }
 }
