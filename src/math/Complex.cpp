@@ -13,6 +13,14 @@ namespace quantum_sim::math {
         return imaginary_;
     }
 
+    Complex Complex::conjugate() const noexcept {
+        return Complex{real_, -imaginary_};
+    }
+
+    double Complex::magnitudeSquared() const noexcept {
+        return (real_ * real_) + (imaginary_ * imaginary_);
+    }
+
     Complex Complex::operator+(const Complex &other) const noexcept {
         return Complex{
             real_ + other.real_,
