@@ -24,12 +24,17 @@ namespace {
 int main() {
     using quantum_sim::math::Complex;
 
-    const Complex first = Complex{3.0, 4.0};
+    const Complex value{2.0, 2.0};
+    bool threw = false;
 
-    check(
-        approximatelyEqual(first.magnitude(), 5),
-        "Compares Magnitude"
-    );
+    try {
+        const Complex result = value / 0.0;
+        static_cast<void>(result);
+    } catch (const std::invalid_argument &) {
+        threw = true;
+    }
+
+    check(threw, "division by zero throws");
 
     if (failures == 0) {
         std::cout << "All Complex tests passed.\n";

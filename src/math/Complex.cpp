@@ -1,6 +1,7 @@
 #include "quantum_sim/math/Complex.hpp"
 
 #include <cmath>
+#include <stdexcept>
 
 namespace quantum_sim::math {
     Complex::Complex(double real, double imaginary)
@@ -38,6 +39,14 @@ namespace quantum_sim::math {
         return Complex{
             (real_ * other.real_) - (imaginary_ * other.imaginary_),
             (real_ * other.imaginary_) + (imaginary_ * other.real_)
+        };
+    }
+
+    Complex Complex::operator/(double scalar) const {
+        if (scalar == 0) throw std::invalid_argument{"Cannot divide a complex number by zero"};
+        return Complex{
+            real_ / scalar,
+            imaginary_ / scalar
         };
     }
 }

@@ -56,6 +56,13 @@ namespace quantum_sim::math {
          */
         [[nodiscard]] Complex operator*(const Complex &other) const noexcept;
 
+        /**
+         *@brief Divides a complex number with a scalar.
+         * @param scalar The scalar number to divide by.
+         * @return A new Complex object representing the quotient.
+         */
+        [[nodiscard]] Complex operator/(double scalar) const;
+
     private:
         double real_{0.0};
         double imaginary_{0.0};
