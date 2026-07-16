@@ -1,6 +1,6 @@
 #include <iostream>
 
 int main() {
-    std::cout << "QuantumC initialized.\n";
+    std::cout << "Quantum computer simulator initialized.\n";
     return 0;
 }
