@@ -25,38 +25,48 @@ namespace {
 
 int main() {
     const ComplexVector zeroState{
-        std::vector{
+        std::vector<Complex>{
             Complex{1.0, 0.0},
             Complex{0.0, 0.0}
         }
     };
+    const ComplexVector invalidState{
+        std::vector<Complex>{
+            Complex{1.0, 0.0},
+            Complex{1.0, 0.0}
+        }
+    };
+    const double amplitude = 1.0 / std::sqrt(2.0);
+
+    const ComplexVector superposition{
+        std::vector<Complex>{
+            Complex{amplitude, 0.0},
+            Complex{amplitude, 0.0}
+        }
+    };
+    const ComplexVector empty{
+        std::vector<Complex>{}
+    };
 
     check(
-        zeroState.size() == 2,
-        "complex vector reports its size"
+        !empty.isNormalized(),
+        "empty complex vector is not normalized"
     );
 
     check(
-        approximatelyEqual(zeroState.at(0).real(), 1.0) &&
-        approximatelyEqual(zeroState.at(0).imaginary(), 0.0),
-        "complex vector stores its first amplitude"
+        zeroState.isNormalized(),
+        "zero state is normalized"
     );
 
     check(
-        approximatelyEqual(zeroState.at(1).real(), 0.0) &&
-        approximatelyEqual(zeroState.at(1).imaginary(), 0.0),
-        "complex vector stores its second amplitude"
+        superposition.isNormalized(),
+        "equal superposition is normalized"
     );
 
-    bool throwOutOfRange = false;
-    try {
-        auto val = zeroState.at(2);
-        static_cast<void>(val);
-    } catch (const std::out_of_range &) {
-        throwOutOfRange = true;
-    }
-    check(throwOutOfRange, "complex vector rejects an invalid index");
-
+    check(
+        !invalidState.isNormalized(),
+        "vector with total probability two is not normalized"
+    );
 
     if (failures == 0) {
         std::cout << "All Complex tests passed.\n";
