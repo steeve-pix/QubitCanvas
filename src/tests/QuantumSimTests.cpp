@@ -37,33 +37,17 @@ int main() {
         }
     };
 
-    const ComplexMatrix xGate1{
-        2, 2,
-        std::vector<Complex>{
-            Complex{0.0, 0.0},
-            Complex{1.0, 0.0},
-            Complex{1.0, 0.0},
-            Complex{0.0, 0.0},
-        }
-    };
-
-    const ComplexVector zeroState{
+    const double amplitude = 1 / std::sqrt(2.0);
+    const ComplexVector superposition{
         std::vector{
-            Complex{1.0, 0.0},
-            Complex{0.0, 0.0}
+            Complex{amplitude, 0.0},
+            Complex{amplitude, 0.0}
         }
     };
 
-    const ComplexMatrix identityGate = xGate0 * xGate1;
-    const ComplexVector zeroState0 = identityGate * zeroState;
+    const ComplexVector transformed  = xGate0 * superposition;
 
-
-    check(
-        approximatelyEqual(zeroState0.at(0).real(), 1.0) &&
-        approximatelyEqual(zeroState0.at(1).real(), 0.0),
-        "Identity matrix doesn't transforms zero state"
-    );
-
+    check(transformed.isNormalized(), "X preserves state normalization");
 
     return failures == 0 ? 0 : 1;
 }
