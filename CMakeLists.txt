@@ -4,41 +4,49 @@ project(QuantumComputer VERSION 0.1.0 LANGUAGES CXX)
 
 include(CTest)
 
+function(enable_project_warnings target_name)
+    if (MSVC)
+        target_compile_options(${target_name} PRIVATE /W4 /permissive-)
+    else ()
+        target_compile_options(${target_name} PRIVATE -Wall -Wextra -Wpedantic)
+    endif ()
+endfunction()
+
+# Core simulator library
 add_library(quantum_sim_core
         src/math/Complex.cpp
+        src/math/ComplexVector.cpp
 )
 
-target_include_directories(quantum_sim_core PUBLIC
-        "${PROJECT_SOURCE_DIR}/include"
-)
+target_include_directories(quantum_sim_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 
 target_compile_features(quantum_sim_core PUBLIC cxx_std_20)
 
+enable_project_warnings(quantum_sim_core)
+
+# Main simulator application
 add_executable(quantum_sim
         src/main.cpp
 )
 
-target_link_libraries(quantum_sim PRIVATE
-        quantum_sim_core
-)
+target_link_libraries(quantum_sim PRIVATE quantum_sim_core)
 
-add_executable(complex_tests
-        tests/ComplexTests.cpp
-)
+enable_project_warnings(quantum_sim)
 
-target_link_libraries(complex_tests PRIVATE quantum_sim_core)
+# Automated tests
+if (BUILD_TESTING)
+    add_executable(quantum_sim_tests
+            src/tests/QuantumSimTests.cpp
+    )
 
-add_test(
-        NAME complex_tests
-        COMMAND complex_tests
-)
+    target_link_libraries(quantum_sim_tests PRIVATE
+            quantum_sim_core
+    )
 
-if (MSVC)
-    target_compile_options(quantum_sim_core PRIVATE /W4 /permissive-)
-    target_compile_options(quantum_sim PRIVATE /W4 /permissive-)
-    target_compile_options(complex_tests PRIVATE /W4 /permissive-)
-else ()
-    target_compile_options(quantum_sim_core PRIVATE -Wall -Wextra -Wpedantic)
-    target_compile_options(quantum_sim PRIVATE -Wall -Wextra -Wpedantic)
-    target_compile_options(complex_tests PRIVATE -Wall -Wextra -Wpedantic)
+    enable_project_warnings(quantum_sim_tests)
+
+    add_test(
+            NAME quantum_sim_tests
+            COMMAND quantum_sim_tests
+    )
 endif ()

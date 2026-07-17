@@ -63,6 +63,8 @@ namespace quantum_sim::math {
          */
         [[nodiscard]] Complex operator/(double scalar) const;
 
+        Complex &operator+=(const Complex &other) noexcept;
+
     private:
         double real_{0.0};
         double imaginary_{0.0};
