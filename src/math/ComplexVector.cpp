@@ -45,4 +45,17 @@ namespace quantum_sim::math {
 
         return ComplexVector{std::move(normalizedValues)};
     }
+
+    ComplexVector ComplexVector::operator+(const ComplexVector &other) const {
+        bool isEqualSize = values_.size() == other.size();
+        if (!isEqualSize) throw std::invalid_argument{"Cannot add complex vectors with different sizes."};
+
+        std::vector<Complex> result;
+        result.reserve(values_.size());
+        for (int i{}; i < values_.size(); ++i) {
+            result.push_back(values_.at(i) + other.values_.at(i));
+        }
+
+        return ComplexVector{result};
+    }
 }

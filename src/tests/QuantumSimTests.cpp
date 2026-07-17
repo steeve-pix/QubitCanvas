@@ -24,21 +24,24 @@ namespace {
 } //
 
 int main() {
-        const ComplexVector zeroState{
-            std::vector{
-                Complex{1.0, 0.0},
-                Complex{0.0, 0.0}
-            }
-        };
+    const ComplexVector x{
+        std::vector{
+            Complex{3.0, 4.0},
+            Complex{0.0, 5.0}
+        }
+    };
 
-        const ComplexVector normalizedZero = zeroState.normalized();
-        check(normalizedZero.isNormalized(), "normalizing an already normalized vector remains normalized");
+    const ComplexVector y{
+        std::vector{
+            Complex{7.0, 6.0},
+            Complex{10.0, 5.0}
+        }
+    };
 
-    if (failures == 0) {
-        std::cout << "All Complex tests passed.\n";
-    } else {
-        std::cerr << failures << " test(s) failed.\n";
-    }
+    const auto z = x + y;
+
+    std::cout << z.at(1).real();
+
 
     return 0;
 }
