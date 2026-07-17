@@ -24,23 +24,16 @@ namespace {
 } //
 
 int main() {
-    const ComplexVector x{
+    const ComplexVector vector{
         std::vector{
-            Complex{3.0, 4.0},
-            Complex{0.0, 5.0}
+            Complex{1.0, 1.0},
+            Complex{0.0, 2.0}
         }
     };
 
-    const ComplexVector y{
-        std::vector{
-            Complex{7.0, 6.0},
-            Complex{10.0, 5.0}
-        }
-    };
+    const ComplexVector result = vector * Complex{0.0, 1.0};
 
-    const auto z = x + y;
-
-    std::cout << z.at(1).real();
+    std::cout << result.at(0).imaginary();
 
 
     return 0;

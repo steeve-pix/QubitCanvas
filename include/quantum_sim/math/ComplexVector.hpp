@@ -15,11 +15,13 @@ namespace quantum_sim::math {
 
         [[nodiscard]] double magnitudeSquared() const noexcept;
 
-        [[nodiscard]] bool isNormalized() const noexcept;
+        [[nodiscard]] bool isNormalized(double epsilon = 1e-9) const noexcept;
 
         [[nodiscard]] ComplexVector normalized() const;
 
-        [[nodiscard]] ComplexVector operator+(const ComplexVector& other) const;
+        [[nodiscard]] ComplexVector operator+(const ComplexVector &other) const;
+
+        [[nodiscard]] ComplexVector operator*(const Complex &scalar) const;
 
     private:
         std::vector<Complex> values_;

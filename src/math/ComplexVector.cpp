@@ -27,15 +27,14 @@ namespace quantum_sim::math {
         return total;
     }
 
-    bool ComplexVector::isNormalized() const noexcept {
-        double epsilon = 1e-9;
+    bool ComplexVector::isNormalized(double epsilon) const noexcept {
         return std::abs(magnitudeSquared() - 1.0) <= epsilon;
     }
 
     ComplexVector ComplexVector::normalized() const {
         const double magnitude = std::sqrt(magnitudeSquared());
 
-        if (magnitude <= 1e-9) throw std::domain_error{"Cannot divide by zero"};
+        if (magnitude == 0.0) throw std::domain_error{"Cannot divide by zero"};
 
         std::vector<Complex> normalizedValues;
         normalizedValues.reserve(values_.size());
@@ -47,15 +46,27 @@ namespace quantum_sim::math {
     }
 
     ComplexVector ComplexVector::operator+(const ComplexVector &other) const {
-        bool isEqualSize = values_.size() == other.size();
-        if (!isEqualSize) throw std::invalid_argument{"Cannot add complex vectors with different sizes."};
+        if (size() != other.size())
+            throw std::invalid_argument{"Cannot add complex vectors with different sizes."};
 
         std::vector<Complex> result;
-        result.reserve(values_.size());
-        for (int i{}; i < values_.size(); ++i) {
-            result.push_back(values_.at(i) + other.values_.at(i));
+        result.reserve(size());
+
+        for (std::size_t i{}; i < size(); ++i) {
+            result.push_back(values_[i] + other.values_[i]);
         }
 
-        return ComplexVector{result};
+        return ComplexVector{std::move(result)};
+    }
+
+    ComplexVector ComplexVector::operator*(const Complex &scalar) const {
+        std::vector<Complex> result;
+        result.reserve(size());
+
+        for (const Complex &value: values_) {
+            result.push_back(value * scalar);
+        }
+
+        return ComplexVector{std::move(result)};
     }
 }
