@@ -33,8 +33,8 @@ namespace quantum_sim::math {
     }
 
     ComplexVector ComplexMatrix::operator*(const ComplexVector &vector) const {
-        if (columns() != vector.size()) {
-            throw std::invalid_argument{"Matrix cannot multiply"};
+        if (columns_ != vector.size()) {
+            throw std::invalid_argument{"Matrix column count must equal vector size."};
         }
 
         std::vector<Complex> output;
@@ -50,5 +50,24 @@ namespace quantum_sim::math {
         }
 
         return ComplexVector{std::move(output)};
+    }
+
+    ComplexMatrix ComplexMatrix::operator*(const ComplexMatrix &matrix) const {
+        if (columns_ != matrix.rows_) {
+            throw std::invalid_argument{"Matrix column count must match other matrix row count"};
+        }
+
+        std::vector<Complex> output;
+        for (std::size_t row{}; row < rows_; ++row) {
+            for (std::size_t column{}; column < matrix.columns_; ++column) {
+                Complex sum{};
+                for (std::size_t position{}; position < columns_; ++position) {
+                    sum += this->at(row, position) * matrix.at(position, column);
+                }
+                output.push_back(sum);
+            }
+        }
+
+        return ComplexMatrix(rows_, matrix.columns_, std::move(output));
     }
 }

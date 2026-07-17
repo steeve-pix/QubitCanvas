@@ -99,13 +99,22 @@ namespace quantum_sim::math {
         [[nodiscard]] ComplexVector operator*(const ComplexVector &vector) const;
 
         /**
-         * @brief Represents the number of rows in a matrix.
+         * @brief Multiplies the current matrix with another matrix.
          *
-         * This private member variable stores the total number of rows in the ComplexMatrix.
-         * It is initialized during the construction of the matrix and directly influences
-         * the structure and operations of the matrix. The value must be a non-negative integer
-         * and remains constant for the lifecycle of the matrix instance.
+         * This operator computes the matrix product of the current matrix and
+         * the provided matrix. The number of columns in the current matrix must
+         * match the number of rows in the provided matrix. The resulting matrix
+         * will have dimensions matching the number of rows in the current matrix
+         * and the number of columns in the provided matrix.
+         *
+         * @param matrix The matrix to multiply with the current matrix.
+         * @return A new ComplexMatrix representing the result of the matrix multiplication.
+         *
+         * @throws std::invalid_argument Thrown when the number of columns in the current matrix
+         * does not match the number of rows in the provided matrix.
          */
+        [[nodiscard]] ComplexMatrix operator*(const ComplexMatrix &matrix) const;
+
     private:
         std::size_t rows_;
         /**

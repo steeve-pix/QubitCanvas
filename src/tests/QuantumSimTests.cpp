@@ -26,7 +26,7 @@ namespace {
 } //
 
 int main() {
-    const ComplexMatrix xGate{
+    const ComplexMatrix xGate0{
         2,
         2,
         std::vector<Complex>{
@@ -37,20 +37,31 @@ int main() {
         }
     };
 
-    const ComplexVector zeroState{
+    const ComplexMatrix xGate1{
+        2, 2,
         std::vector<Complex>{
+            Complex{0.0, 0.0},
+            Complex{1.0, 0.0},
+            Complex{1.0, 0.0},
+            Complex{0.0, 0.0},
+        }
+    };
+
+    const ComplexVector zeroState{
+        std::vector{
             Complex{1.0, 0.0},
             Complex{0.0, 0.0}
         }
     };
 
-    const ComplexVector result = xGate * zeroState;
-    const ComplexVector flippedOne = xGate * result;
+    const ComplexMatrix identityGate = xGate0 * xGate1;
+    const ComplexVector zeroState0 = identityGate * zeroState;
+
 
     check(
-        approximatelyEqual(flippedOne.at(0).real(), 1.0) &&
-        approximatelyEqual(flippedOne.at(1).real(), 0.0),
-        "X matrix transforms one state into zero state"
+        approximatelyEqual(zeroState0.at(0).real(), 1.0) &&
+        approximatelyEqual(zeroState0.at(1).real(), 0.0),
+        "Identity matrix doesn't transforms zero state"
     );
 
 
