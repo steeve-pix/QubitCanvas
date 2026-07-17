@@ -26,26 +26,33 @@ namespace {
 } //
 
 int main() {
-    const ComplexMatrix matrix{
-        2, 3, std::vector{
-            Complex{1, 0},
-            Complex{2, 0},
-            Complex{3, 0},
-
-            Complex{4, 0},
-            Complex{5, 0},
-            Complex{6, 0},
+    const ComplexMatrix xGate{
+        2,
+        2,
+        std::vector<Complex>{
+            Complex{0.0, 0.0},
+            Complex{1.0, 0.0},
+            Complex{1.0, 0.0},
+            Complex{0.0, 0.0}
         }
     };
 
-    bool isInvalidRowThrow = false;
-    try {
-        static_cast<void>(matrix.at(3, 3));
-    } catch (const std::out_of_range&) {
-        isInvalidRowThrow = true;
-    }
+    const ComplexVector zeroState{
+        std::vector<Complex>{
+            Complex{1.0, 0.0},
+            Complex{0.0, 0.0}
+        }
+    };
 
-    
+    const ComplexVector result = xGate * zeroState;
+    const ComplexVector flippedOne = xGate * result;
+
+    check(
+        approximatelyEqual(flippedOne.at(0).real(), 1.0) &&
+        approximatelyEqual(flippedOne.at(1).real(), 0.0),
+        "X matrix transforms one state into zero state"
+    );
+
 
     return failures == 0 ? 0 : 1;
 }
