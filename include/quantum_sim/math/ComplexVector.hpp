@@ -19,6 +19,8 @@ namespace quantum_sim::math {
 
         [[nodiscard]] ComplexVector normalized() const;
 
+        [[nodiscard]] Complex innerProduct(const ComplexVector &other) const;
+
         [[nodiscard]] ComplexVector operator+(const ComplexVector &other) const;
 
         [[nodiscard]] ComplexVector operator*(const Complex &scalar) const;

@@ -45,6 +45,20 @@ namespace quantum_sim::math {
         return ComplexVector{std::move(normalizedValues)};
     }
 
+    Complex ComplexVector::innerProduct(const ComplexVector &other) const {
+        if (size() != other.size())
+            throw std::invalid_argument{"Cannot compute the inner product of vectors with different sizes."};
+
+
+        Complex result{};
+
+        for (std::size_t i = 0; i < size(); ++i) {
+            result += values_[i].conjugate() * other.values_[i];
+        }
+
+        return result;
+    }
+
     ComplexVector ComplexVector::operator+(const ComplexVector &other) const {
         if (size() != other.size())
             throw std::invalid_argument{"Cannot add complex vectors with different sizes."};

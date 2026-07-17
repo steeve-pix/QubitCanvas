@@ -49,4 +49,11 @@ namespace quantum_sim::math {
             imaginary_ / scalar
         };
     }
+
+    Complex &Complex::operator+=(const Complex &other) noexcept {
+        this->real_ += other.real_;
+        this->imaginary_ += other.imaginary_;
+
+        return *this;
+    }
 }

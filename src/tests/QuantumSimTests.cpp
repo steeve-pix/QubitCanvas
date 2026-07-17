@@ -24,17 +24,27 @@ namespace {
 } //
 
 int main() {
-    const ComplexVector vector{
-        std::vector{
-            Complex{1.0, 1.0},
-            Complex{0.0, 2.0}
+    const ComplexVector zeroState{
+        std::vector<Complex>{
+            Complex{1.0, 0.0},
+            Complex{0.0, 0.0}
         }
     };
 
-    const ComplexVector result = vector * Complex{0.0, 1.0};
+    const ComplexVector oneState{
+        std::vector<Complex>{
+            Complex{0.0, 0.0},
+            Complex{1.0, 0.0}
+        }
+    };
 
-    std::cout << result.at(0).imaginary();
+    const Complex orthogonalResult = zeroState.innerProduct(oneState);
 
+    check(
+        approximatelyEqual(orthogonalResult.real(), 0.0) &&
+        approximatelyEqual(orthogonalResult.imaginary(), 0.0),
+        "orthogonal states have inner product zero"
+    );
 
-    return 0;
+    return failures == 0 ? 0 : 1;
 }
