@@ -2,6 +2,7 @@
 
 #include <utility>
 #include <cmath>
+#include <stdexcept>
 
 namespace quantum_sim::math {
     ComplexVector::ComplexVector(std::vector<Complex> values)
@@ -29,5 +30,19 @@ namespace quantum_sim::math {
     bool ComplexVector::isNormalized() const noexcept {
         double epsilon = 1e-9;
         return std::abs(magnitudeSquared() - 1.0) <= epsilon;
+    }
+
+    ComplexVector ComplexVector::normalized() const {
+        const double magnitude = std::sqrt(magnitudeSquared());
+
+        if (magnitude <= 1e-9) throw std::domain_error{"Cannot divide by zero"};
+
+        std::vector<Complex> normalizedValues;
+        normalizedValues.reserve(values_.size());
+        for (const Complex &value: values_) {
+            normalizedValues.push_back(value / magnitude);
+        }
+
+        return ComplexVector{std::move(normalizedValues)};
     }
 }

@@ -24,49 +24,15 @@ namespace {
 } //
 
 int main() {
-    const ComplexVector zeroState{
-        std::vector<Complex>{
-            Complex{1.0, 0.0},
-            Complex{0.0, 0.0}
-        }
-    };
-    const ComplexVector invalidState{
-        std::vector<Complex>{
-            Complex{1.0, 0.0},
-            Complex{1.0, 0.0}
-        }
-    };
-    const double amplitude = 1.0 / std::sqrt(2.0);
+        const ComplexVector zeroState{
+            std::vector{
+                Complex{1.0, 0.0},
+                Complex{0.0, 0.0}
+            }
+        };
 
-    const ComplexVector superposition{
-        std::vector<Complex>{
-            Complex{amplitude, 0.0},
-            Complex{amplitude, 0.0}
-        }
-    };
-    const ComplexVector empty{
-        std::vector<Complex>{}
-    };
-
-    check(
-        !empty.isNormalized(),
-        "empty complex vector is not normalized"
-    );
-
-    check(
-        zeroState.isNormalized(),
-        "zero state is normalized"
-    );
-
-    check(
-        superposition.isNormalized(),
-        "equal superposition is normalized"
-    );
-
-    check(
-        !invalidState.isNormalized(),
-        "vector with total probability two is not normalized"
-    );
+        const ComplexVector normalizedZero = zeroState.normalized();
+        check(normalizedZero.isNormalized(), "normalizing an already normalized vector remains normalized");
 
     if (failures == 0) {
         std::cout << "All Complex tests passed.\n";

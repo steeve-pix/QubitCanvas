@@ -13,9 +13,11 @@ namespace quantum_sim::math {
 
         [[nodiscard]] const Complex &at(std::size_t index) const;
 
-        [[nodiscard]] double magnitudeSquared()const noexcept;
+        [[nodiscard]] double magnitudeSquared() const noexcept;
 
-        [[nodiscard]]bool isNormalized() const noexcept;
+        [[nodiscard]] bool isNormalized() const noexcept;
+
+        [[nodiscard]] ComplexVector normalized() const;
 
     private:
         std::vector<Complex> values_;
