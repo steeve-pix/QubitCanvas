@@ -1,5 +1,5 @@
 #pragma once
-#include "Complex.hpp"
+#include "quantum_sim/math/Complex.hpp"
 
 #include <vector>
 #include <cstddef>

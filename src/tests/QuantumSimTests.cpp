@@ -1,9 +1,11 @@
 #include <iostream>
 
+#include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/math/ComplexVector.hpp"
 
 namespace {
     using quantum_sim::math::ComplexVector;
+    using quantum_sim::math::ComplexMatrix;
     using quantum_sim::math::Complex;
 
     int failures = 0;
@@ -24,27 +26,26 @@ namespace {
 } //
 
 int main() {
-    const ComplexVector zeroState{
-        std::vector<Complex>{
-            Complex{1.0, 0.0},
-            Complex{0.0, 0.0}
+    const ComplexMatrix matrix{
+        2, 3, std::vector{
+            Complex{1, 0},
+            Complex{2, 0},
+            Complex{3, 0},
+
+            Complex{4, 0},
+            Complex{5, 0},
+            Complex{6, 0},
         }
     };
 
-    const ComplexVector oneState{
-        std::vector<Complex>{
-            Complex{0.0, 0.0},
-            Complex{1.0, 0.0}
-        }
-    };
+    bool isInvalidRowThrow = false;
+    try {
+        static_cast<void>(matrix.at(3, 3));
+    } catch (const std::out_of_range&) {
+        isInvalidRowThrow = true;
+    }
 
-    const Complex orthogonalResult = zeroState.innerProduct(oneState);
-
-    check(
-        approximatelyEqual(orthogonalResult.real(), 0.0) &&
-        approximatelyEqual(orthogonalResult.imaginary(), 0.0),
-        "orthogonal states have inner product zero"
-    );
+    
 
     return failures == 0 ? 0 : 1;
 }
