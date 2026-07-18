@@ -27,4 +27,16 @@ namespace quantum_sim::gates {
             }
         };
     }
+
+    math::ComplexMatrix zGate() {
+        return math::ComplexMatrix{
+            2, 2,
+            std::vector{
+                math::Complex{1.0, 0.0},
+                math::Complex{},
+                math::Complex{},
+                math::Complex{-1.0, 0.0},
+            }
+        };
+    }
 }

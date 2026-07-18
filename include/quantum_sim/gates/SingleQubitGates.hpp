@@ -3,5 +3,8 @@
 
 namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix xGate();
+
     [[nodiscard]] math::ComplexMatrix hadamardGate();
+
+    [[nodiscard]] math::ComplexMatrix zGate();
 }
