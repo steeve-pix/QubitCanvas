@@ -1,22 +1,29 @@
 #pragma once
 
-#include "../math/ComplexVector.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
+#include <random>
 
 namespace quantum_sim::quantum {
-    class Quibit final {
+    enum class MeasurementResult {
+        Zero,
+        One
+    };
+
+    class Qubit final {
     public:
-        Quibit(math::Complex alpha, math::Complex beta);
+        Qubit(math::Complex alpha, math::Complex beta);
 
         [[nodiscard]] const math::Complex &zeroAmplitude() const noexcept;
 
         [[nodiscard]] const math::Complex &oneAmplitude() const noexcept;
 
-        [[nodiscard]] Quibit apply(const math::ComplexMatrix &gate) const;
+        [[nodiscard]] Qubit apply(const math::ComplexMatrix &gate) const;
 
         [[nodiscard]] double probabilityOfZero() const noexcept;
 
         [[nodiscard]] double probabilityOfOne() const noexcept;
+
+        [[nodiscard]] MeasurementResult measure(std::mt19937& randomEngine);
 
     private:
         math::Complex alpha_;
