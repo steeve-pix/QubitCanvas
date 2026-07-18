@@ -1,9 +1,8 @@
 #include "quantum_sim/math/ComplexMatrix.hpp"
+#include "quantum_sim/math/ComplexVector.hpp"
 
 #include <stdexcept>
 #include <utility>
-
-#include "quantum_sim/math/ComplexVector.hpp"
 
 namespace quantum_sim::math {
     ComplexMatrix::ComplexMatrix(std::size_t rows, std::size_t columns, std::vector<Complex> values)
@@ -30,6 +29,19 @@ namespace quantum_sim::math {
 
         const std::size_t index = row * columns_ + column;
         return values_[index];
+    }
+
+    ComplexMatrix ComplexMatrix::conjugateTranspose() const {
+        std::vector result(rows() * columns(), Complex{});
+
+        for (std::size_t newRow{}; newRow < rows_; ++newRow) {
+            for (std::size_t newColumn{}; newColumn < columns_; ++newColumn) {
+                const std::size_t outputIndex = newColumn * rows() + newRow;
+
+                result[outputIndex] = at(newRow, newColumn).conjugate();
+            }
+        }
+        return ComplexMatrix{columns(), rows(), std::move(result)}; // NOLINT
     }
 
     ComplexVector ComplexMatrix::operator*(const ComplexVector &vector) const {

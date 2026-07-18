@@ -82,6 +82,20 @@ namespace quantum_sim::math {
         [[nodiscard]] const Complex &at(std::size_t row, std::size_t column) const;
 
         /**
+         * @brief Computes the conjugate transpose of the current matrix.
+         *
+         * This method calculates the conjugate transpose (also known as the Hermitian transpose)
+         * of the matrix. It transposes the matrix by swapping rows and columns, and then computes
+         * the complex conjugate for each element.
+         *
+         * The resulting matrix will have its rows and columns swapped compared to the original matrix,
+         * with each element replaced by its conjugate.
+         *
+         * @return A new ComplexMatrix instance representing the conjugate transpose of the original matrix.
+         */
+        [[nodiscard]] ComplexMatrix conjugateTranspose()const;
+
+        /**
          * @brief Overloads an operator to perform a specific operation.
          *
          * The operator function provides functionality for customized behavior

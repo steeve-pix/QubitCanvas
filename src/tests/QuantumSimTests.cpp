@@ -26,28 +26,39 @@ namespace {
 } //
 
 int main() {
-    const ComplexMatrix xGate0{
-        2,
-        2,
-        std::vector<Complex>{
-            Complex{0.0, 0.0},
-            Complex{1.0, 0.0},
-            Complex{1.0, 0.0},
-            Complex{0.0, 0.0}
-        }
-    };
-
-    const double amplitude = 1 / std::sqrt(2.0);
-    const ComplexVector superposition{
+    const ComplexMatrix gate{
+        2, 2,
         std::vector{
-            Complex{amplitude, 0.0},
-            Complex{amplitude, 0.0}
+            Complex{0.0, 0.0},
+            Complex{0.0, -1.0},
+            Complex{1.0, 2.0},
+            Complex{2.0, 0.0}
         }
     };
+    const auto transposed = gate.conjugateTranspose();
 
-    const ComplexVector transformed  = xGate0 * superposition;
+    check(
+        approximatelyEqual(transposed.at(0, 0).real(), 0.0) &&
+        approximatelyEqual(transposed.at(0, 0).imaginary(), 0.0),
+        "conjugate transpose element (0, 0)");
 
-    check(transformed.isNormalized(), "X preserves state normalization");
+    check(
+        approximatelyEqual(transposed.at(0, 1).real(), 1.0) &&
+        approximatelyEqual(transposed.at(0, 1).imaginary(), -2.0),
+        "conjugate transpose element (0, 1)");
+
+    check(
+        approximatelyEqual(transposed.at(1, 0).real(), 0.0) &&
+        approximatelyEqual(transposed.at(1, 0).imaginary(), 1.0),
+        "conjugate transpose element (1, 0)");
+
+    check(approximatelyEqual(transposed.at(1, 1).real(), 2.0) &&
+          approximatelyEqual(transposed.at(1, 1).imaginary(), 0.0),
+          "conjugate transpose element (1, 1)");
+
+    if (failures == 0) {
+        std::cout << "All conjugate-transpose tests passed.\n";
+    }
 
     return failures == 0 ? 0 : 1;
 }
