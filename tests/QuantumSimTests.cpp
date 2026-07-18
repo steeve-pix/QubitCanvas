@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include "quantum_sim/gates/SingleQubitGates.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/math/ComplexVector.hpp"
 
@@ -26,15 +27,7 @@ namespace {
 } //
 
 int main() {
-    const ComplexMatrix xMatrix{
-        2, 2,
-        std::vector{
-            Complex{1.0, 0.0},
-            Complex{},
-            Complex{},
-            Complex{1.0, 0.0}
-        }
-    };
+    const ComplexMatrix xMatrix = quantum_sim::gates::xGate();
 
 
     const ComplexMatrix scalingMatrix{
