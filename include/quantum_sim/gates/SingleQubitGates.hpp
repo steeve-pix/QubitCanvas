@@ -9,4 +9,6 @@ namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix zGate();
 
     [[nodiscard]] math::ComplexMatrix yGate();
+
+    [[nodiscard]] math::ComplexMatrix sGate();
 }

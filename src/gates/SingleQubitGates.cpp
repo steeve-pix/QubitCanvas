@@ -45,10 +45,22 @@ namespace quantum_sim::gates {
             2, 2,
             std::vector{
                 math::Complex{},
-                math::Complex{0.0,1.0},
-                math::Complex{0.0,-1.0},
+                math::Complex{0.0, 1.0},
+                math::Complex{0.0, -1.0},
                 math::Complex{},
             }
         };
     }
+
+    math::ComplexMatrix sGate() {
+        return math::ComplexMatrix{
+            2, 2,
+            std::vector{
+                math::Complex{1.0, 0.0},
+                math::Complex{},
+                math::Complex{},
+                math::Complex{0.0, 1.0},
+            }
+        };
+    };
 }
