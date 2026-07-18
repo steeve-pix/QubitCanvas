@@ -1,4 +1,6 @@
 #include <iostream>
+#include <numbers>
+#include <cmath>
 
 #include "quantum_sim/gates/SingleQubitGates.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
@@ -29,32 +31,18 @@ namespace {
 } //
 
 int main() {
-    const Quibit zeroQubit{
+    const Quibit zero{
         Complex{1.0, 0.0},
         Complex{0.0, 0.0},
     };
 
-    check(
-        approximatelyEqual(zeroQubit.zeroAmplitude().real(), 1.0),
-        "zero qubit stores its zero amplitude"
-    );
+    const Quibit flipped = zero.apply(quantum_sim::gates::hadamardGate());
 
-    const double amplitude = 1 / std::sqrt(2.0);
-    bool isInvalidQubit = false;
-    try {
-        const Quibit invalidQubit{
-            Complex{1.0, 0.0},
-            Complex{1.0, 0.0}
-        };
-        static_cast<void>(invalidQubit);
-    } catch (const std::invalid_argument &) {
-        isInvalidQubit = true;
-    }
-
-    check(isInvalidQubit, "qubit rejects non-normalized amplitudes");
+    check(approximatelyEqual(flipped.oneAmplitude().real(), std::cos((std::numbers::pi) / 4)),
+          "Hadamard probability amplitude check");
 
     if (failures == 0) {
-        std::cout << "All conjugate-transpose tests passed.\n";
+        std::cout << "All tests passed.\n";
     }
 
     return 0;

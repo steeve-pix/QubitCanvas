@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../math/ComplexVector.hpp"
+#include "quantum_sim/math/ComplexMatrix.hpp"
 
 namespace quantum_sim::quantum {
     class Quibit final {
@@ -10,6 +11,8 @@ namespace quantum_sim::quantum {
         [[nodiscard]] const math::Complex &zeroAmplitude() const noexcept;
 
         [[nodiscard]] const math::Complex &oneAmplitude() const noexcept;
+
+        [[nodiscard]] Quibit apply(const math::ComplexMatrix& gate)const;
 
     private:
         math::Complex alpha_;
