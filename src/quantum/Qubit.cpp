@@ -47,4 +47,12 @@ namespace quantum_sim::quantum {
             transformed.at(1)
         };
     }
+
+    double Quibit::probabilityOfZero() const noexcept {
+        return alpha_.magnitudeSquared();
+    }
+
+    double Quibit::probabilityOfOne() const noexcept {
+        return beta_.magnitudeSquared();
+    }
 }

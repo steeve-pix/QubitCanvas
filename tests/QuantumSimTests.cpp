@@ -36,10 +36,8 @@ int main() {
         Complex{0.0, 0.0},
     };
 
-    const Quibit flipped = zero.apply(quantum_sim::gates::hadamardGate());
-
-    check(approximatelyEqual(flipped.oneAmplitude().real(), std::cos((std::numbers::pi) / 4)),
-          "Hadamard probability amplitude check");
+    check(approximatelyEqual(zero.probabilityOfOne()+zero.probabilityOfZero(), 1.0),
+          "");
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";

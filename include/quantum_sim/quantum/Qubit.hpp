@@ -12,7 +12,11 @@ namespace quantum_sim::quantum {
 
         [[nodiscard]] const math::Complex &oneAmplitude() const noexcept;
 
-        [[nodiscard]] Quibit apply(const math::ComplexMatrix& gate)const;
+        [[nodiscard]] Quibit apply(const math::ComplexMatrix &gate) const;
+
+        [[nodiscard]] double probabilityOfZero() const noexcept;
+
+        [[nodiscard]] double probabilityOfOne() const noexcept;
 
     private:
         math::Complex alpha_;
