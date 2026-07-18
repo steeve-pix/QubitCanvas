@@ -16,6 +16,7 @@ endfunction()
 add_library(quantum_sim_core
         src/math/Complex.cpp
         src/math/ComplexVector.cpp
+        src/math/ComplexMatrix.cpp
 )
 
 target_include_directories(quantum_sim_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
@@ -36,7 +37,7 @@ enable_project_warnings(quantum_sim)
 # Automated tests
 if (BUILD_TESTING)
     add_executable(quantum_sim_tests
-            src/tests/QuantumSimTests.cpp
+            tests/QuantumSimTests.cpp
     )
 
     target_link_libraries(quantum_sim_tests PRIVATE
