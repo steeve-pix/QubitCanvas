@@ -99,6 +99,8 @@ namespace quantum_sim::math {
          */
         [[nodiscard]] ComplexVector operator*(const Complex &scalar) const;
 
+        [[nodiscard]] ComplexVector tensorProduct(const ComplexVector& other)const;
+
         /**
          * Stores a collection of complex numbers representing the elements of the vector.
          *
