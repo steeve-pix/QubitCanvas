@@ -3,11 +3,13 @@
 #include "quantum_sim/gates/SingleQubitGates.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/math/ComplexVector.hpp"
+#include "quantum_sim/quantum/Qubit.hpp"
 
 namespace {
     using quantum_sim::math::ComplexVector;
     using quantum_sim::math::ComplexMatrix;
     using quantum_sim::math::Complex;
+    using quantum_sim::quantum::Quibit;
 
     int failures = 0;
 
@@ -27,19 +29,29 @@ namespace {
 } //
 
 int main() {
-    const ComplexMatrix hGate = quantum_sim::gates::hadamardGate();
-
-    const ComplexVector oneState{
-        std::vector{
-            Complex{1, 0}, // α
-            Complex{0, 0}, // β
-        }
+    const Quibit zeroQubit{
+        Complex{1.0, 0.0},
+        Complex{0.0, 0.0},
     };
 
-    const ComplexVector result = hGate * oneState;
-    const ComplexVector output = hGate * result;
+    check(
+        approximatelyEqual(zeroQubit.zeroAmplitude().real(), 1.0),
+        "zero qubit stores its zero amplitude"
+    );
 
-    std::cout << output.at(0).real() << std::endl;
+    const double amplitude = 1 / std::sqrt(2.0);
+    bool isInvalidQubit = false;
+    try {
+        const Quibit invalidQubit{
+            Complex{1.0, 0.0},
+            Complex{1.0, 0.0}
+        };
+        static_cast<void>(invalidQubit);
+    } catch (const std::invalid_argument &) {
+        isInvalidQubit = true;
+    }
+
+    check(isInvalidQubit, "qubit rejects non-normalized amplitudes");
 
     if (failures == 0) {
         std::cout << "All conjugate-transpose tests passed.\n";
