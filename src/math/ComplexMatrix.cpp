@@ -44,6 +44,16 @@ namespace quantum_sim::math {
         return ComplexMatrix{columns(), rows(), std::move(result)}; // NOLINT
     }
 
+    ComplexMatrix ComplexMatrix::identity(std::size_t size) {
+        ComplexMatrix matrix{size, size, std::move(std::vector(size * size, Complex{}))};
+
+        for (std::size_t i{}; i < size; ++i) {
+            matrix.values_[i * size + i] = Complex{1.0, 0.0};
+        }
+
+        return matrix;
+    }
+
     ComplexVector ComplexMatrix::operator*(const ComplexVector &vector) const {
         if (columns_ != vector.size()) {
             throw std::invalid_argument{"Matrix column count must equal vector size."};

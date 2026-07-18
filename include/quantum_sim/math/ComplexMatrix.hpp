@@ -93,7 +93,20 @@ namespace quantum_sim::math {
          *
          * @return A new ComplexMatrix instance representing the conjugate transpose of the original matrix.
          */
-        [[nodiscard]] ComplexMatrix conjugateTranspose()const;
+        [[nodiscard]] ComplexMatrix conjugateTranspose() const;
+
+        /**
+         * @brief Creates an identity matrix of the specified size.
+         *
+         * This method generates a square identity matrix of the given dimensions,
+         * where the diagonal elements are set to 1 (represented as complex numbers
+         * with real part 1 and imaginary part 0) and all other elements are set to 0.
+         *
+         * @param size The size of the square matrix (number of rows and columns).
+         *             Must be a positive integer.
+         * @return A ComplexMatrix instance representing the identity matrix.
+         */
+        [[nodiscard]] static ComplexMatrix identity(std::size_t size);
 
         /**
          * @brief Overloads an operator to perform a specific operation.
