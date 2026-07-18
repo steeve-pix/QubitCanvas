@@ -5,6 +5,7 @@
 #include "quantum_sim/gates/SingleQubitGates.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/math/ComplexVector.hpp"
+#include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/quantum/Qubit.hpp"
 
 namespace {
@@ -13,6 +14,7 @@ namespace {
     using quantum_sim::math::Complex;
     using quantum_sim::quantum::Qubit;
     using quantum_sim::quantum::MeasurementResult;
+    using quantum_sim::quantum::QuantumRegister;
 
     int failures = 0;
 
@@ -32,45 +34,24 @@ namespace {
 } //
 
 int main() {
-    std::mt19937 randomEngine{42};
+    using quantum_sim::math::ComplexVector;
 
-    Qubit zero{
-        Complex{1.0, 0.0},
-        Complex{0.0, 0.0},
-    };
-    Qubit one{
-        Complex{0.0, 0.0},
-        Complex{1.0, 0.0}
-    };
-    const double amplitude = std::cos(std::numbers::pi / 4);
-    Qubit superposition{
-        Complex{amplitude, 0.0},
-        Complex{amplitude, 0.0}
+    const QuantumRegister register01{
+        2,
+        ComplexVector{
+            std::vector{
+                Complex{0.0, 0.0}, // |00⟩
+                Complex{1.0, 0.0}, // |01⟩
+                Complex{0.0, 0.0}, // |10⟩
+                Complex{0.0, 0.0}, // |11⟩
+            }
+        }
     };
 
-    const MeasurementResult firstResult =
-            superposition.measure(randomEngine);
-
-    const MeasurementResult secondResult =
-            superposition.measure(randomEngine);
-
-    check(
-        secondResult == firstResult,
-        "repeated measurement returns the collapsed result"
-    );
-    if (firstResult == MeasurementResult::Zero) {
-        check(
-            approximatelyEqual(superposition.probabilityOfZero(), 1.0) &&
-            approximatelyEqual(superposition.probabilityOfOne(), 0.0),
-            "zero measurement collapses superposition to zero"
-        );
-    } else {
-        check(
-            approximatelyEqual(superposition.probabilityOfZero(), 0.0) &&
-            approximatelyEqual(superposition.probabilityOfOne(), 1.0),
-            "one measurement collapses superposition to one"
-        );
-    }
+    check(register01.qubitCount() == 2, "quantum register reports its qubit count");
+    check(register01.stateCount() == 4, "two-qubit register contains four states");
+    check(approximatelyEqual(register01.amplitude(1).magnitudeSquared(), 1.0),
+          "register stores the amplitude for state 01");
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";

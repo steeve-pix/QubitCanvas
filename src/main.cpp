@@ -5,6 +5,7 @@
 #include <cstddef>
 
 #include "quantum_sim/gates/SingleQubitGates.hpp"
+#include "quantum_sim/quantum/QuantumRegister.hpp"
 
 int main() {
     using quantum_sim::math::Complex;

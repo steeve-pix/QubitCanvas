@@ -9,7 +9,6 @@ namespace quantum_sim::math {
      * This class provides member functions and utilities for operations involving complex numbers.
      */
     class Complex final {
-
     public:
         /**
         * @brief Constructs a complex number.

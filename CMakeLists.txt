@@ -21,6 +21,7 @@ add_library(quantum_sim_core
         src/gates/SingleQubitGates.cpp
 
         src/quantum/Qubit.cpp
+        src/quantum/QuantumRegister.cpp
 )
 
 target_include_directories(quantum_sim_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
