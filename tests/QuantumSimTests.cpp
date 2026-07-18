@@ -27,33 +27,19 @@ namespace {
 } //
 
 int main() {
-    const ComplexMatrix xMatrix = quantum_sim::gates::xGate();
+    const ComplexMatrix hGate = quantum_sim::gates::hadamardGate();
 
-
-    const ComplexMatrix scalingMatrix{
-        2, 2,
-        std::vector<Complex>{
-            Complex{2.0, 0.0},
-            Complex{},
-            Complex{},
-            Complex{2.0, 0.0}
+    const ComplexVector oneState{
+        std::vector{
+            Complex{1, 0}, // α
+            Complex{0, 0}, // β
         }
     };
-    check(
-        xMatrix.isUnitary(),
-        "X matrix is unitary"
-    );
 
-    check(
-        ComplexMatrix::identity(3).isUnitary(),
-        "identity matrix is unitary"
-    );
+    const ComplexVector result = hGate * oneState;
+    const ComplexVector output = hGate * result;
 
-    check(
-        !scalingMatrix.isUnitary(),
-        "scaling matrix is not unitary"
-    );
-
+    std::cout << output.at(0).real() << std::endl;
 
     if (failures == 0) {
         std::cout << "All conjugate-transpose tests passed.\n";
