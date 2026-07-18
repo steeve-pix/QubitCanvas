@@ -37,7 +37,7 @@ enable_project_warnings(quantum_sim)
 # Automated tests
 if (BUILD_TESTING)
     add_executable(quantum_sim_tests
-            src/tests/QuantumSimTests.cpp
+            tests/QuantumSimTests.cpp
     )
 
     target_link_libraries(quantum_sim_tests PRIVATE

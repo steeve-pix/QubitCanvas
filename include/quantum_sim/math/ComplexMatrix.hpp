@@ -108,6 +108,8 @@ namespace quantum_sim::math {
          */
         [[nodiscard]] static ComplexMatrix identity(std::size_t size);
 
+        [[nodiscard]] bool isUnitary(double epsilon = 1e-9) const;
+
         /**
          * @brief Overloads an operator to perform a specific operation.
          *

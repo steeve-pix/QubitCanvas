@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 #include <utility>
+#include <cmath>
 
 namespace quantum_sim::math {
     ComplexMatrix::ComplexMatrix(std::size_t rows, std::size_t columns, std::vector<Complex> values)
@@ -52,6 +53,28 @@ namespace quantum_sim::math {
         }
 
         return matrix;
+    }
+
+    bool ComplexMatrix::isUnitary(double epsilon) const {
+        if (rows_ != columns_) return false;
+
+        const ComplexMatrix product = conjugateTranspose() * (*this);
+        const ComplexMatrix expected = identity(rows());
+
+        for (std::size_t row{}; row < rows_; ++row) {
+            for (std::size_t column{}; column < columns_; ++column) {
+                const Complex &actual = product.at(row, column);
+                const Complex &target = expected.at(row, column);
+
+                const bool realMatches = std::abs(actual.real() - target.real()) <= epsilon;
+                const bool imaginaryMatches = std::abs(actual.imaginary() - target.imaginary()) <= epsilon;;
+
+                if (!realMatches || !imaginaryMatches) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     ComplexVector ComplexMatrix::operator*(const ComplexVector &vector) const {
