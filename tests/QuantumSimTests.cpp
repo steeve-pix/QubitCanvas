@@ -36,8 +36,9 @@ namespace {
 int main() {
     using quantum_sim::math::ComplexVector;
 
-    const ComplexMatrix xOnFirstQubit =
-            quantum_sim::gates::xGate().tensorProduct(ComplexMatrix::identity(2));
+    const ComplexMatrix xOnSecondQubit =
+            ComplexMatrix::identity(2)
+            .tensorProduct(quantum_sim::gates::xGate());
 
     const ComplexVector state00{
         std::vector{
@@ -48,16 +49,17 @@ int main() {
         }
     };
 
-    const ComplexVector result = xOnFirstQubit * state00;
+    const ComplexVector resultOnSecond =
+            xOnSecondQubit * state00;
 
     check(
-        approximatelyEqual(result.at(0).magnitudeSquared(), 0.0) &&
-        approximatelyEqual(result.at(1).magnitudeSquared(), 0.0) &&
-        approximatelyEqual(result.at(2).magnitudeSquared(), 1.0) &&
-        approximatelyEqual(result.at(3).magnitudeSquared(), 0.0),
-        "X tensor identity flips the first qubit"
+        approximatelyEqual(resultOnSecond.at(0).magnitudeSquared(), 0.0) &&
+        approximatelyEqual(resultOnSecond.at(1).magnitudeSquared(), 1.0) &&
+        approximatelyEqual(resultOnSecond.at(2).magnitudeSquared(), 0.0) &&
+        approximatelyEqual(resultOnSecond.at(3).magnitudeSquared(), 0.0),
+        "identity tensor X flips the second qubit"
     );
-    
+
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
