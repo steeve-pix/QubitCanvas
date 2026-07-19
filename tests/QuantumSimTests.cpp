@@ -34,30 +34,24 @@ namespace {
 } //
 
 int main() {
-    using quantum_sim::math::ComplexVector;
-
-    const ComplexMatrix xOnSecondQubit =
-            ComplexMatrix::identity(2)
-            .tensorProduct(quantum_sim::gates::xGate());
-
-    const ComplexVector state00{
-        std::vector{
-            Complex{1.0, 0.0},
-            Complex{0.0, 0.0},
-            Complex{0.0, 0.0},
-            Complex{0.0, 0.0},
+    const QuantumRegister register00{
+        2,
+        ComplexVector{
+            std::vector{
+                Complex{1.0, 0.0}, // |00⟩
+                Complex{0.0, 0.0}, // |01⟩
+                Complex{0.0, 0.0}, // |10⟩
+                Complex{0.0, 0.0}, // |11⟩
+            }
         }
     };
 
-    const ComplexVector resultOnSecond =
-            xOnSecondQubit * state00;
+    const QuantumRegister flippedFirst =
+            register00.applySingleQubitGate(quantum_sim::gates::xGate(), 0);
 
     check(
-        approximatelyEqual(resultOnSecond.at(0).magnitudeSquared(), 0.0) &&
-        approximatelyEqual(resultOnSecond.at(1).magnitudeSquared(), 1.0) &&
-        approximatelyEqual(resultOnSecond.at(2).magnitudeSquared(), 0.0) &&
-        approximatelyEqual(resultOnSecond.at(3).magnitudeSquared(), 0.0),
-        "identity tensor X flips the second qubit"
+        approximatelyEqual(flippedFirst.amplitude(2).magnitudeSquared(), 1.0),
+        "X on qubit zero transforms 00 into 10"
     );
 
     if (failures == 0) {

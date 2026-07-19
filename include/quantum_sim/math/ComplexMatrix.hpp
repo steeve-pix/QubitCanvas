@@ -108,8 +108,32 @@ namespace quantum_sim::math {
          */
         [[nodiscard]] static ComplexMatrix identity(std::size_t size);
 
+        /**
+         * @brief Determines whether the matrix is unitary within a given tolerance.
+         *
+         * A unitary matrix is a square matrix whose conjugate transpose is also its inverse.
+         * This method verifies the condition by checking whether the product of the
+         * matrix and its conjugate transpose equals the identity matrix, within a specified
+         * tolerance for numerical precision.
+         *
+         * @param epsilon The numerical tolerance for comparing matrix elements.
+         * @return true if the matrix is unitary; false otherwise.
+         */
         [[nodiscard]] bool isUnitary(double epsilon = 1e-9) const;
 
+        /**
+         * @brief Computes the tensor product of this matrix with another matrix.
+         *
+         * The tensor product, also known as the Kronecker product, combines two matrices
+         * into a larger matrix. The resulting matrix has dimensions that are the product
+         * of the dimensions of the two input matrices, and its elements are computed as
+         * the pairwise products of the elements from the respective matrices.
+         *
+         * This operation assumes that both matrices are valid and properly dimensioned.
+         *
+         * @param other The ComplexMatrix with which the tensor product is computed.
+         * @return A new ComplexMatrix representing the tensor product of this matrix and the provided matrix.
+         */
         [[nodiscard]] ComplexMatrix tensorProduct(const ComplexMatrix& other) const;
 
         /**

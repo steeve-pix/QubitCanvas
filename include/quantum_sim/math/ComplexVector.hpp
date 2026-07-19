@@ -39,7 +39,13 @@ namespace quantum_sim::math {
         [[nodiscard]] const Complex &at(std::size_t index) const;
 
         /**
-         **/
+         * Computes the squared magnitude of the vector.
+         *
+         * The squared magnitude is calculated as the sum of the squared magnitudes
+         * of all complex elements in the vector.
+         *
+         * @return The squared magnitude of the vector as a double.
+         */
         [[nodiscard]] double magnitudeSquared() const noexcept;
 
         /**

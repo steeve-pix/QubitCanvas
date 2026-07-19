@@ -40,4 +40,37 @@ namespace quantum_sim::quantum {
     const math::Complex &QuantumRegister::amplitude(std::size_t stateIndex) const {
         return amplitudes_.at(stateIndex);
     }
+
+    QuantumRegister QuantumRegister::applySingleQubitGate(const math::ComplexMatrix &gate,
+                                                          std::size_t targetQubit) const {
+        if (gate.rows() != 2 || gate.columns() != 2) {
+            throw std::invalid_argument{"A single-qubit gate must be a 2 by 2 matrix."};
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{"A quantum gate must be unitary."};
+        }
+
+        if (targetQubit >= qubitCount_) {
+            throw std::out_of_range{"Target qubit index is outside the register."};
+        }
+
+        math::ComplexMatrix combinedGate =
+                math::ComplexMatrix::identity(1);
+
+        for (std::size_t qubit{}; qubit < qubitCount_; ++qubit) {
+            math::ComplexMatrix operationForThisQubit =
+                    math::ComplexMatrix::identity(2);
+
+            if (qubit == targetQubit) {
+                operationForThisQubit = gate;
+            }
+            combinedGate = combinedGate.tensorProduct(operationForThisQubit);
+        }
+
+        const math::ComplexVector transformedAmplitudes =
+                combinedGate * amplitudes_;
+
+        return QuantumRegister{qubitCount_, transformedAmplitudes};
+    }
 }
