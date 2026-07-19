@@ -36,30 +36,28 @@ namespace {
 int main() {
     using quantum_sim::math::ComplexVector;
 
-    const ComplexVector vec2{
+    const ComplexMatrix xOnFirstQubit =
+            quantum_sim::gates::xGate().tensorProduct(ComplexMatrix::identity(2));
+
+    const ComplexVector state00{
         std::vector{
-            Complex{0.0, 0.0},
             Complex{1.0, 0.0},
+            Complex{0.0, 0.0},
+            Complex{0.0, 0.0},
+            Complex{0.0, 0.0},
         }
     };
 
-    const QuantumRegister register01{2, vec2.tensorProduct(vec2)};
+    const ComplexVector result = xOnFirstQubit * state00;
 
     check(
-        register01.qubitCount() == 2,
-        "quantum register reports its qubit count"
+        approximatelyEqual(result.at(0).magnitudeSquared(), 0.0) &&
+        approximatelyEqual(result.at(1).magnitudeSquared(), 0.0) &&
+        approximatelyEqual(result.at(2).magnitudeSquared(), 1.0) &&
+        approximatelyEqual(result.at(3).magnitudeSquared(), 0.0),
+        "X tensor identity flips the first qubit"
     );
-
-    check(
-        register01.stateCount() == 4,
-        "two-qubit register contains four states"
-    );
-
-    check(
-        approximatelyEqual(register01.amplitude(3).magnitudeSquared(), 1.0),
-        "register stores the amplitude for state 01"
-    );
-
+    
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }

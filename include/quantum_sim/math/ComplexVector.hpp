@@ -99,7 +99,17 @@ namespace quantum_sim::math {
          */
         [[nodiscard]] ComplexVector operator*(const Complex &scalar) const;
 
-        [[nodiscard]] ComplexVector tensorProduct(const ComplexVector& other)const;
+        /**
+         * Computes the tensor product of this complex vector with another complex vector.
+         *
+         * The tensor product is a mathematical operation that combines two vectors into a single vector
+         * with a size equal to the product of the sizes of the input vectors. Each element of the resulting
+         * vector is computed as the product of an element in the first vector and an element in the second vector.
+         *
+         * @param other The complex vector to combine with this vector.
+         * @return A new complex vector representing the tensor product of the two vectors.
+         */
+        [[nodiscard]] ComplexVector tensorProduct(const ComplexVector &other) const;
 
         /**
          * Stores a collection of complex numbers representing the elements of the vector.

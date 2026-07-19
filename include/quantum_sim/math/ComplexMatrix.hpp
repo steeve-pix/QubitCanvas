@@ -110,6 +110,8 @@ namespace quantum_sim::math {
 
         [[nodiscard]] bool isUnitary(double epsilon = 1e-9) const;
 
+        [[nodiscard]] ComplexMatrix tensorProduct(const ComplexMatrix& other) const;
+
         /**
          * @brief Overloads an operator to perform a specific operation.
          *
