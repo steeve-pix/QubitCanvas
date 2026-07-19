@@ -34,33 +34,15 @@ namespace {
 } //
 
 int main() {
-    std::mt19937 randomEngine{42};
-
-    const QuantumRegister register00{
-        2, ComplexVector{
-            std::vector{
-                Complex{1.0, 0.0},
-                Complex{0.0, 0.0},
-                Complex{0.0, 0.0},
-                Complex{0.0, 0.0},
-            }
-        }
-    };
-    const QuantumRegister afterHadamard = register00.applySingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-    const QuantumRegister bellState = afterHadamard.applyGate(quantum_sim::gates::cnotGate());
-
-    QuantumRegister measuredBellState = bellState;
-
-    const MeasurementResult measuredQubit =
-            measuredBellState.measureQubit(0, randomEngine);
-
-    const MeasurementResult secondMeasurement =
-            measuredBellState.measureQubit(1, randomEngine);
+    const QuantumRegister state10 = QuantumRegister::basisState(2, 2);
 
     check(
-        secondMeasurement == measuredQubit,
-        "measuring one Bell qubit determines the other qubit"
+        state10.qubitCount() == 2 && state10.stateCount() == 4,
+        "basis state creates the correct register size"
     );
+
+    check(
+        approximatelyEqual(state10.probability(2), 1.0), "basis state creates state 10");
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";

@@ -5,6 +5,8 @@
 #include <vector>
 #include <utility>
 
+#include "quantum_sim/gates/QuantumGates.hpp"
+
 namespace quantum_sim::quantum {
     QuantumRegister::QuantumRegister(std::size_t qubitCount, math::ComplexVector amplitudes)
         : qubitCount_(qubitCount), amplitudes_(amplitudes) {
@@ -196,5 +198,25 @@ namespace quantum_sim::quantum {
         };
 
         return result;
+    }
+
+    QuantumRegister QuantumRegister::basisState(std::size_t qubitCount, std::size_t stateIndex) {
+        if (qubitCount == 0) {
+            throw std::invalid_argument{"A quantum register must contain at least one qubit."};
+        }
+        if (qubitCount >= std::numeric_limits<std::size_t>::digits) {
+            throw std::invalid_argument{"Qubit count is too large to represent its state count."};
+        }
+
+        const std::size_t stateCount =
+                std::size_t{1} << qubitCount;
+        if (stateIndex >= stateCount) {
+            throw std::out_of_range{"Basis state index is outside the register."};
+        }
+
+        std::vector values(stateCount, math::Complex{});
+        values[stateIndex] = math::Complex{1.0, 0.0};
+
+        return QuantumRegister{qubitCount, math::ComplexVector{std::move(values)}};
     }
 }
