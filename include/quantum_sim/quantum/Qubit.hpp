@@ -96,7 +96,16 @@ namespace quantum_sim::quantum {
         [[nodiscard]] MeasurementResult measure(std::mt19937 &randomEngine);
 
         /**
+         * @brief Represents the complex amplitude of the |0⟩ state in a qubit's quantum state.
          *
+         * A qubit's state is described as a superposition of the basis states |0⟩ and |1⟩,
+         * mathematically represented as |ψ⟩ = α|0⟩ + β|1⟩. The variable alpha_ corresponds
+         * to the complex number α, which determines the amplitude (magnitude and phase)
+         * of the |0⟩ state in this superposition.
+         *
+         * This variable is a fundamental component of the Qubit class and is used to compute
+         * probabilities, perform measurements, and apply quantum operations. It is managed
+         * internally within the class to ensure the consistency of the qubit's quantum state.
          */
     private:
         math::Complex alpha_;

@@ -70,6 +70,22 @@ namespace quantum_sim::quantum {
         [[nodiscard]] QuantumRegister applySingleQubitGate(const math::ComplexMatrix &gate,
                                                            std::size_t targetQubit) const;
 
+        /**
+         * Applies a quantum gate to the quantum register, resulting in a new quantum register
+         * with the state modified according to the given gate's transformation. The gate must
+         * be unitary and its dimensions must align with the state count of the quantum register.
+         *
+         * @param gate A unitary matrix representing the quantum gate to apply. Its dimensions
+         * must match the state count of the quantum register.
+         * @return A new QuantumRegister object representing the updated quantum state after
+         * applying the quantum gate.
+         * @throws std::invalid_argument If the gate dimensions do not match the state count
+         * of the quantum register, or if the gate is not unitary.
+         */
+        [[nodiscard]] QuantumRegister applyGate(const math::ComplexMatrix &gate) const;
+
+        [[nodiscard]] double probability(std::size_t stateIndex) const;
+
     private:
         /**
          * @brief Stores the number of qubits in the quantum register.

@@ -73,4 +73,31 @@ namespace quantum_sim::quantum {
 
         return QuantumRegister{qubitCount_, transformedAmplitudes};
     }
+
+    QuantumRegister QuantumRegister::applyGate(const math::ComplexMatrix &gate) const {
+        if (gate.rows() != stateCount() ||
+            gate.columns() != stateCount()) {
+            throw std::invalid_argument{
+                "Gate dimensions must match the quantum register state count."
+            };
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{
+                "A quantum gate must be unitary."
+            };
+        }
+
+        const math::ComplexVector transformed =
+                gate * amplitudes_;
+
+        return QuantumRegister{
+            qubitCount_,
+            transformed
+        };
+    }
+
+    double QuantumRegister::probability(std::size_t stateIndex) const {
+        return amplitude(stateIndex).magnitudeSquared();
+    }
 }

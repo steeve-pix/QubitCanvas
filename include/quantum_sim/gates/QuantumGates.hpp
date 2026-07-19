@@ -57,5 +57,12 @@ namespace quantum_sim::gates {
      */
     [[nodiscard]] math::ComplexMatrix hadamardGate();
 
+    /**
+     * Constructs the CNOT (Controlled-NOT) gate as a 4x4 complex matrix.
+     * The CNOT gate is a two-qubit quantum gate that flips the state of the target qubit
+     * if and only if the control qubit is in the |1⟩ state.
+     *
+     * @return A 4x4 ComplexMatrix representing the CNOT gate.
+     */
     [[nodiscard]] math::ComplexMatrix cnotGate();
 }
