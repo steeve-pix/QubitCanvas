@@ -86,14 +86,60 @@ namespace quantum_sim::quantum {
          */
         [[nodiscard]] QuantumRegister applyGate(const math::ComplexMatrix &gate) const;
 
+        /**
+         * Calculates the probability of the quantum system being in a specific state
+         * identified by the given state index. The probability is derived from the
+         * squared magnitude of the amplitude corresponding to the state.
+         *
+         * @param stateIndex The index of the state for which the probability is to be calculated.
+         * @return The probability of the quantum system being in the specified state.
+         */
         [[nodiscard]] double probability(std::size_t stateIndex) const;
 
+        /**
+         * Measures the current quantum state, collapsing the superposition into a single basis state
+         * with a probability proportional to the square of its amplitude, and updates the state to the
+         * measured basis state.
+         *
+         * @param randomEngine A random number generator used to sample the measurement result based on
+         *                     the probabilities of the quantum states.
+         * @return The index of the basis state that was measured.
+         */
         [[nodiscard]] std::size_t measure(std::mt19937 &randomEngine);
 
+        /**
+         * Calculates the probability that a specific qubit within the quantum register
+         * collapses to the |1⟩ state when measured.
+         *
+         * @param qubitIndex The index of the qubit within the register for which the
+         *                   probability of being in the |1⟩ state is computed. Must be within
+         *                   the bounds of the register.
+         * @return The probability that the specified qubit is in the |1⟩ state.
+         * @throws std::out_of_range If the provided qubitIndex is outside the bounds of the
+         *                           quantum register.
+         */
         [[nodiscard]] double probabilityOfQubitOne(std::size_t qubitIndex) const;
 
+        /**
+         * Computes the probability of a specified qubit being in the |0⟩ state within the quantum register.
+         *
+         * @param qubitIndex The index of the qubit within the quantum register.
+         * @return The probability of the qubit being in the |0⟩ state, represented as a double.
+         */
         [[nodiscard]] double probabilityOfQubitZero(std::size_t qubitIndex) const;
 
+        /**
+         * Performs a measurement on the specified qubit, collapsing its state to either |0⟩ or |1⟩
+         * and updating the quantum state accordingly.
+         *
+         * The measurement uses the probabilities of the qubit being in the |0⟩ or |1⟩ states, and it
+         * samples from a uniform random distribution to determine the result.
+         * After the measurement, the quantum state amplitudes are updated to reflect the measured collapse.
+         *
+         * @param qubitIndex The index of the qubit to be measured.
+         * @param randomEngine A random engine used to perform the probabilistic measurement.
+         * @return The result of the measurement, either MeasurementResult::Zero or MeasurementResult::One.
+         */
         [[nodiscard]] MeasurementResult measureQubit(std::size_t qubitIndex, std::mt19937 &randomEngine);
 
     private:
