@@ -2,6 +2,8 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <vector>
+#include <utility>
 
 namespace quantum_sim::quantum {
     QuantumRegister::QuantumRegister(std::size_t qubitCount, math::ComplexVector amplitudes)
@@ -99,5 +101,29 @@ namespace quantum_sim::quantum {
 
     double QuantumRegister::probability(std::size_t stateIndex) const {
         return amplitude(stateIndex).magnitudeSquared();
+    }
+
+    std::size_t QuantumRegister::measure(std::mt19937 &randomEngine) {
+        std::uniform_real_distribution distribution{0.0, 1.0};
+        const double sample = distribution(randomEngine);
+
+        double cumulativeProbability = 0.0;
+        std::size_t measuredState = stateCount() - 1;
+
+        for (std::size_t state{}; state < stateCount(); ++state) {
+            cumulativeProbability += probability(state);
+
+            if (sample < cumulativeProbability) {
+                measuredState = state;
+                break;
+            }
+        }
+        std::vector collapsedValues(
+            stateCount(), math::Complex{});
+
+        collapsedValues[measuredState] = math::Complex{1.0, 0.0};
+        amplitudes_ = math::ComplexVector{std::move(collapsedValues)};
+
+        return measuredState;
     }
 }

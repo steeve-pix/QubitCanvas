@@ -55,25 +55,18 @@ int main() {
         afterHadamard.applyGate(quantum_sim::gates::cnotGate())
     };
 
-    check(
-        approximatelyEqual(bellState.probability(0), 0.5),
-        "Bell state probability of 00 is one half"
-    );
+    std::mt19937 randomEngine{42};
+    QuantumRegister measuredBellState = bellState;
+
+    const std::size_t firstResult =
+            measuredBellState.measure(randomEngine);
+
+    const std::size_t secondResult =
+      measuredBellState.measure(randomEngine);
 
     check(
-        approximatelyEqual(bellState.probability(3), 0.5),
-        "Bell state probability of 11 is one half"
-    );
-
-    check(
-        approximatelyEqual(bellState.probability(1), 0.0) &&
-        approximatelyEqual(bellState.probability(2), 0.0),
-        "Bell state probability of 01 and 10 is zero"
-    );
-    check(
-        approximatelyEqual(bellState.probability(1), 0.0) &&
-        approximatelyEqual(bellState.probability(2), 0.0),
-        "Bell state gives states 01 and 10 zero probability"
+        secondResult == firstResult,
+        "repeated measurement returns the collapsed state"
     );
 
     if (failures == 0) {

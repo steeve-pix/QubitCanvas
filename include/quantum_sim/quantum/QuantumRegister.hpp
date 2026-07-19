@@ -3,6 +3,7 @@
 #include "quantum_sim/math/ComplexVector.hpp"
 
 #include<cstddef>
+#include <random>
 #include <vector>
 
 #include "quantum_sim/math/ComplexMatrix.hpp"
@@ -85,6 +86,8 @@ namespace quantum_sim::quantum {
         [[nodiscard]] QuantumRegister applyGate(const math::ComplexMatrix &gate) const;
 
         [[nodiscard]] double probability(std::size_t stateIndex) const;
+
+        [[nodiscard]] std::size_t measure(std::mt19937 &randomEngine);
 
     private:
         /**
