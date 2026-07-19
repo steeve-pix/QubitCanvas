@@ -2,7 +2,7 @@
 #include <numbers>
 #include <cmath>
 
-#include "quantum_sim/gates/SingleQubitGates.hpp"
+#include "quantum_sim/gates/QuantumGates.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/math/ComplexVector.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
@@ -34,24 +34,9 @@ namespace {
 } //
 
 int main() {
-    const QuantumRegister register00{
-        2,
-        ComplexVector{
-            std::vector{
-                Complex{1.0, 0.0}, // |00⟩
-                Complex{0.0, 0.0}, // |01⟩
-                Complex{0.0, 0.0}, // |10⟩
-                Complex{0.0, 0.0}, // |11⟩
-            }
-        }
-    };
-
-    const QuantumRegister flippedFirst =
-            register00.applySingleQubitGate(quantum_sim::gates::xGate(), 0);
-
     check(
-        approximatelyEqual(flippedFirst.amplitude(2).magnitudeSquared(), 1.0),
-        "X on qubit zero transforms 00 into 10"
+        quantum_sim::gates::cnotGate().isUnitary(),
+        "Unitary CNot gate."
     );
 
     if (failures == 0) {

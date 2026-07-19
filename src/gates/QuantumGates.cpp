@@ -1,4 +1,4 @@
-#include "quantum_sim/gates/SingleQubitGates.hpp"
+#include "quantum_sim/gates/QuantumGates.hpp"
 
 #include <cmath>
 #include <numbers>
@@ -75,6 +75,33 @@ namespace quantum_sim::gates {
                 math::Complex{invSqrt2, 0.0},
                 math::Complex{invSqrt2, 0.0},
                 math::Complex{-invSqrt2, 0.0}
+            }
+        };
+    }
+
+    math::ComplexMatrix cnotGate() {
+        return math::ComplexMatrix{
+            4, 4,
+            std::vector{
+                math::Complex{1.0, 0.0},
+                math::Complex{0.0, 0.0},
+                math::Complex{0.0, 0.0},
+                math::Complex{0.0, 0.0},
+
+                math::Complex{0.0, 0.0},
+                math::Complex{1.0, 0.0},
+                math::Complex{0.0, 0.0},
+                math::Complex{0.0, 0.0},
+
+                math::Complex{0.0, 0.0},
+                math::Complex{0.0, 0.0},
+                math::Complex{0.0, 0.0},
+                math::Complex{1.0, 0.0},
+
+                math::Complex{0.0, 0.0},
+                math::Complex{0.0, 0.0},
+                math::Complex{1.0, 0.0},
+                math::Complex{0.0, 0.0},
             }
         };
     }

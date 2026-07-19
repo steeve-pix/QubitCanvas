@@ -56,4 +56,6 @@ namespace quantum_sim::gates {
      * @return A representation of the Hadamard gate for a single qubit.
      */
     [[nodiscard]] math::ComplexMatrix hadamardGate();
+
+    [[nodiscard]] math::ComplexMatrix cnotGate();
 }

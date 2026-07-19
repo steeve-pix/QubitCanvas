@@ -4,7 +4,7 @@
 #include <random>
 #include <cstddef>
 
-#include "quantum_sim/gates/SingleQubitGates.hpp"
+#include "quantum_sim/gates/QuantumGates.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 
 int main() {
