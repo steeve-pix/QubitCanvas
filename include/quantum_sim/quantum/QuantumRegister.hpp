@@ -1,12 +1,13 @@
 #pragma once
 
 #include "quantum_sim/math/ComplexVector.hpp"
+#include "quantum_sim/math/ComplexMatrix.hpp"
+#include "Qubit.hpp"
 
-#include<cstddef>
+#include <cstddef>
 #include <random>
 #include <vector>
 
-#include "quantum_sim/math/ComplexMatrix.hpp"
 
 namespace quantum_sim::quantum {
     /**
@@ -89,6 +90,12 @@ namespace quantum_sim::quantum {
 
         [[nodiscard]] std::size_t measure(std::mt19937 &randomEngine);
 
+        [[nodiscard]] double probabilityOfQubitOne(std::size_t qubitIndex) const;
+
+        [[nodiscard]] double probabilityOfQubitZero(std::size_t qubitIndex) const;
+
+        [[nodiscard]] MeasurementResult measureQubit(std::size_t qubitIndex, std::mt19937 &randomEngine);
+
     private:
         /**
          * @brief Stores the number of qubits in the quantum register.
@@ -121,5 +128,14 @@ namespace quantum_sim::quantum {
          *       normalization.
          */
         math::ComplexVector amplitudes_;
+
+        /**
+         * Determines whether the specified qubit in the given quantum state index has the state |1⟩.
+         *
+         * @param stateIndex The index representing the quantum state.
+         * @param qubitIndex The index of the qubit to check, relative to the quantum register.
+         * @return True if the qubit at the specified index has the state |1⟩, otherwise false.
+         */
+        [[nodiscard]] bool stateHasQubitOne(std::size_t stateIndex, std::size_t qubitIndex) const noexcept;
     };
 }

@@ -126,4 +126,75 @@ namespace quantum_sim::quantum {
 
         return measuredState;
     }
+
+    bool QuantumRegister::stateHasQubitOne(std::size_t stateIndex, std::size_t qubitIndex) const noexcept {
+        const std::size_t bitPosition = qubitCount_ - 1 - qubitIndex;
+        const std::size_t mask =
+                std::size_t{1} << bitPosition;
+
+        return (stateIndex & mask) != 0;
+    }
+
+    double QuantumRegister::probabilityOfQubitOne(std::size_t qubitIndex) const {
+        if (qubitIndex >= qubitCount_) {
+            throw std::out_of_range{"Qubit index is outside the register."};
+        }
+
+        double totalProbability = 0.0;
+        for (std::size_t state{}; state < stateCount(); ++state) {
+            if (stateHasQubitOne(state, qubitIndex)) {
+                totalProbability += probability(state);
+            }
+        }
+
+        return totalProbability;
+    }
+
+    double QuantumRegister::probabilityOfQubitZero(std::size_t qubitIndex) const {
+        return 1.0 - probabilityOfQubitOne(qubitIndex);
+    }
+
+    MeasurementResult QuantumRegister::measureQubit(std::size_t qubitIndex, std::mt19937 &randomEngine) {
+        const double zeroProbability = probabilityOfQubitZero(qubitIndex);
+        const double oneProbability = probabilityOfQubitOne(qubitIndex);
+
+
+        std::uniform_real_distribution<double> distribution{0.0, 1.0};
+        const double sample = distribution(randomEngine);
+
+        const MeasurementResult result =
+                sample < zeroProbability
+                    ? MeasurementResult::Zero
+                    : MeasurementResult::One;
+
+        const bool measuredOne = result == MeasurementResult::One;
+
+        const double resultProbability =
+                measuredOne
+                    ? oneProbability
+                    : zeroProbability;
+
+        const double normalizationFactor =
+                std::sqrt(resultProbability);
+
+        std::vector<math::Complex> collapsedValues;
+        collapsedValues.reserve(stateCount());
+
+        for (std::size_t state{}; state < stateCount(); ++state) {
+            const bool stateQubitIsOne =
+                    stateHasQubitOne(state, qubitIndex);
+
+            if (stateQubitIsOne == measuredOne) {
+                collapsedValues.push_back(amplitude(state) / normalizationFactor);
+            } else {
+                collapsedValues.push_back(math::Complex{});
+            }
+        }
+
+        amplitudes_ = math::ComplexVector{
+            std::move(collapsedValues)
+        };
+
+        return result;
+    }
 }
