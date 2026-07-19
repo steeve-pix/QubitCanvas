@@ -1,16 +1,11 @@
 #include "quantum_sim/gates/QuantumGates.hpp"
-#include "quantum_sim/math/Complex.hpp"
-#include "quantum_sim/math/ComplexVector.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 
 #include <cstddef>
 #include <iostream>
 #include <random>
-#include <vector>
 
 int main() {
-    using quantum_sim::math::Complex;
-    using quantum_sim::math::ComplexVector;
     using quantum_sim::quantum::MeasurementResult;
     using quantum_sim::quantum::QuantumRegister;
 
@@ -24,16 +19,7 @@ int main() {
     std::size_t mismatchCount = 0;
 
     for (std::size_t shot = 0; shot < shotCount; ++shot) {
-        const QuantumRegister register00{
-            2, ComplexVector{
-                std::vector{
-                    Complex{1.0, 0.0},
-                    Complex{0.0, 0.0},
-                    Complex{0.0, 0.0},
-                    Complex{0.0, 0.0},
-                }
-            }
-        };
+        const QuantumRegister register00 = QuantumRegister::basisState(2, 0);
 
         const QuantumRegister afterHadamard = register00.applySingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
         QuantumRegister bellState = afterHadamard.applyGate(quantum_sim::gates::cnotGate());
