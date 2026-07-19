@@ -42,25 +42,25 @@ int main() {
             QuantumRegister::basisState(2, 0);
 
     circuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-    circuit.addSingleQubitGate(quantum_sim::gates::xGate(), 1);
+    circuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
 
     const QuantumRegister result =
             circuit.execute(initialState);
 
     check(
-        approximatelyEqual(result.probability(1), 0.5),
-        "circuit creates probability one half for state 01"
+        approximatelyEqual(result.probability(0), 0.5),
+        "Bell circuit gives state 00 probability one half"
     );
 
     check(
         approximatelyEqual(result.probability(3), 0.5),
-        "circuit creates probability one half for state 11"
+        "Bell circuit gives state 11 probability one half"
     );
 
     check(
-        approximatelyEqual(result.probability(0), 0.0) &&
+        approximatelyEqual(result.probability(1), 0.0) &&
         approximatelyEqual(result.probability(2), 0.0),
-        "circuit leaves states 00 and 10 with zero probability"
+        "Bell circuit gives states 01 and 10 zero probability"
     );
 
     if (failures == 0) {

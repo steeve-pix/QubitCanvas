@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 #include <utility>
+#include <type_traits>
+#include <variant>
 
 namespace quantum_sim::circuit {
     QuantumCircuit::QuantumCircuit(std::size_t qubitCount) : qubitCount_(qubitCount) {
@@ -29,6 +31,20 @@ namespace quantum_sim::circuit {
         instructions_.push_back(SingleQubitInstruction{std::move(gate), targetQubit});
     }
 
+    void QuantumCircuit::addFullRegisterGate(math::ComplexMatrix gate) {
+        const std::size_t expectedSize =
+                std::size_t{1} << qubitCount_;
+        if (gate.rows() != expectedSize || gate.columns() != expectedSize) {
+            throw std::invalid_argument{"Full-register gate dimensions must match the circuit state count."};
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{"A quantum gate must be unitary."};
+        }
+
+        instructions_.push_back(FullRegisterInstruction{std::move(gate)});
+    }
+
     std::size_t QuantumCircuit::instructionCount() const noexcept {
         return instructions_.size();
     }
@@ -40,9 +56,20 @@ namespace quantum_sim::circuit {
 
         quantum::QuantumRegister currentState = initialState;
 
-        for (const SingleQubitInstruction &instruction: instructions_) {
-            currentState =
-                currentState.applySingleQubitGate(instruction.gate, instruction.targetQubit);
+        for (const Instruction &instruction: instructions_) {
+            std::visit([&currentState]<typename T0>(const T0 &actualInstruction) {
+                           using InstructionType =
+                                   std::decay_t<T0>;
+
+                           if constexpr (std::is_same_v<InstructionType, SingleQubitInstruction>) {
+                               currentState =
+                                       currentState.applySingleQubitGate(
+                                           actualInstruction.gate, actualInstruction.targetQubit);
+                           } else {
+                               currentState = currentState.applyGate(actualInstruction.gate);
+                           }
+                       },
+                       instruction);
         }
 
         return currentState;

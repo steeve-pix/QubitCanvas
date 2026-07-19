@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <vector>
+#include <variant>
 
 namespace quantum_sim::circuit {
     class QuantumCircuit final {
@@ -14,6 +15,8 @@ namespace quantum_sim::circuit {
         [[nodiscard]] std::size_t qubitCount() const noexcept;
 
         void addSingleQubitGate(math::ComplexMatrix gate, std::size_t targetQubit);
+
+        void addFullRegisterGate(math::ComplexMatrix gate);
 
         [[nodiscard]] std::size_t instructionCount() const noexcept;
 
@@ -25,7 +28,13 @@ namespace quantum_sim::circuit {
             std::size_t targetQubit;
         };
 
+        struct FullRegisterInstruction {
+            math::ComplexMatrix gate;
+        };
+
+        using Instruction = std::variant<SingleQubitInstruction, FullRegisterInstruction>;
+
         std::size_t qubitCount_;
-        std::vector<SingleQubitInstruction> instructions_;
+        std::vector<Instruction> instructions_;
     };
 }
