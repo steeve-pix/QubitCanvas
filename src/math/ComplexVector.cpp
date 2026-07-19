@@ -1,4 +1,5 @@
 #include "quantum_sim/math/ComplexVector.hpp"
+#include "quantum_sim/quantum/QuantumRegister.hpp"
 
 #include <utility>
 #include <cmath>
@@ -79,6 +80,19 @@ namespace quantum_sim::math {
 
         for (const Complex &value: values_) {
             result.push_back(value * scalar);
+        }
+
+        return ComplexVector{std::move(result)};
+    }
+
+    ComplexVector ComplexVector::tensorProduct(const ComplexVector &other) const {
+        std::vector<Complex> result;
+        result.reserve(this->size() * other.size());
+
+        for (const Complex &left: values_) {
+            for (const Complex &right: other.values_) {
+                result.push_back(left * right);
+            }
         }
 
         return ComplexVector{std::move(result)};

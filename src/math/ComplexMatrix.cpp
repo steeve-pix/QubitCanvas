@@ -77,6 +77,31 @@ namespace quantum_sim::math {
         return true;
     }
 
+    ComplexMatrix ComplexMatrix::tensorProduct(const ComplexMatrix &other) const {
+        const std::size_t outputRows = rows_ * other.rows_;
+        const std::size_t outputColumns = columns_ * other.columns_;
+
+        std::vector result(outputRows * outputColumns, Complex{});
+
+        for (std::size_t leftRow{}; leftRow < rows_; ++leftRow) {
+            for (std::size_t rightRow{}; rightRow < other.rows_; ++rightRow) {
+                for (std::size_t leftColumn{}; leftColumn < columns_; ++leftColumn) {
+                    for (std::size_t rightColumn{}; rightColumn < other.columns_; ++rightColumn) {
+                        const std::size_t outputRow = leftRow * other.rows_ + rightRow;
+                        const std::size_t outputColumn = leftColumn * other.columns_ + rightColumn;
+
+                        const std::size_t outputIndex =
+                                outputRow * outputColumns + outputColumn;
+
+                        result[outputIndex] = at(leftRow, leftColumn) * other.at(rightRow, rightColumn);
+                    }
+                }
+            }
+        }
+
+        return ComplexMatrix{outputRows, outputColumns, std::move(result)};
+    }
+
     ComplexVector ComplexMatrix::operator*(const ComplexVector &vector) const {
         if (columns_ != vector.size()) {
             throw std::invalid_argument{"Matrix column count must equal vector size."};

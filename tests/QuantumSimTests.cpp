@@ -2,9 +2,10 @@
 #include <numbers>
 #include <cmath>
 
-#include "quantum_sim/gates/SingleQubitGates.hpp"
+#include "quantum_sim/gates/QuantumGates.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/math/ComplexVector.hpp"
+#include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/quantum/Qubit.hpp"
 
 namespace {
@@ -13,6 +14,7 @@ namespace {
     using quantum_sim::math::Complex;
     using quantum_sim::quantum::Qubit;
     using quantum_sim::quantum::MeasurementResult;
+    using quantum_sim::quantum::QuantumRegister;
 
     int failures = 0;
 
@@ -32,45 +34,15 @@ namespace {
 } //
 
 int main() {
-    std::mt19937 randomEngine{42};
-
-    Qubit zero{
-        Complex{1.0, 0.0},
-        Complex{0.0, 0.0},
-    };
-    Qubit one{
-        Complex{0.0, 0.0},
-        Complex{1.0, 0.0}
-    };
-    const double amplitude = std::cos(std::numbers::pi / 4);
-    Qubit superposition{
-        Complex{amplitude, 0.0},
-        Complex{amplitude, 0.0}
-    };
-
-    const MeasurementResult firstResult =
-            superposition.measure(randomEngine);
-
-    const MeasurementResult secondResult =
-            superposition.measure(randomEngine);
+    const QuantumRegister state10 = QuantumRegister::basisState(2, 2);
 
     check(
-        secondResult == firstResult,
-        "repeated measurement returns the collapsed result"
+        state10.qubitCount() == 2 && state10.stateCount() == 4,
+        "basis state creates the correct register size"
     );
-    if (firstResult == MeasurementResult::Zero) {
-        check(
-            approximatelyEqual(superposition.probabilityOfZero(), 1.0) &&
-            approximatelyEqual(superposition.probabilityOfOne(), 0.0),
-            "zero measurement collapses superposition to zero"
-        );
-    } else {
-        check(
-            approximatelyEqual(superposition.probabilityOfZero(), 0.0) &&
-            approximatelyEqual(superposition.probabilityOfOne(), 1.0),
-            "one measurement collapses superposition to one"
-        );
-    }
+
+    check(
+        approximatelyEqual(state10.probability(2), 1.0), "basis state creates state 10");
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";

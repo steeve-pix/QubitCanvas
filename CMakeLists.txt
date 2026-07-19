@@ -18,9 +18,10 @@ add_library(quantum_sim_core
         src/math/ComplexVector.cpp
         src/math/ComplexMatrix.cpp
 
-        src/gates/SingleQubitGates.cpp
+        src/gates/QuantumGates.cpp
 
         src/quantum/Qubit.cpp
+        src/quantum/QuantumRegister.cpp
 )
 
 target_include_directories(quantum_sim_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
