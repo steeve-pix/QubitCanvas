@@ -65,4 +65,5 @@ namespace quantum_sim::gates {
      * @return A 4x4 ComplexMatrix representing the CNOT gate.
      */
     [[nodiscard]] math::ComplexMatrix cnotGate();
+    [[nodiscard]] math::ComplexMatrix swapGate();
 }

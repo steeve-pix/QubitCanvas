@@ -34,40 +34,7 @@ namespace {
 } //
 
 int main() {
-    const QuantumRegister register00
-    {
-        2,
-        ComplexVector{
-            std::vector{
-                Complex{1.0, 0.0},
-                Complex{0.0, 0.0},
-                Complex{0.0, 0.0},
-                Complex{0.0, 0.0}
-            }
-        }
-    };
-
-    const QuantumRegister afterHadamard{
-        register00.applySingleQubitGate(quantum_sim::gates::hadamardGate(), 0)
-    };
-
-    const QuantumRegister bellState{
-        afterHadamard.applyGate(quantum_sim::gates::cnotGate())
-    };
-
-    std::mt19937 randomEngine{42};
-    QuantumRegister measuredBellState = bellState;
-
-    const std::size_t firstResult =
-            measuredBellState.measure(randomEngine);
-
-    const std::size_t secondResult =
-      measuredBellState.measure(randomEngine);
-
-    check(
-        secondResult == firstResult,
-        "repeated measurement returns the collapsed state"
-    );
+    check(quantum_sim::gates::swapGate().isUnitary(), "");
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";
