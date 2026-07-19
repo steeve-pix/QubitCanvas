@@ -142,6 +142,21 @@ namespace quantum_sim::quantum {
          */
         [[nodiscard]] MeasurementResult measureQubit(std::size_t qubitIndex, std::mt19937 &randomEngine);
 
+        /**
+         * Constructs a quantum register initialized to a specific basis state.
+         *
+         * A basis state is represented as a quantum state where the amplitude of a single state index
+         * is set to 1 while all others are set to 0. This function verifies that the given qubit count
+         * and state index are valid and creates the corresponding quantum register.
+         *
+         * @param qubitCount The number of qubits in the quantum register. Must be greater than 0 and
+         *                   less than or equal to the maximum supported by the system.
+         * @param stateIndex The index of the basis state to initialize. Must be less than the total number
+         *                   of possible states (2^qubitCount).
+         * @return A QuantumRegister instance representing the specified basis state.
+         * @throws std::invalid_argument If the qubit count is zero, or exceeds the allowable limits.
+         * @throws std::out_of_range If the provided state index is outside the range of valid basis states.
+         */
         [[nodiscard]] static QuantumRegister basisState(std::size_t qubitCount, std::size_t stateIndex);
 
     private:
