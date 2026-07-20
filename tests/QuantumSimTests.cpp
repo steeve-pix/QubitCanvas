@@ -45,28 +45,26 @@ int main() {
 
     const QuantumRegister bellState = bellCircuit.execute(initialState);
 
-    std::vector<quantum_sim::circuit::CircuitInstructionInfo> instructions =
-            bellCircuit.instructionInfo();
+    std::ostringstream diagramOutput;
 
-    check(
-        instructions.size() == 2,
-        "circuit exposes one description per instruction"
-    );
-    check(
-        instructions[0].name == "H" &&
-        instructions[0].kind ==
-        quantum_sim::circuit::CircuitInstructionKind::SingleQubit &&
-        instructions[0].targetQubit.has_value() &&
-        instructions[0].targetQubit.value() == 0,
-        "circuit describes the Hadamard instruction"
+    quantum_sim::visualization::printCircuitDiagram(
+        bellCircuit,
+        diagramOutput
     );
 
+    const std::string diagram =
+            diagramOutput.str();
+
     check(
-        instructions[1].name == "CNOT" &&
-        instructions[1].kind ==
-        quantum_sim::circuit::CircuitInstructionKind::FullRegister &&
-        !instructions[1].targetQubit.has_value(),
-        "circuit describes the CNOT instruction"
+    diagram.find("q0: |0> --H----CNOT--")
+        != std::string::npos,
+    "circuit diagram displays Hadamard on qubit zero"
+);
+
+    check(
+        diagram.find("q1: |0> -------CNOT--")
+            != std::string::npos,
+        "circuit diagram displays CNOT on the second qubit line"
     );
 
     if (failures == 0) {

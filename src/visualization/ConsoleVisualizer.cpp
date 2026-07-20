@@ -89,4 +89,36 @@ namespace quantum_sim::visualization {
             printProbabilityBars(step.state, output, barWidth);
         }
     }
+
+    void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output) {
+        const std::vector<circuit::CircuitInstructionInfo> instructions =
+                circuit.instructionInfo();
+
+        for (std::size_t qubit = 0; qubit < circuit.qubitCount(); ++qubit) {
+            output
+                    << "q"
+                    << qubit
+                    << ": |0> ";
+
+            for (const circuit::CircuitInstructionInfo &instruction: instructions) {
+                if (instruction.kind == circuit::CircuitInstructionKind::SingleQubit) {
+                    if (instruction.targetQubit.value() == qubit) {
+                        output
+                                << "--"
+                                << instruction.name
+                                << "--";
+                    } else {
+                        output << "-----";
+                    }
+                } else {
+                    output
+                            << "--"
+                            << instruction.name
+                            << "--";
+                }
+            }
+
+            output << '\n';
+        }
+    }
 }
