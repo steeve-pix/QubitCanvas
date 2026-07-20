@@ -29,13 +29,18 @@ int main() {
 
     std::cout << "Theoretical probabilities:\n";
 
-    quantum_sim::visualization::printProbabilityBars(
-        bellState,
-        std::cout
-    );
+    quantum_sim::visualization::printProbabilityBars(bellState, std::cout);
 
     const std::vector<std::size_t> counts =
             bellCircuit.runShots(initialState, shotCount, randomEngine);
+
+    std::cout << "\nObserved shot results:\n";
+
+    quantum_sim::visualization::printShotBars(
+        bellState,
+        counts,
+        std::cout
+    );
 
     return 0;
 }
