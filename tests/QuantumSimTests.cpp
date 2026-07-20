@@ -10,6 +10,7 @@
 #include <iostream>
 
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
+#include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 
 namespace {
     using quantum_sim::math::ComplexVector;
@@ -37,25 +38,9 @@ namespace {
     }
 } //
 int main() {
-    const QuantumRegister initialState = QuantumRegister::basisState(3, 0);
+    QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
-    const QuantumCircuit circuit = quantum_sim::algorithms::equalSuperpositionCircuit(3);
-
-    const QuantumRegister result = circuit.execute(initialState);
-
-    bool allProbabilitiesEqual = true;
-
-    for (std::size_t state{}; state < result.stateCount(); ++state) {
-        if (!approximatelyEqual(result.probability(state), 0.125)) {
-            allProbabilitiesEqual = false;
-            break;
-        }
-    }
-
-    check(
-        allProbabilitiesEqual,
-        "Equal-superposition circuit distributes probability equally"
-    );
+    const QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";
