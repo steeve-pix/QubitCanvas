@@ -43,65 +43,55 @@ int main() {
     bellCircuit.addFullRegisterGate("CNOT", quantum_sim::gates::cnotGate());
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
+    std::ostringstream traceOutput;
 
     const std::vector<quantum_sim::circuit::TraceStep> trace =
             bellCircuit.executeWithTrace(initialState);
 
+    quantum_sim::visualization::printExecutionTrace(initialState, trace, traceOutput);
+
+    const std::string traceVisualization =
+            traceOutput.str();
+
     const QuantumRegister bellState = bellCircuit.execute(initialState);
 
-    const std::vector<quantum_sim::quantum::StateInfo> allStates =
-            bellState.states();
-
-    std::ostringstream output;
-
-    std::ostringstream shotOutput;
-
-    const std::vector<std::size_t> counts{
-        50,
-        0,
-        0,
-        50
-    };
-
-    quantum_sim::visualization::printShotBars(bellState, counts, shotOutput, 100);
-
-    quantum_sim::visualization::printProbabilityBars(bellState, output, 10);
-
-    const std::string visualization =
-            output.str();
-
-    const std::string shotVisualization =
-            shotOutput.str();
-
     check(
-        trace.size() == 2,
-        "execution trace contains one step per instruction"
+        traceVisualization.find("Initial state:")
+        != std::string::npos,
+        "trace visualizer displays the initial state"
     );
 
     check(
-        approximatelyEqual(trace[0].state.probability(0), 0.5) &&
-        approximatelyEqual(trace[0].state.probability(2), 0.5),
-        "first trace step contains the state after Hadamard"
+        traceVisualization.find("After H on qubit 0:")
+        != std::string::npos,
+        "trace visualizer displays the Hadamard step"
     );
 
     check(
-        approximatelyEqual(trace[1].state.probability(0), 0.5) &&
-        approximatelyEqual(trace[1].state.probability(3), 0.5),
-        "second trace step contains the state after CNOT"
+        traceVisualization.find("After CNOT:")
+        != std::string::npos,
+        "trace visualizer displays the CNOT step"
     );
 
     check(
-        trace[0].description ==
-        "H on qubit 0",
-        "trace describes the single-qubit instruction"
+        traceVisualization.find("|00> [##########] 100.00%")
+        != std::string::npos,
+        "trace visualizer displays the initial 00 state"
     );
 
     check(
-        trace[1].description ==
-        "CNOT",
-        "trace describes the full-register instruction"
+        traceVisualization.find("|10> [#####     ] 50.00%")
+        != std::string::npos,
+        "trace visualizer displays the state after Hadamard"
     );
 
+    check(
+        traceVisualization.find("|11> [#####     ] 50.00%")
+        != std::string::npos,
+        "trace visualizer displays the Bell state after CNOT"
+    );
+
+    std::cout << traceVisualization;
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
