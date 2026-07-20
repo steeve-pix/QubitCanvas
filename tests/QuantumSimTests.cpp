@@ -36,31 +36,37 @@ namespace {
 } //
 
 int main() {
-    QuantumCircuit circuit{2};
+    std::mt19937 randomEngine{42};
+
+    QuantumCircuit bellCircuit{2};
+
+    bellCircuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
+    bellCircuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
 
     const QuantumRegister initialState =
             QuantumRegister::basisState(2, 0);
 
-    circuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-    circuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
-
-    const QuantumRegister result =
-            circuit.execute(initialState);
+    const std::vector<std::size_t> counts =
+            bellCircuit.runShots(initialState, 1'000, randomEngine);
 
     check(
-        approximatelyEqual(result.probability(0), 0.5),
-        "Bell circuit gives state 00 probability one half"
+        counts.size() == 4,
+        "shot execution returns one counter per basis state"
     );
 
     check(
-        approximatelyEqual(result.probability(3), 0.5),
-        "Bell circuit gives state 11 probability one half"
+        counts[1] == 0 && counts[2] == 0,
+        "Bell circuit never measures states 01 or 10"
     );
 
     check(
-        approximatelyEqual(result.probability(1), 0.0) &&
-        approximatelyEqual(result.probability(2), 0.0),
-        "Bell circuit gives states 01 and 10 zero probability"
+        counts[0] + counts[3] == 1'000,
+        "Bell circuit accounts for every shot"
+    );
+
+    check(
+        counts[0] > 0 && counts[3] > 0,
+        "Bell circuit produces both states 00 and 11"
     );
 
     if (failures == 0) {

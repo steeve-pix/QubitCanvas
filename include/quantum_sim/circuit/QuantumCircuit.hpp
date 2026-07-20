@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <vector>
 #include <variant>
+#include <random>
 
 namespace quantum_sim::circuit {
     class QuantumCircuit final {
@@ -20,7 +21,10 @@ namespace quantum_sim::circuit {
 
         [[nodiscard]] std::size_t instructionCount() const noexcept;
 
-        [[nodiscard]] quantum::QuantumRegister execute(const quantum::QuantumRegister &initialState);
+        [[nodiscard]] quantum::QuantumRegister execute(const quantum::QuantumRegister &initialState) const;
+
+        [[nodiscard]] std::vector<std::size_t> runShots(const quantum::QuantumRegister &initialState,
+                                                        std::size_t shotCount, std::mt19937 &randomEngine) const;
 
     private:
         struct SingleQubitInstruction {
