@@ -10,36 +10,146 @@
 #include <string>
 
 namespace quantum_sim::circuit {
+    /**
+     * A class representing a quantum circuit that operates on a specified number of qubits.
+     *
+     * This class allows the user to construct a quantum circuit, add quantum gates, and
+     * simulate quantum computations, including measurements.
+     */
     class QuantumCircuit final {
+        /**
+         * Constructs a QuantumCircuit object with the specified number of qubits.
+         *
+         * @param qubitCount The number of qubits in the quantum circuit. Must be greater than zero.
+         * @throws std::invalid_argument If the specified qubit count is zero.
+         */
     public:
         explicit QuantumCircuit(std::size_t qubitCount);
 
+        /**
+         * Retrieves the number of qubits in the quantum circuit.
+         *
+         * @return The total number of qubits in the circuit as a std::size_t value.
+         */
         [[nodiscard]] std::size_t qubitCount() const noexcept;
 
+        /**
+         * Adds a single-qubit quantum gate to the circuit.
+         *
+         * The provided gate must be a 2x2 unitary matrix. The target qubit index must
+         * be in the valid range of the circuit's qubits.
+         *
+         * @param gate A 2x2 unitary matrix representing the single-qubit quantum gate.
+         * @param targetQubit The index of the target qubit where the gate will be applied.
+         * @throws std::invalid_argument If the gate is not a 2x2 matrix or if it is not unitary.
+         * @throws std::out_of_range If the target qubit index is outside the valid bounds of the circuit.
+         */
         void addSingleQubitGate(math::ComplexMatrix gate, std::size_t targetQubit);
 
+        /**
+         * Adds a full-register quantum gate to the circuit.
+         * A full-register gate operates on all qubits of the circuit simultaneously.
+         * The gate must have dimensions matching the size of the circuit state space
+         * (2^qubitCount) and must be a unitary matrix.
+         *
+         * @param gate The complex-valued matrix representing the full-register gate.
+         *             The matrix dimensions must be 2^qubitCount x 2^qubitCount, and
+         *             it must satisfy the property of being unitary.
+         * @throws std::invalid_argument if the gate dimensions do not match the circuit
+         *         state count or if the gate is not unitary.
+         */
         void addFullRegisterGate(math::ComplexMatrix gate);
 
+        /**
+         * Retrieves the total number of instructions added to the quantum circuit.
+         *
+         * @return The number of instructions currently present in the quantum circuit.
+         */
         [[nodiscard]] std::size_t instructionCount() const noexcept;
 
+        /**
+         * Executes the primary operation or process defined by the method's implementation.
+         *
+         * @return A boolean value indicating the success or failure of the execution.
+         */
         [[nodiscard]] quantum::QuantumRegister execute(const quantum::QuantumRegister &initialState) const;
 
+        /**
+         * Simulates multiple measurement shots on the quantum circuit starting from an initial quantum state.
+         * Each shot involves executing the circuit, collapsing the quantum state with a measurement,
+         * and counting the occurrences of measured states over all shots.
+         *
+         * @param initialState The initial quantum state as a QuantumRegister.
+         * @param shotCount The number of measurement shots to simulate.
+         * @param randomEngine The random number generator used for sampling during measurement.
+         * @return A vector where each element represents the number of occurrences of the corresponding state
+         *         after simulating the specified number of shots.
+         */
         [[nodiscard]] std::vector<std::size_t> runShots(const quantum::QuantumRegister &initialState,
                                                         std::size_t shotCount, std::mt19937 &randomEngine) const;
 
+        /**
+         *
+         */
     private:
         struct SingleQubitInstruction {
+            /**
+             * A complex matrix representing a single-qubit quantum gate.
+             *
+             * This matrix defines the transformation applied to the quantum state
+             * of a single qubit during the execution of a quantum circuit.
+             */
             math::ComplexMatrix gate;
+            /**
+             *
+             */
             std::size_t targetQubit;
         };
 
+        /**
+         * A structure representing an instruction that applies a full-register quantum gate
+         * to a quantum circuit.
+         *
+         * A full-register quantum gate operates on all qubits within the circuit simultaneously.
+         * The gate is represented as a complex-valued matrix with dimensions matching the state
+         * space size of the circuit, which is 2^qubitCount x 2^qubitCount, where qubitCount
+         * is the total number of qubits in the circuit. The matrix must satisfy the property
+         * of being unitary.
+         */
         struct FullRegisterInstruction {
+            /**
+             *
+             */
             math::ComplexMatrix gate;
         };
 
         using Instruction = std::variant<SingleQubitInstruction, FullRegisterInstruction>;
 
+        /**
+         * Stores the number of qubits in the quantum circuit.
+         *
+         * This variable defines the size of the quantum system and is used to validate
+         * operations such as gate applications and circuit manipulations. The value must be a
+         * positive integer greater than zero and remains constant for the lifetime of the
+         * QuantumCircuit instance.
+         */
         std::size_t qubitCount_;
+        /**
+         * A container for storing the sequence of quantum instructions in the circuit.
+         *
+         * This vector holds a collection of quantum instructions, where each instruction
+         * can either represent a single-qubit gate operation or a full-register gate operation.
+         * The stored instructions define the transformations applied to the quantum state
+         * of the circuit.
+         *
+         * The `Instruction` type is a variant that can encapsulate one of the following:
+         * - `SingleQubitInstruction`: Represents a gate operation applied to a single qubit.
+         * - `FullRegisterInstruction`: Represents a gate operation applied to all qubits in the circuit.
+         *
+         * Instructions are added to this container when gates are applied using the appropriate
+         * methods in the QuantumCircuit class. The sequence in which instructions are stored
+         * corresponds to the order in which the gates were applied.
+         */
         std::vector<Instruction> instructions_;
     };
 }

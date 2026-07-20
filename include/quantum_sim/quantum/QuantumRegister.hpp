@@ -10,6 +10,12 @@
 
 
 namespace quantum_sim::quantum {
+    struct StateInfo {
+        std::string label;
+        math::Complex amplitude;
+        double probability;
+    };
+
     /**
      * Represents a quantum register composed of qubits, enabling the simulation and manipulation
      * of quantum states through operations such as quantum gates.
@@ -159,7 +165,17 @@ namespace quantum_sim::quantum {
          */
         [[nodiscard]] static QuantumRegister basisState(std::size_t qubitCount, std::size_t stateIndex);
 
+        /**
+         * Generates a string representation of a basis state for the quantum register.
+         *
+         * @param stateIndex The index of the basis state to label.
+         * @return A string label representing the basis state, formatted as "|...>" where each
+         *         character within represents the state of a qubit ('0' or '1').
+         * @throws std::out_of_range If the provided state index exceeds the valid range of basis states.
+         */
         [[nodiscard]] std::string basisStateLabel(std::size_t stateIndex) const;
+
+        [[nodiscard]] StateInfo stateInfo(std::size_t stateIndex) const;
 
     private:
         /**

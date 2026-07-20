@@ -1,11 +1,10 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
+#include "quantum_sim/gates/QuantumGates.hpp"
 
 #include <cmath>
 #include <stdexcept>
 #include <vector>
 #include <utility>
-
-#include "quantum_sim/gates/QuantumGates.hpp"
 
 namespace quantum_sim::quantum {
     QuantumRegister::QuantumRegister(std::size_t qubitCount, math::ComplexVector amplitudes)
@@ -234,5 +233,13 @@ namespace quantum_sim::quantum {
         label += ">";
 
         return label;
+    }
+
+    StateInfo QuantumRegister::stateInfo(std::size_t stateIndex) const {
+        return StateInfo{
+            basisStateLabel(stateIndex),
+            amplitude(stateIndex),
+            probability(stateIndex)
+        };
     }
 }

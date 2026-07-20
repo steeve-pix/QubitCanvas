@@ -36,12 +36,40 @@ namespace {
 } //
 
 int main() {
-    const QuantumRegister threeQubits =
-            QuantumRegister::basisState(3, 5);
+    QuantumCircuit circuit{2};
+
+    const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
+
+    circuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
+    circuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
+
+    const QuantumRegister bellState = circuit.execute(initialState);
+
+    const quantum_sim::quantum::StateInfo info00 = bellState.stateInfo(0);
 
     check(
-        threeQubits.basisStateLabel(5) == "|101>",
-        "state index zero is labeled 00"
+        info00.label == "|00>",
+        "state info contains the basis state label"
+    );
+
+    check(
+        approximatelyEqual(info00.probability, 0.5),
+        "state info contains the basis state probability"
+    );
+
+    const double expectedAmplitude =
+            1.0 / std::sqrt(2.0);
+
+    check(
+        approximatelyEqual(
+            info00.amplitude.real(),
+            expectedAmplitude
+        ) &&
+        approximatelyEqual(
+            info00.amplitude.imaginary(),
+            0.0
+        ),
+        "state info contains the complex amplitude"
     );
 
     if (failures == 0) {
