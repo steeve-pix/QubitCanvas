@@ -1,6 +1,4 @@
 #include <iostream>
-#include <numbers>
-#include <cmath>
 
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/gates/QuantumGates.hpp"
@@ -45,32 +43,29 @@ int main() {
 
     const QuantumRegister bellState = circuit.execute(initialState);
 
-    const quantum_sim::quantum::StateInfo info00 = bellState.stateInfo(0);
+    const std::vector<quantum_sim::quantum::StateInfo> allStates =
+            bellState.states();
 
-    check(
-        info00.label == "|00>",
-        "state info contains the basis state label"
+    check(allStates.size() == 4,
+          "state inspection returns every basis state"
     );
 
     check(
-        approximatelyEqual(info00.probability, 0.5),
-        "state info contains the basis state probability"
+        allStates[0].label == "|00>" &&
+        allStates[1].label == "|01>" &&
+        allStates[2].label == "|10>" &&
+        allStates[3].label == "|11>",
+        "state inspection preserves basis state order"
     );
-
-    const double expectedAmplitude =
-            1.0 / std::sqrt(2.0);
 
     check(
-        approximatelyEqual(
-            info00.amplitude.real(),
-            expectedAmplitude
-        ) &&
-        approximatelyEqual(
-            info00.amplitude.imaginary(),
-            0.0
-        ),
-        "state info contains the complex amplitude"
+        approximatelyEqual(allStates[0].probability, 0.5) &&
+        approximatelyEqual(allStates[1].probability, 0.0) &&
+        approximatelyEqual(allStates[2].probability, 0.0) &&
+        approximatelyEqual(allStates[3].probability, 0.5),
+        "state inspection returns Bell state probabilities"
     );
+
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";

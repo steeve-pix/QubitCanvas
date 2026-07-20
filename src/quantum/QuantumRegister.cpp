@@ -242,4 +242,15 @@ namespace quantum_sim::quantum {
             probability(stateIndex)
         };
     }
+
+    std::vector<StateInfo> QuantumRegister::states() const {
+        std::vector<StateInfo> result;
+        result.reserve(stateCount());
+
+        for (std::size_t stateIndex{}; stateIndex < stateCount(); ++stateIndex) {
+            result.push_back(stateInfo(stateIndex));
+        }
+
+        return result;
+    }
 }

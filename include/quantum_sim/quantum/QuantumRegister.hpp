@@ -177,6 +177,8 @@ namespace quantum_sim::quantum {
 
         [[nodiscard]] StateInfo stateInfo(std::size_t stateIndex) const;
 
+        [[nodiscard]] std::vector<StateInfo> states() const;
+
     private:
         /**
          * @brief Stores the number of qubits in the quantum register.
