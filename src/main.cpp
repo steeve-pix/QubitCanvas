@@ -15,8 +15,8 @@ int main() {
 
     QuantumCircuit bellCircuit{2};
 
-    bellCircuit.addSingleQubitGate("Hadamard Gate", quantum_sim::gates::hadamardGate(), 0);
-    bellCircuit.addFullRegisterGate("CNOT Gate", quantum_sim::gates::cnotGate());
+    bellCircuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), 0);
+    bellCircuit.addFullRegisterGate("CNOT", quantum_sim::gates::cnotGate());
 
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
@@ -38,11 +38,20 @@ int main() {
 
     quantum_sim::visualization::printShotBars(bellState, counts, std::cout);
 
+    std::cout << "----------------------------------------------------\n";
+
     const std::vector<quantum_sim::circuit::TraceStep> trace =
             bellCircuit.executeWithTrace(initialState);
-    std::cout << "----------------------------------------------------" << std::endl;
+
     std::cout << "Circuit execution trace:\n\n";
     quantum_sim::visualization::printExecutionTrace(initialState, trace, std::cout);
+
+    std::cout << "----------------------------------------------------\n";
+    std::cout << "Circuit diagram:\n";
+
+    quantum_sim::visualization::printCircuitDiagram(bellCircuit, std::cout);
+
+    std::cout << '\n';
 
     return 0;
 }
