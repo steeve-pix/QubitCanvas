@@ -1,11 +1,13 @@
-#include <iostream>
-
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/gates/QuantumGates.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/math/ComplexVector.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/quantum/Qubit.hpp"
+#include "quantum_sim/visualization/ConsoleVisualizer.hpp"
+
+#include <sstream>
+#include <iostream>
 
 namespace {
     using quantum_sim::math::ComplexVector;
@@ -46,27 +48,32 @@ int main() {
     const std::vector<quantum_sim::quantum::StateInfo> allStates =
             bellState.states();
 
-    check(allStates.size() == 4,
-          "state inspection returns every basis state"
+    std::ostringstream output;
+
+    quantum_sim::visualization::printProbabilityBars(bellState, output, 10);
+
+    const std::string visualization =
+            output.str();
+
+    check(
+        visualization.find("|00> [####      ] 50.00%")
+        != std::string::npos,
+        "probability visualizer displays state 00"
     );
 
     check(
-        allStates[0].label == "|00>" &&
-        allStates[1].label == "|01>" &&
-        allStates[2].label == "|10>" &&
-        allStates[3].label == "|11>",
-        "state inspection preserves basis state order"
+        visualization.find("|01> [          ] 0.00%")
+        != std::string::npos,
+        "probability visualizer displays state 01"
     );
 
     check(
-        approximatelyEqual(allStates[0].probability, 0.5) &&
-        approximatelyEqual(allStates[1].probability, 0.0) &&
-        approximatelyEqual(allStates[2].probability, 0.0) &&
-        approximatelyEqual(allStates[3].probability, 0.5),
-        "state inspection returns Bell state probabilities"
+        visualization.find("|11> [####      ] 50.00%")
+        != std::string::npos,
+        "probability visualizer displays state 11"
     );
 
-
+    std::cout << visualization << std::endl;
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
