@@ -36,37 +36,25 @@ namespace {
         }
     }
 } //
-
 int main() {
-    const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
+    const QuantumRegister initialState = QuantumRegister::basisState(3, 0);
 
-    const QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
+    const QuantumCircuit circuit = quantum_sim::algorithms::equalSuperpositionCircuit(3);
 
-    const QuantumRegister result = bellCircuit.execute(initialState);
+    const QuantumRegister result = circuit.execute(initialState);
 
-    const std::vector<quantum_sim::circuit::CircuitInstructionInfo> instructions =
-            bellCircuit.instructionInfo();
+    bool allProbabilitiesEqual = true;
 
-    check(
-        bellCircuit.qubitCount() == 2,
-        "Bell algorithm creates a two-qubit circuit"
-    );
-
-    check(
-        bellCircuit.instructionCount() == 2,
-        "Bell algorithm contains two instructions"
-    );
+    for (std::size_t state{}; state < result.stateCount(); ++state) {
+        if (!approximatelyEqual(result.probability(state), 0.125)) {
+            allProbabilitiesEqual = false;
+            break;
+        }
+    }
 
     check(
-        approximatelyEqual(result.probability(0), 0.5) &&
-        approximatelyEqual(result.probability(3), 0.5),
-        "Bell algorithm creates equal probabilities for 00 and 11"
-    );
-
-    check(
-        approximatelyEqual(result.probability(1), 0.0) &&
-        approximatelyEqual(result.probability(2), 0.0),
-        "Bell algorithm removes probabilities for 01 and 10"
+        allProbabilitiesEqual,
+        "Equal-superposition circuit distributes probability equally"
     );
 
     if (failures == 0) {

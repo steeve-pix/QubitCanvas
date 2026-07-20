@@ -11,4 +11,14 @@ namespace quantum_sim::algorithms {
 
         return circuit;
     }
+
+    circuit::QuantumCircuit equalSuperpositionCircuit(std::size_t qubitCount) {
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
+            circuit.addSingleQubitGate("H", gates::hadamardGate(), qubit);
+        }
+        
+        return circuit;
+    }
 }
