@@ -7,6 +7,7 @@
 #include <random>
 
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
+#include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 
 int main() {
     using quantum_sim::circuit::QuantumCircuit;
@@ -26,23 +27,20 @@ int main() {
 
     const QuantumRegister bellState = bellCircuit.execute(initialState);
 
+    std::cout << "Theoretical probabilities:\n";
+
+    quantum_sim::visualization::printProbabilityBars(bellState, std::cout);
+
     const std::vector<std::size_t> counts =
             bellCircuit.runShots(initialState, shotCount, randomEngine);
 
-    std::cout << "State vector:\n";
+    std::cout << "\nObserved shot results:\n";
 
-    for (const auto &state: bellState.states()) {
-        std::cout << state.label << "  amplitude: " << state.amplitude.real();
-
-        if (state.amplitude.imaginary() >= 0.0) {
-            std::cout << " + ";
-        } else {
-            std::cout << " - ";
-        }
-
-        std::cout << std::abs(state.amplitude.imaginary()) << "i" << "  probability: " << state.probability * 100.0 <<
-                "%\n";
-    }
+    quantum_sim::visualization::printShotBars(
+        bellState,
+        counts,
+        std::cout
+    );
 
     return 0;
 }

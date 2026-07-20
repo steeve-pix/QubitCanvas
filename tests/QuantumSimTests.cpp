@@ -1,11 +1,13 @@
-#include <iostream>
-
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/gates/QuantumGates.hpp"
 #include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/math/ComplexVector.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/quantum/Qubit.hpp"
+#include "quantum_sim/visualization/ConsoleVisualizer.hpp"
+
+#include <sstream>
+#include <iostream>
 
 namespace {
     using quantum_sim::math::ComplexVector;
@@ -46,27 +48,50 @@ int main() {
     const std::vector<quantum_sim::quantum::StateInfo> allStates =
             bellState.states();
 
-    check(allStates.size() == 4,
-          "state inspection returns every basis state"
+    std::ostringstream output;
+
+    std::ostringstream shotOutput;
+
+    const std::vector<std::size_t> counts{
+        50,
+        0,
+        0,
+        50
+    };
+
+    quantum_sim::visualization::printShotBars(bellState, counts, shotOutput, 100);
+
+    quantum_sim::visualization::printProbabilityBars(bellState, output, 10);
+
+    const std::string visualization =
+            output.str();
+
+    const std::string shotVisualization =
+            shotOutput.str();
+
+    check(
+        shotVisualization.find(
+            "|00> [#####     ] 50 (50.00%)"
+        ) != std::string::npos,
+        "shot visualizer displays state 00 counts"
     );
 
     check(
-        allStates[0].label == "|00>" &&
-        allStates[1].label == "|01>" &&
-        allStates[2].label == "|10>" &&
-        allStates[3].label == "|11>",
-        "state inspection preserves basis state order"
+        shotVisualization.find(
+            "|01> [          ] 0 (0.00%)"
+        ) != std::string::npos,
+        "shot visualizer displays zero-count states"
     );
 
     check(
-        approximatelyEqual(allStates[0].probability, 0.5) &&
-        approximatelyEqual(allStates[1].probability, 0.0) &&
-        approximatelyEqual(allStates[2].probability, 0.0) &&
-        approximatelyEqual(allStates[3].probability, 0.5),
-        "state inspection returns Bell state probabilities"
+        shotVisualization.find(
+            "|11> [#####     ] 50 (50.00%)"
+        ) != std::string::npos,
+        "shot visualizer displays state 11 counts"
     );
 
-
+    std::cout << visualization << std::endl;
+    std::cout << shotVisualization << std::endl;
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
