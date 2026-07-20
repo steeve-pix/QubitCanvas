@@ -39,8 +39,8 @@ int main() {
     QuantumCircuit bellCircuit{2};
 
 
-    bellCircuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-    bellCircuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
+    bellCircuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), 0);
+    bellCircuit.addFullRegisterGate("CNOT", quantum_sim::gates::cnotGate());
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
 
@@ -92,13 +92,13 @@ int main() {
 
     check(
         trace[0].description ==
-        "Single-qubit gate on qubit 0",
+        "H on qubit 0",
         "trace describes the single-qubit instruction"
     );
 
     check(
         trace[1].description ==
-        "Full-register gate",
+        "CNOT",
         "trace describes the full-register instruction"
     );
 

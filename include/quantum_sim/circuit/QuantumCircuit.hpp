@@ -49,7 +49,7 @@ namespace quantum_sim::circuit {
          * @throws std::invalid_argument If the gate is not a 2x2 matrix or if it is not unitary.
          * @throws std::out_of_range If the target qubit index is outside the valid bounds of the circuit.
          */
-        void addSingleQubitGate(math::ComplexMatrix gate, std::size_t targetQubit);
+        void addSingleQubitGate(std::string name, math::ComplexMatrix gate, std::size_t targetQubit);
 
         /**
          * Adds a full-register quantum gate to the circuit.
@@ -63,7 +63,7 @@ namespace quantum_sim::circuit {
          * @throws std::invalid_argument if the gate dimensions do not match the circuit
          *         state count or if the gate is not unitary.
          */
-        void addFullRegisterGate(math::ComplexMatrix gate);
+        void addFullRegisterGate(std::string name, math::ComplexMatrix gate);
 
         /**
          * Retrieves the total number of instructions added to the quantum circuit.
@@ -106,6 +106,13 @@ namespace quantum_sim::circuit {
     private:
         struct SingleQubitInstruction {
             /**
+             * A variable representing the name or identifier, typically used to store a label or title.
+             *
+             * This variable is commonly utilized as a general-purpose placeholder for textual content
+             * and may represent entity names, user inputs, or other string-based identifiers in a program.
+             */
+            std::string name;
+            /**
              * A complex matrix representing a single-qubit quantum gate.
              *
              * This matrix defines the transformation applied to the quantum state
@@ -113,7 +120,11 @@ namespace quantum_sim::circuit {
              */
             math::ComplexMatrix gate;
             /**
+             * The index of the target qubit on which a single-qubit quantum gate is applied.
              *
+             * This variable specifies the qubit in the quantum register to which the gate
+             * operation defined by the instruction applies. The index corresponds to the
+             * position of the qubit within the quantum circuit.
              */
             std::size_t targetQubit;
         };
@@ -130,7 +141,18 @@ namespace quantum_sim::circuit {
          */
         struct FullRegisterInstruction {
             /**
+             * A string representing the name of the full register instruction.
              *
+             * This variable is used to identify or label the instruction, allowing for
+             * easier reference and clarity in quantum circuit operations.
+             */
+            std::string name;
+            /**
+             * A complex-valued matrix representing the quantum gate to be applied.
+             *
+             * This matrix defines the operation of the quantum gate on the quantum register.
+             * It encapsulates the mathematical transformation that the gate performs when
+             * executed as part of a quantum circuit.
              */
             math::ComplexMatrix gate;
         };
