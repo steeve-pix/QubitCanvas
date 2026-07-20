@@ -4,6 +4,7 @@
 #include <utility>
 #include <type_traits>
 #include <variant>
+#include <string>
 
 namespace quantum_sim::circuit {
     QuantumCircuit::QuantumCircuit(std::size_t qubitCount) : qubitCount_(qubitCount) {
@@ -87,5 +88,34 @@ namespace quantum_sim::circuit {
         }
 
         return counts;
+    }
+
+    std::vector<TraceStep> QuantumCircuit::executeWithTrace(const quantum::QuantumRegister &initialState) const {
+        if (initialState.qubitCount() != qubitCount_) {
+            throw std::invalid_argument{"Register qubit count must match the circuit qubit count."};
+        }
+
+        quantum::QuantumRegister currentState = initialState;
+        std::vector<TraceStep> trace;
+        trace.reserve(instructions_.size());
+        for (const Instruction &instruction: instructions_) {
+            std::visit([&currentState,&trace](const auto &actualInstruction) {
+                using InstructionType = std::decay_t<decltype(actualInstruction)>;
+
+                std::string description;
+
+                if constexpr (std::is_same_v<InstructionType, SingleQubitInstruction>) {
+                    currentState = currentState.applySingleQubitGate(actualInstruction.gate,
+                                                                     actualInstruction.targetQubit);
+                    description = "Single-qubit gate on qubit " + std::to_string(actualInstruction.targetQubit);
+                } else {
+                    currentState = currentState.applyGate(actualInstruction.gate);
+                    description = "Full-register gate";
+                }
+                trace.push_back(TraceStep{std::move(description), currentState});
+            }, instruction);
+        }
+
+        return trace;
     }
 }

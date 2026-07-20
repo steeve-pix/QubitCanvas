@@ -36,14 +36,18 @@ namespace {
 } //
 
 int main() {
-    QuantumCircuit circuit{2};
+    QuantumCircuit bellCircuit{2};
 
+
+    bellCircuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
+    bellCircuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
-    circuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-    circuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
 
-    const QuantumRegister bellState = circuit.execute(initialState);
+    const std::vector<quantum_sim::circuit::TraceStep> trace =
+            bellCircuit.executeWithTrace(initialState);
+
+    const QuantumRegister bellState = bellCircuit.execute(initialState);
 
     const std::vector<quantum_sim::quantum::StateInfo> allStates =
             bellState.states();
@@ -70,28 +74,34 @@ int main() {
             shotOutput.str();
 
     check(
-        shotVisualization.find(
-            "|00> [#####     ] 50 (50.00%)"
-        ) != std::string::npos,
-        "shot visualizer displays state 00 counts"
+        trace.size() == 2,
+        "execution trace contains one step per instruction"
     );
 
     check(
-        shotVisualization.find(
-            "|01> [          ] 0 (0.00%)"
-        ) != std::string::npos,
-        "shot visualizer displays zero-count states"
+        approximatelyEqual(trace[0].state.probability(0), 0.5) &&
+        approximatelyEqual(trace[0].state.probability(2), 0.5),
+        "first trace step contains the state after Hadamard"
     );
 
     check(
-        shotVisualization.find(
-            "|11> [#####     ] 50 (50.00%)"
-        ) != std::string::npos,
-        "shot visualizer displays state 11 counts"
+        approximatelyEqual(trace[1].state.probability(0), 0.5) &&
+        approximatelyEqual(trace[1].state.probability(3), 0.5),
+        "second trace step contains the state after CNOT"
     );
 
-    std::cout << visualization << std::endl;
-    std::cout << shotVisualization << std::endl;
+    check(
+        trace[0].description ==
+        "Single-qubit gate on qubit 0",
+        "trace describes the single-qubit instruction"
+    );
+
+    check(
+        trace[1].description ==
+        "Full-register gate",
+        "trace describes the full-register instruction"
+    );
+
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }

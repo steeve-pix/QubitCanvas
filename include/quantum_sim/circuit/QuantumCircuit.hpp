@@ -10,6 +10,11 @@
 #include <string>
 
 namespace quantum_sim::circuit {
+    struct TraceStep {
+        std::string description;
+        quantum::QuantumRegister state;
+    };
+
     /**
      * A class representing a quantum circuit that operates on a specified number of qubits.
      *
@@ -88,8 +93,15 @@ namespace quantum_sim::circuit {
         [[nodiscard]] std::vector<std::size_t> runShots(const quantum::QuantumRegister &initialState,
                                                         std::size_t shotCount, std::mt19937 &randomEngine) const;
 
+        [[nodiscard]] std::vector<TraceStep> executeWithTrace(const quantum::QuantumRegister &initialState) const;
+
         /**
+         * A structure representing an instruction for a single-qubit quantum gate.
          *
+         * This structure encapsulates a quantum gate, represented as a complex matrix,
+         * and the target qubit on which the gate is applied during the execution of
+         * a quantum circuit. It is used to define single-qubit operations within a
+         * quantum algorithm.
          */
     private:
         struct SingleQubitInstruction {
