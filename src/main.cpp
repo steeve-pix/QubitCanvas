@@ -23,14 +23,26 @@ int main() {
     std::mt19937 randomEngine{seedSource()};
 
     constexpr std::size_t shotCount = 1'000;
+
+    const QuantumRegister bellState = bellCircuit.execute(initialState);
+
     const std::vector<std::size_t> counts =
             bellCircuit.runShots(initialState, shotCount, randomEngine);
 
-    std::cout << "Shots: " << shotCount << '\n';
-    std::cout << "|00>: " << counts[0] << '\n';
-    std::cout << "|01>: " << counts[1] << '\n';
-    std::cout << "|10>: " << counts[2] << '\n';
-    std::cout << "|11>: " << counts[3] << '\n';
+    std::cout << "State vector:\n";
+
+    for (const auto &state: bellState.states()) {
+        std::cout << state.label << "  amplitude: " << state.amplitude.real();
+
+        if (state.amplitude.imaginary() >= 0.0) {
+            std::cout << " + ";
+        } else {
+            std::cout << " - ";
+        }
+
+        std::cout << std::abs(state.amplitude.imaginary()) << "i" << "  probability: " << state.probability * 100.0 <<
+                "%\n";
+    }
 
     return 0;
 }
