@@ -1,3 +1,4 @@
+#include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/gates/QuantumGates.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 
@@ -5,43 +6,31 @@
 #include <iostream>
 #include <random>
 
+#include "quantum_sim/circuit/QuantumCircuit.hpp"
+
 int main() {
-    using quantum_sim::quantum::MeasurementResult;
+    using quantum_sim::circuit::QuantumCircuit;
     using quantum_sim::quantum::QuantumRegister;
 
-    std::random_device seedSource;
+    QuantumCircuit bellCircuit{2};
+
+    bellCircuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
+    bellCircuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
+
+    const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
+
+    std::random_device seedSource{};
     std::mt19937 randomEngine{seedSource()};
 
     constexpr std::size_t shotCount = 1'000;
-
-    std::size_t bothZeroCount = 0;
-    std::size_t bothOneCount = 0;
-    std::size_t mismatchCount = 0;
-
-    for (std::size_t shot = 0; shot < shotCount; ++shot) {
-        const QuantumRegister register00 = QuantumRegister::basisState(2, 0);
-
-        const QuantumRegister afterHadamard = register00.applySingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-        QuantumRegister bellState = afterHadamard.applyGate(quantum_sim::gates::cnotGate());
-
-        const MeasurementResult first = bellState.measureQubit(0, randomEngine);
-        const MeasurementResult second = bellState.measureQubit(1, randomEngine);
-
-        if (first == MeasurementResult::Zero &&
-            second == MeasurementResult::Zero) {
-            ++bothZeroCount;
-        } else if (first == MeasurementResult::One &&
-                   second == MeasurementResult::One) {
-            ++bothOneCount;
-        } else {
-            ++mismatchCount;
-        }
-    }
+    const std::vector<std::size_t> counts =
+            bellCircuit.runShots(initialState, shotCount, randomEngine);
 
     std::cout << "Shots: " << shotCount << '\n';
-    std::cout << "Both zero:  " << bothZeroCount << '\n';
-    std::cout << "Both one:  " << bothOneCount << '\n';
-    std::cout << "Mismatch: " << mismatchCount << '\n';
+    std::cout << "|00>: " << counts[0] << '\n';
+    std::cout << "|01>: " << counts[1] << '\n';
+    std::cout << "|10>: " << counts[2] << '\n';
+    std::cout << "|11>: " << counts[3] << '\n';
 
     return 0;
 }
