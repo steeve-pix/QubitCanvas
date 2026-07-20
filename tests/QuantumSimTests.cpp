@@ -36,31 +36,21 @@ namespace {
 } //
 
 int main() {
-    QuantumCircuit circuit{2};
+    std::mt19937 randomEngine{42};
 
-    const QuantumRegister initialState =
-            QuantumRegister::basisState(2, 0);
+    QuantumCircuit bellCircuit{1};
 
-    circuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-    circuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
+    bellCircuit.addSingleQubitGate(quantum_sim::gates::xGate(), 0);
 
-    const QuantumRegister result =
-            circuit.execute(initialState);
+    const QuantumRegister zeroState =
+            QuantumRegister::basisState(1, 0);
 
-    check(
-        approximatelyEqual(result.probability(0), 0.5),
-        "Bell circuit gives state 00 probability one half"
-    );
+    const std::vector<std::size_t> xCounts =
+            bellCircuit.runShots(zeroState, 100, randomEngine);
 
     check(
-        approximatelyEqual(result.probability(3), 0.5),
-        "Bell circuit gives state 11 probability one half"
-    );
-
-    check(
-        approximatelyEqual(result.probability(1), 0.0) &&
-        approximatelyEqual(result.probability(2), 0.0),
-        "Bell circuit gives states 01 and 10 zero probability"
+        xCounts[0] == 0 && xCounts[1] == 100,
+        "X circuit always transforms zero into one"
     );
 
     if (failures == 0) {

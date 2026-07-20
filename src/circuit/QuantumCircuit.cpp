@@ -49,7 +49,7 @@ namespace quantum_sim::circuit {
         return instructions_.size();
     }
 
-    quantum::QuantumRegister QuantumCircuit::execute(const quantum::QuantumRegister &initialState) {
+    quantum::QuantumRegister QuantumCircuit::execute(const quantum::QuantumRegister &initialState) const {
         if (initialState.qubitCount() != qubitCount_) {
             throw std::invalid_argument{"Register qubit count must match the circuit qubit count."};
         }
@@ -73,5 +73,19 @@ namespace quantum_sim::circuit {
         }
 
         return currentState;
+    }
+
+    std::vector<std::size_t> QuantumCircuit::runShots(const quantum::QuantumRegister &initialState,
+                                                      std::size_t shotCount, std::mt19937 &randomEngine) const {
+        std::vector<std::size_t> counts(initialState.stateCount(), 0);
+
+        for (std::size_t shot = 0; shot < shotCount; ++shot) {
+            quantum::QuantumRegister result = execute(initialState);
+            const std::size_t measuredState = result.measure(randomEngine);
+
+            ++counts[measuredState];
+        }
+
+        return counts;
     }
 }

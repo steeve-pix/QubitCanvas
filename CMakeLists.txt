@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(QuantumComputer VERSION 0.1.0 LANGUAGES CXX)
+project(QubitCanvas VERSION 0.1.0 LANGUAGES CXX)
 
 include(CTest)
 
@@ -33,13 +33,13 @@ target_compile_features(quantum_sim_core PUBLIC cxx_std_20)
 enable_project_warnings(quantum_sim_core)
 
 # Main simulator application
-add_executable(quantum_sim
+add_executable(qubit_canvas
         src/main.cpp
 )
 
-target_link_libraries(quantum_sim PRIVATE quantum_sim_core)
+target_link_libraries(qubit_canvas PRIVATE quantum_sim_core)
 
-enable_project_warnings(quantum_sim)
+enable_project_warnings(qubit_canvas)
 
 # Automated tests
 if (BUILD_TESTING)
