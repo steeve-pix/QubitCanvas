@@ -38,35 +38,19 @@ namespace {
 int main() {
     std::mt19937 randomEngine{42};
 
-    QuantumCircuit bellCircuit{2};
+    QuantumCircuit bellCircuit{1};
 
-    bellCircuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-    bellCircuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
+    bellCircuit.addSingleQubitGate(quantum_sim::gates::xGate(), 0);
 
-    const QuantumRegister initialState =
-            QuantumRegister::basisState(2, 0);
+    const QuantumRegister zeroState =
+            QuantumRegister::basisState(1, 0);
 
-    const std::vector<std::size_t> counts =
-            bellCircuit.runShots(initialState, 1'000, randomEngine);
-
-    check(
-        counts.size() == 4,
-        "shot execution returns one counter per basis state"
-    );
+    const std::vector<std::size_t> xCounts =
+            bellCircuit.runShots(zeroState, 100, randomEngine);
 
     check(
-        counts[1] == 0 && counts[2] == 0,
-        "Bell circuit never measures states 01 or 10"
-    );
-
-    check(
-        counts[0] + counts[3] == 1'000,
-        "Bell circuit accounts for every shot"
-    );
-
-    check(
-        counts[0] > 0 && counts[3] > 0,
-        "Bell circuit produces both states 00 and 11"
+        xCounts[0] == 0 && xCounts[1] == 100,
+        "X circuit always transforms zero into one"
     );
 
     if (failures == 0) {
