@@ -16,7 +16,7 @@ int main() {
     QuantumCircuit bellCircuit{2};
 
     bellCircuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), 0);
-    bellCircuit.addFullRegisterGate("CNOT", quantum_sim::gates::cnotGate());
+    bellCircuit.addControlledGate("CNOT", quantum_sim::gates::cnotGate(), 0, 1);
 
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 

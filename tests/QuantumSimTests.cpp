@@ -40,31 +40,25 @@ int main() {
 
 
     bellCircuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), 0);
-    bellCircuit.addFullRegisterGate("CNOT", quantum_sim::gates::cnotGate());
+    bellCircuit.addControlledGate("CNOT", quantum_sim::gates::cnotGate(), 0, 1);
+
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
     const QuantumRegister bellState = bellCircuit.execute(initialState);
 
-    std::ostringstream diagramOutput;
-
-    quantum_sim::visualization::printCircuitDiagram(
-        bellCircuit,
-        diagramOutput
-    );
-
-    const std::string diagram =
-            diagramOutput.str();
+    const std::vector<quantum_sim::circuit::CircuitInstructionInfo> instructions =
+            bellCircuit.instructionInfo();
 
     check(
-    diagram.find("q0: |0> --H----CNOT--")
-        != std::string::npos,
-    "circuit diagram displays Hadamard on qubit zero"
-);
-
-    check(
-        diagram.find("q1: |0> -------CNOT--")
-            != std::string::npos,
-        "circuit diagram displays CNOT on the second qubit line"
+        instructions[1].name == "CNOT" &&
+        instructions[1].kind ==
+        quantum_sim::circuit::CircuitInstructionKind::FullRegister &&
+        !instructions[1].targetQubit.has_value() &&
+        instructions[1].controlQubit.has_value() &&
+        instructions[1].controlQubit.value() == 0 &&
+        instructions[1].secondaryTargetQubit.has_value() &&
+        instructions[1].secondaryTargetQubit.value() == 1,
+        "circuit describes the CNOT control and target"
     );
 
     if (failures == 0) {

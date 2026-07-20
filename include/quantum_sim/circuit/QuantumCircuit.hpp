@@ -45,6 +45,8 @@ namespace quantum_sim::circuit {
         std::string name;
         CircuitInstructionKind kind;
         std::optional<std::size_t> targetQubit;
+        std::optional<std::size_t> controlQubit;
+        std::optional<std::size_t> secondaryTargetQubit;
     };
 
     /**
@@ -129,6 +131,9 @@ namespace quantum_sim::circuit {
 
         [[nodiscard]] std::vector<CircuitInstructionInfo> instructionInfo() const;
 
+        void addControlledGate(std::string name, math::ComplexMatrix gate, std::size_t controlQubit,
+                               std::size_t targetQubit);
+
         /**
          * A structure representing an instruction for a single-qubit quantum gate.
          *
@@ -189,6 +194,8 @@ namespace quantum_sim::circuit {
              * executed as part of a quantum circuit.
              */
             math::ComplexMatrix gate;
+            std::optional<std::size_t> controlQubit;
+            std::optional<std::size_t> targetQubit;
         };
 
         using Instruction = std::variant<SingleQubitInstruction, FullRegisterInstruction>;

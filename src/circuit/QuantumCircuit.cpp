@@ -44,7 +44,12 @@ namespace quantum_sim::circuit {
             throw std::invalid_argument{"A quantum gate must be unitary."};
         }
 
-        instructions_.push_back(FullRegisterInstruction{std::move(name), std::move(gate)});
+        instructions_.push_back(FullRegisterInstruction{
+            std::move(name),
+            std::move(gate),
+            std::nullopt,
+            std::nullopt
+        });
     }
 
     std::size_t QuantumCircuit::instructionCount() const noexcept {
@@ -130,16 +135,53 @@ namespace quantum_sim::circuit {
 
                 if constexpr (std::is_same_v<InstructionType, SingleQubitInstruction>) {
                     result.push_back(CircuitInstructionInfo{
-                        actualInstruction.name, CircuitInstructionKind::SingleQubit, actualInstruction.targetQubit
+                        actualInstruction.name,
+                        CircuitInstructionKind::SingleQubit,
+                        actualInstruction.targetQubit,
+                        std::nullopt,
+                        std::nullopt
                     });
                 } else {
                     result.push_back(CircuitInstructionInfo{
-                        actualInstruction.name, CircuitInstructionKind::FullRegister, std::nullopt
+                        actualInstruction.name,
+                        CircuitInstructionKind::FullRegister,
+                        std::nullopt,
+                        actualInstruction.controlQubit,
+                        actualInstruction.targetQubit
                     });
                 }
             }, instruction);
         }
 
         return result;
+    }
+
+    void QuantumCircuit::addControlledGate(std::string name, math::ComplexMatrix gate, std::size_t controlQubit,
+                                           std::size_t targetQubit) {
+        if (controlQubit >= qubitCount_ || targetQubit >= qubitCount_) {
+            throw std::out_of_range{"Controlled-gate qubit index is outside the circuit."};
+        }
+        if (controlQubit == targetQubit) {
+            throw std::invalid_argument{"Control and target qubits must be different."};
+        }
+
+        const std::size_t expectedSize =
+                std::size_t{1} << qubitCount_;
+
+        if (gate.rows() != expectedSize || gate.columns() != expectedSize) {
+            throw std::invalid_argument{"Controlled-gate dimensions must match the circuit state count."};
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{"A quantum gate must be unitary."};
+        }
+
+        instructions_.push_back(
+            FullRegisterInstruction{
+                std::move(name),
+                std::move(gate),
+                controlQubit,
+                targetQubit
+            });
     }
 }
