@@ -42,10 +42,49 @@ namespace quantum_sim::circuit {
     };
 
     struct CircuitInstructionInfo {
+        /**
+         * Represents the name or identifier associated with an entity or object.
+         *
+         * This variable is used to store a textual label or designation
+         * that uniquely identifies or describes the corresponding instance.
+         */
         std::string name;
+        /**
+         * Represents a classification or category identifier used to differentiate or group items.
+         *
+         * This variable is typically used to specify or determine the type, nature,
+         * or purpose of an entity in a given context.
+         */
         CircuitInstructionKind kind;
+        /**
+         * Specifies the target qubit for a quantum operation within a quantum circuit.
+         *
+         * This variable is used to identify the qubit on which a single-qubit gate
+         * or operation is applied. If no target qubit is specified, it indicates
+         * that the operation does not involve a specific qubit or is not a single-qubit
+         * operation.
+         *
+         * The value is optional to account for operations that may not require a target
+         * qubit, such as full-register operations or measurements involving multiple qubits.
+         */
         std::optional<std::size_t> targetQubit;
+        /**
+         * Represents the optional index of the control qubit in a quantum circuit operation.
+         *
+         * This variable denotes the qubit that acts as the control for a controlled quantum gate,
+         * such as a CNOT or controlled phase gate. If the value is present, it specifies the index
+         * of the control qubit within the circuit. Otherwise, the operation does not have a control qubit.
+         */
         std::optional<std::size_t> controlQubit;
+        /**
+         * Represents an optional secondary target qubit in a quantum operation.
+         *
+         * This variable is used in quantum circuits to specify a secondary
+         * target qubit that is involved in multi-qubit operations, such as
+         * controlled gates (e.g., CNOT). When set, it identifies the index
+         * of the additional qubit required by the operation. If nullopt, no
+         * secondary target qubit is involved.
+         */
         std::optional<std::size_t> secondaryTargetQubit;
     };
 
@@ -127,10 +166,58 @@ namespace quantum_sim::circuit {
         [[nodiscard]] std::vector<std::size_t> runShots(const quantum::QuantumRegister &initialState,
                                                         std::size_t shotCount, std::mt19937 &randomEngine) const;
 
+        /**
+         * Executes the quantum circuit on a given initial quantum register and returns
+         * a detailed execution trace of the process.
+         *
+         * This method processes each instruction in the circuit, applying it to the
+         * quantum register, and records the sequential steps in the form of a trace.
+         * Each trace step includes a description of the operation performed and the
+         * corresponding quantum state after the operation.
+         *
+         * @param initialState The initial quantum register to be used as the starting
+         *                     state for the execution of the circuit. The number of
+         *                     qubits in this register must match the circuit's
+         *                     qubit count, or an exception will be thrown.
+         * @return A vector of `TraceStep` objects, where each object represents an
+         *         individual operation performed during circuit execution along with
+         *         the resulting quantum state.
+         * @throws std::invalid_argument If the number of qubits in the initial state
+         *                                does not match the qubit count of the circuit.
+         */
         [[nodiscard]] std::vector<TraceStep> executeWithTrace(const quantum::QuantumRegister &initialState) const;
 
+        /**
+         * Retrieves detailed information about the instructions in the quantum circuit.
+         *
+         * This method processes all instructions contained within the quantum circuit and
+         * compiles a vector of CircuitInstructionInfo objects, each representing a single
+         * instruction with its associated metadata. The type of instruction (e.g., single-qubit
+         * or full-register operation) and relevant parameters such as target and control qubits
+         * are included in the result.
+         *
+         * @return A vector of CircuitInstructionInfo objects, each containing metadata about
+         *         an individual instruction in the quantum circuit.
+         */
         [[nodiscard]] std::vector<CircuitInstructionInfo> instructionInfo() const;
 
+        /**
+         * Adds a controlled quantum gate to the circuit.
+         *
+         * This method appends a controlled quantum gate operation to the circuit's list of instructions.
+         * A controlled gate applies the specified unitary transformation to the target qubit
+         * only when the control qubit is in the specified state.
+         *
+         * @param name The name of the controlled gate.
+         * @param gate A unitary matrix defining the transformation of the controlled gate.
+         * @param controlQubit The index of the control qubit in the circuit.
+         * @param targetQubit The index of the target qubit for the gate.
+         *
+         * @throws std::out_of_range If the control or target qubit index exceeds the number of qubits in the circuit.
+         * @throws std::invalid_argument If the control qubit is the same as the target qubit.
+         * @throws std::invalid_argument If the dimensions of the matrix do not match the size of the circuit's state.
+         * @throws std::invalid_argument If the matrix is not unitary.
+         */
         void addControlledGate(std::string name, math::ComplexMatrix gate, std::size_t controlQubit,
                                std::size_t targetQubit);
 
@@ -194,7 +281,22 @@ namespace quantum_sim::circuit {
              * executed as part of a quantum circuit.
              */
             math::ComplexMatrix gate;
+            /**
+             * Represents the control qubit for a quantum gate in a quantum circuit.
+             *
+             * This variable optionally specifies the index of the qubit that acts as the control
+             * in a controlled quantum operation. If a value is present, the gate is conditional
+             * on the state of the specified qubit. If no value is present, the operation is
+             * performed without a control qubit.
+             */
             std::optional<std::size_t> controlQubit;
+            /**
+             * Represents the target qubit for a quantum gate operation in a quantum circuit.
+             *
+             * This optional variable identifies the specific qubit on which a single-qubit gate
+             * is applied. If the value is not set, it indicates that the operation does not
+             * target a specific qubit or applies to all qubits in the register.
+             */
             std::optional<std::size_t> targetQubit;
         };
 

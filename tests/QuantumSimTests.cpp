@@ -9,6 +9,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
+
 namespace {
     using quantum_sim::math::ComplexVector;
     using quantum_sim::math::ComplexMatrix;
@@ -36,29 +38,35 @@ namespace {
 } //
 
 int main() {
-    QuantumCircuit bellCircuit{2};
-
-
-    bellCircuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), 0);
-    bellCircuit.addControlledGate("CNOT", quantum_sim::gates::cnotGate(), 0, 1);
-
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
-    const QuantumRegister bellState = bellCircuit.execute(initialState);
+    const QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
+
+    const QuantumRegister result = bellCircuit.execute(initialState);
 
     const std::vector<quantum_sim::circuit::CircuitInstructionInfo> instructions =
             bellCircuit.instructionInfo();
 
     check(
-        instructions[1].name == "CNOT" &&
-        instructions[1].kind ==
-        quantum_sim::circuit::CircuitInstructionKind::FullRegister &&
-        !instructions[1].targetQubit.has_value() &&
-        instructions[1].controlQubit.has_value() &&
-        instructions[1].controlQubit.value() == 0 &&
-        instructions[1].secondaryTargetQubit.has_value() &&
-        instructions[1].secondaryTargetQubit.value() == 1,
-        "circuit describes the CNOT control and target"
+        bellCircuit.qubitCount() == 2,
+        "Bell algorithm creates a two-qubit circuit"
+    );
+
+    check(
+        bellCircuit.instructionCount() == 2,
+        "Bell algorithm contains two instructions"
+    );
+
+    check(
+        approximatelyEqual(result.probability(0), 0.5) &&
+        approximatelyEqual(result.probability(3), 0.5),
+        "Bell algorithm creates equal probabilities for 00 and 11"
+    );
+
+    check(
+        approximatelyEqual(result.probability(1), 0.0) &&
+        approximatelyEqual(result.probability(2), 0.0),
+        "Bell algorithm removes probabilities for 01 and 10"
     );
 
     if (failures == 0) {
