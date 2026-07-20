@@ -36,21 +36,12 @@ namespace {
 } //
 
 int main() {
-    std::mt19937 randomEngine{42};
-
-    QuantumCircuit bellCircuit{1};
-
-    bellCircuit.addSingleQubitGate(quantum_sim::gates::xGate(), 0);
-
-    const QuantumRegister zeroState =
-            QuantumRegister::basisState(1, 0);
-
-    const std::vector<std::size_t> xCounts =
-            bellCircuit.runShots(zeroState, 100, randomEngine);
+    const QuantumRegister threeQubits =
+            QuantumRegister::basisState(3, 5);
 
     check(
-        xCounts[0] == 0 && xCounts[1] == 100,
-        "X circuit always transforms zero into one"
+        threeQubits.basisStateLabel(5) == "|101>",
+        "state index zero is labeled 00"
     );
 
     if (failures == 0) {

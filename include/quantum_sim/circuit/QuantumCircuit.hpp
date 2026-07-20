@@ -7,6 +7,7 @@
 #include <vector>
 #include <variant>
 #include <random>
+#include <string>
 
 namespace quantum_sim::circuit {
     class QuantumCircuit final {

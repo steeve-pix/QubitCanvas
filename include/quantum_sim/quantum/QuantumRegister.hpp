@@ -159,6 +159,8 @@ namespace quantum_sim::quantum {
          */
         [[nodiscard]] static QuantumRegister basisState(std::size_t qubitCount, std::size_t stateIndex);
 
+        [[nodiscard]] std::string basisStateLabel(std::size_t stateIndex) const;
+
     private:
         /**
          * @brief Stores the number of qubits in the quantum register.

@@ -219,4 +219,20 @@ namespace quantum_sim::quantum {
 
         return QuantumRegister{qubitCount, math::ComplexVector{std::move(values)}};
     }
+
+    std::string QuantumRegister::basisStateLabel(std::size_t stateIndex) const {
+        if (stateIndex >= stateCount()) {
+            throw std::out_of_range{"Basis state index is outside the register"};
+        }
+
+        std::string label{"|"};
+        for (std::size_t qubit = 0; qubit < qubitCount_; ++qubit) {
+            const bool isOne = stateHasQubitOne(stateIndex, qubit);
+
+            label += isOne ? '1' : '0';
+        }
+        label += ">";
+
+        return label;
+    }
 }
