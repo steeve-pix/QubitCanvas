@@ -111,14 +111,38 @@ namespace quantum_sim::visualization {
                         output << "-----";
                     }
                 } else {
-                    output
-                            << "--"
-                            << instruction.name
-                            << "--";
+                    if (instruction.controlQubit.has_value() && instruction.secondaryTargetQubit.has_value()) {
+                        if (qubit == instruction.controlQubit.value()) {
+                            output << "--C--";
+                        } else if (
+                            qubit ==
+                            instruction.secondaryTargetQubit.value()
+                        ) {
+                            output << "--X--";
+                        } else {
+                            output << "-----";
+                        }
+                    } else {
+                        output
+                                << "--"
+                                << instruction.name
+                                << "--";
+                    }
                 }
             }
 
             output << '\n';
+        }
+
+        for (const circuit::CircuitInstructionInfo &instruction: instructions) {
+            if (instruction.controlQubit.has_value() && instruction.secondaryTargetQubit.has_value()) {
+                output
+                        << "            control q"
+                        << instruction.controlQubit.value()
+                        << " --> target q"
+                        << instruction.secondaryTargetQubit.value()
+                        << '\n';
+            }
         }
     }
 }
