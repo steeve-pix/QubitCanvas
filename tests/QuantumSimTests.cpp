@@ -50,30 +50,48 @@ int main() {
 
     std::ostringstream output;
 
+    std::ostringstream shotOutput;
+
+    const std::vector<std::size_t> counts{
+        50,
+        0,
+        0,
+        50
+    };
+
+    quantum_sim::visualization::printShotBars(bellState, counts, shotOutput, 100);
+
     quantum_sim::visualization::printProbabilityBars(bellState, output, 10);
 
     const std::string visualization =
             output.str();
 
+    const std::string shotVisualization =
+            shotOutput.str();
+
     check(
-        visualization.find("|00> [####      ] 50.00%")
-        != std::string::npos,
-        "probability visualizer displays state 00"
+        shotVisualization.find(
+            "|00> [#####     ] 50 (50.00%)"
+        ) != std::string::npos,
+        "shot visualizer displays state 00 counts"
     );
 
     check(
-        visualization.find("|01> [          ] 0.00%")
-        != std::string::npos,
-        "probability visualizer displays state 01"
+        shotVisualization.find(
+            "|01> [          ] 0 (0.00%)"
+        ) != std::string::npos,
+        "shot visualizer displays zero-count states"
     );
 
     check(
-        visualization.find("|11> [####      ] 50.00%")
-        != std::string::npos,
-        "probability visualizer displays state 11"
+        shotVisualization.find(
+            "|11> [#####     ] 50 (50.00%)"
+        ) != std::string::npos,
+        "shot visualizer displays state 11 counts"
     );
 
     std::cout << visualization << std::endl;
+    std::cout << shotVisualization << std::endl;
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
