@@ -28,6 +28,8 @@ add_library(quantum_sim_core
         src/visualization/ConsoleVisualizer.cpp
 
         src/algorithms/QuantumAlgorithms.cpp
+
+        src/debug/InteractiveCircuitDebugger.cpp
 )
 
 target_include_directories(quantum_sim_core PUBLIC "${PROJECT_SOURCE_DIR}/include")

@@ -8,46 +8,35 @@
 
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
+#include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 
 int main() {
     using quantum_sim::circuit::QuantumCircuit;
     using quantum_sim::quantum::QuantumRegister;
 
-    const QuantumCircuit result = quantum_sim::algorithms::equalSuperpositionCircuit(3);
+    const QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
 
-    const QuantumRegister initialState = QuantumRegister::basisState(3, 0);
+    const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
     std::random_device seedSource{};
     std::mt19937 randomEngine{seedSource()};
 
     constexpr std::size_t shotCount = 1'000;
 
-    const QuantumRegister superpositionState = result.execute(initialState);
-
-    std::cout << "Theoretical probabilities:\n";
-
-    quantum_sim::visualization::printProbabilityBars(superpositionState, std::cout);
-
-    const std::vector<std::size_t> counts =
-            result.runShots(initialState, shotCount, randomEngine);
-
-    std::cout << "\nObserved shot results:\n";
-
-    quantum_sim::visualization::printShotBars(superpositionState, counts, std::cout);
-
-    std::cout << "----------------------------------------------------\n";
+    const QuantumRegister bellState = bellCircuit.execute(initialState);
 
     const std::vector<quantum_sim::circuit::TraceStep> trace =
-            result.executeWithTrace(initialState);
+            bellCircuit.executeWithTrace(initialState);
 
     std::cout << "Circuit execution trace:\n\n";
-    quantum_sim::visualization::printExecutionTrace(initialState, trace, std::cout);
+    QuantumRegister state = initialState;
+    quantum_sim::debug::runInteractiveDebugger(bellCircuit, state);
 
+    std::cout << "\n";
     std::cout << "----------------------------------------------------\n";
     std::cout << "Circuit diagram:\n";
-
-    quantum_sim::visualization::printCircuitDiagram(result, std::cout);
+    quantum_sim::visualization::printCircuitDiagram(bellCircuit, std::cout);
 
     std::cout << '\n';
 

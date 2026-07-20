@@ -175,8 +175,23 @@ namespace quantum_sim::quantum {
          */
         [[nodiscard]] std::string basisStateLabel(std::size_t stateIndex) const;
 
+        /**
+         * Retrieves detailed information about a specific quantum state in the quantum register,
+         * including its basis state representation, amplitude, and probability.
+         *
+         * @param stateIndex The index of the quantum state whose information is to be retrieved.
+         * @return A StateInfo object containing the basis state label, amplitude, and probability
+         *         of the specified quantum state.
+         */
         [[nodiscard]] StateInfo stateInfo(std::size_t stateIndex) const;
 
+        /**
+         * Represents a collection of possible system configurations or conditions,
+         * used to define various types of states that an application or system can
+         * transition through or operate within.
+         *
+         * @return A set or group of distinct states applicable within a specific context.
+         */
         [[nodiscard]] std::vector<StateInfo> states() const;
 
     private:
