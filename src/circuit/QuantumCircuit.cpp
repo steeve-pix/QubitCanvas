@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <variant>
 #include <string>
+#include <optional>
 
 namespace quantum_sim::circuit {
     QuantumCircuit::QuantumCircuit(std::size_t qubitCount) : qubitCount_(qubitCount) {
@@ -117,5 +118,28 @@ namespace quantum_sim::circuit {
         }
 
         return trace;
+    }
+
+    std::vector<CircuitInstructionInfo> QuantumCircuit::instructionInfo() const {
+        std::vector<CircuitInstructionInfo> result;
+        result.reserve(instructions_.size());
+
+        for (const Instruction &instruction: instructions_) {
+            std::visit([&result]<typename T0>(const T0 &actualInstruction) {
+                using InstructionType = std::decay_t<decltype(actualInstruction)>;
+
+                if constexpr (std::is_same_v<InstructionType, SingleQubitInstruction>) {
+                    result.push_back(CircuitInstructionInfo{
+                        actualInstruction.name, CircuitInstructionKind::SingleQubit, actualInstruction.targetQubit
+                    });
+                } else {
+                    result.push_back(CircuitInstructionInfo{
+                        actualInstruction.name, CircuitInstructionKind::FullRegister, std::nullopt
+                    });
+                }
+            }, instruction);
+        }
+
+        return result;
     }
 }

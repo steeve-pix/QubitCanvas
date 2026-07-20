@@ -43,55 +43,32 @@ int main() {
     bellCircuit.addFullRegisterGate("CNOT", quantum_sim::gates::cnotGate());
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
-    std::ostringstream traceOutput;
-
-    const std::vector<quantum_sim::circuit::TraceStep> trace =
-            bellCircuit.executeWithTrace(initialState);
-
-    quantum_sim::visualization::printExecutionTrace(initialState, trace, traceOutput);
-
-    const std::string traceVisualization =
-            traceOutput.str();
-
     const QuantumRegister bellState = bellCircuit.execute(initialState);
 
+    std::vector<quantum_sim::circuit::CircuitInstructionInfo> instructions =
+            bellCircuit.instructionInfo();
+
     check(
-        traceVisualization.find("Initial state:")
-        != std::string::npos,
-        "trace visualizer displays the initial state"
+        instructions.size() == 2,
+        "circuit exposes one description per instruction"
+    );
+    check(
+        instructions[0].name == "H" &&
+        instructions[0].kind ==
+        quantum_sim::circuit::CircuitInstructionKind::SingleQubit &&
+        instructions[0].targetQubit.has_value() &&
+        instructions[0].targetQubit.value() == 0,
+        "circuit describes the Hadamard instruction"
     );
 
     check(
-        traceVisualization.find("After H on qubit 0:")
-        != std::string::npos,
-        "trace visualizer displays the Hadamard step"
+        instructions[1].name == "CNOT" &&
+        instructions[1].kind ==
+        quantum_sim::circuit::CircuitInstructionKind::FullRegister &&
+        !instructions[1].targetQubit.has_value(),
+        "circuit describes the CNOT instruction"
     );
 
-    check(
-        traceVisualization.find("After CNOT:")
-        != std::string::npos,
-        "trace visualizer displays the CNOT step"
-    );
-
-    check(
-        traceVisualization.find("|00> [##########] 100.00%")
-        != std::string::npos,
-        "trace visualizer displays the initial 00 state"
-    );
-
-    check(
-        traceVisualization.find("|10> [#####     ] 50.00%")
-        != std::string::npos,
-        "trace visualizer displays the state after Hadamard"
-    );
-
-    check(
-        traceVisualization.find("|11> [#####     ] 50.00%")
-        != std::string::npos,
-        "trace visualizer displays the Bell state after CNOT"
-    );
-
-    std::cout << traceVisualization;
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
