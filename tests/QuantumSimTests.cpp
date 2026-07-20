@@ -9,6 +9,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
+
 namespace {
     using quantum_sim::math::ComplexVector;
     using quantum_sim::math::ComplexMatrix;
@@ -34,31 +36,25 @@ namespace {
         }
     }
 } //
-
 int main() {
-    QuantumCircuit bellCircuit{2};
+    const QuantumRegister initialState = QuantumRegister::basisState(3, 0);
 
+    const QuantumCircuit circuit = quantum_sim::algorithms::equalSuperpositionCircuit(3);
 
-    bellCircuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), 0);
-    bellCircuit.addControlledGate("CNOT", quantum_sim::gates::cnotGate(), 0, 1);
+    const QuantumRegister result = circuit.execute(initialState);
 
-    const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
+    bool allProbabilitiesEqual = true;
 
-    const QuantumRegister bellState = bellCircuit.execute(initialState);
-
-    const std::vector<quantum_sim::circuit::CircuitInstructionInfo> instructions =
-            bellCircuit.instructionInfo();
+    for (std::size_t state{}; state < result.stateCount(); ++state) {
+        if (!approximatelyEqual(result.probability(state), 0.125)) {
+            allProbabilitiesEqual = false;
+            break;
+        }
+    }
 
     check(
-        instructions[1].name == "CNOT" &&
-        instructions[1].kind ==
-        quantum_sim::circuit::CircuitInstructionKind::FullRegister &&
-        !instructions[1].targetQubit.has_value() &&
-        instructions[1].controlQubit.has_value() &&
-        instructions[1].controlQubit.value() == 0 &&
-        instructions[1].secondaryTargetQubit.has_value() &&
-        instructions[1].secondaryTargetQubit.value() == 1,
-        "circuit describes the CNOT control and target"
+        allProbabilitiesEqual,
+        "Equal-superposition circuit distributes probability equally"
     );
 
     if (failures == 0) {
