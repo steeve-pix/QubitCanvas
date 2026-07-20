@@ -4,6 +4,7 @@
 #include <utility>
 #include <type_traits>
 #include <variant>
+#include <string>
 
 namespace quantum_sim::circuit {
     QuantumCircuit::QuantumCircuit(std::size_t qubitCount) : qubitCount_(qubitCount) {
@@ -16,7 +17,7 @@ namespace quantum_sim::circuit {
         return qubitCount_;
     }
 
-    void QuantumCircuit::addSingleQubitGate(math::ComplexMatrix gate, std::size_t targetQubit) {
+    void QuantumCircuit::addSingleQubitGate(std::string name, math::ComplexMatrix gate, std::size_t targetQubit) {
         if (gate.rows() != 2 || gate.columns() != 2) {
             throw std::invalid_argument{"A single-qubit gate must be a 2 by 2 matrix."};
         }
@@ -28,10 +29,10 @@ namespace quantum_sim::circuit {
             throw std::out_of_range{"Target qubit index is outside the circuit."};
         }
 
-        instructions_.push_back(SingleQubitInstruction{std::move(gate), targetQubit});
+        instructions_.push_back(SingleQubitInstruction{std::move(name), std::move(gate), targetQubit});
     }
 
-    void QuantumCircuit::addFullRegisterGate(math::ComplexMatrix gate) {
+    void QuantumCircuit::addFullRegisterGate(std::string name, math::ComplexMatrix gate) {
         const std::size_t expectedSize =
                 std::size_t{1} << qubitCount_;
         if (gate.rows() != expectedSize || gate.columns() != expectedSize) {
@@ -42,7 +43,7 @@ namespace quantum_sim::circuit {
             throw std::invalid_argument{"A quantum gate must be unitary."};
         }
 
-        instructions_.push_back(FullRegisterInstruction{std::move(gate)});
+        instructions_.push_back(FullRegisterInstruction{std::move(name), std::move(gate)});
     }
 
     std::size_t QuantumCircuit::instructionCount() const noexcept {
@@ -87,5 +88,34 @@ namespace quantum_sim::circuit {
         }
 
         return counts;
+    }
+
+    std::vector<TraceStep> QuantumCircuit::executeWithTrace(const quantum::QuantumRegister &initialState) const {
+        if (initialState.qubitCount() != qubitCount_) {
+            throw std::invalid_argument{"Register qubit count must match the circuit qubit count."};
+        }
+
+        quantum::QuantumRegister currentState = initialState;
+        std::vector<TraceStep> trace;
+        trace.reserve(instructions_.size());
+        for (const Instruction &instruction: instructions_) {
+            std::visit([&currentState,&trace]<typename T0>(const T0 &actualInstruction) {
+                using InstructionType = std::decay_t<T0>;
+
+                std::string description;
+
+                if constexpr (std::is_same_v<InstructionType, SingleQubitInstruction>) {
+                    currentState = currentState.applySingleQubitGate(actualInstruction.gate,
+                                                                     actualInstruction.targetQubit);
+                    description = actualInstruction.name + " on qubit " + std::to_string(actualInstruction.targetQubit);
+                } else {
+                    currentState = currentState.applyGate(actualInstruction.gate);
+                    description = actualInstruction.name;
+                }
+                trace.push_back(TraceStep{std::move(description), currentState});
+            }, instruction);
+        }
+
+        return trace;
     }
 }

@@ -13,7 +13,8 @@ namespace quantum_sim::visualization {
                     std::clamp(info.probability, 0.0, 1.0);
 
             const std::size_t filledWidth =
-                    static_cast<std::size_t>(clampedProbability * static_cast<double>(barWidth));
+                    std::min(barWidth, static_cast<std::size_t>(std::llround(
+                                 clampedProbability * static_cast<double>(barWidth))));
 
             const std::string filled(filledWidth, '#');
 
@@ -74,6 +75,18 @@ namespace quantum_sim::visualization {
                     << std::setprecision(2)
                     << frequency * 100.0
                     << "%)\n";
+        }
+    }
+
+    void printExecutionTrace(const quantum::QuantumRegister &initialState, const std::vector<circuit::TraceStep> &trace,
+                             std::ostream &output, std::size_t barWidth) {
+        output << "Initial state:\n";
+        printProbabilityBars(initialState, output, barWidth);
+
+        for (const circuit::TraceStep &step: trace) {
+            output << "\nAfter " << step.description << ":\n";
+
+            printProbabilityBars(step.state, output, barWidth);
         }
     }
 }

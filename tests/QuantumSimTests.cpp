@@ -36,62 +36,62 @@ namespace {
 } //
 
 int main() {
-    QuantumCircuit circuit{2};
+    QuantumCircuit bellCircuit{2};
 
+
+    bellCircuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), 0);
+    bellCircuit.addFullRegisterGate("CNOT", quantum_sim::gates::cnotGate());
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
-    circuit.addSingleQubitGate(quantum_sim::gates::hadamardGate(), 0);
-    circuit.addFullRegisterGate(quantum_sim::gates::cnotGate());
+    std::ostringstream traceOutput;
 
-    const QuantumRegister bellState = circuit.execute(initialState);
+    const std::vector<quantum_sim::circuit::TraceStep> trace =
+            bellCircuit.executeWithTrace(initialState);
 
-    const std::vector<quantum_sim::quantum::StateInfo> allStates =
-            bellState.states();
+    quantum_sim::visualization::printExecutionTrace(initialState, trace, traceOutput);
 
-    std::ostringstream output;
+    const std::string traceVisualization =
+            traceOutput.str();
 
-    std::ostringstream shotOutput;
-
-    const std::vector<std::size_t> counts{
-        50,
-        0,
-        0,
-        50
-    };
-
-    quantum_sim::visualization::printShotBars(bellState, counts, shotOutput, 100);
-
-    quantum_sim::visualization::printProbabilityBars(bellState, output, 10);
-
-    const std::string visualization =
-            output.str();
-
-    const std::string shotVisualization =
-            shotOutput.str();
+    const QuantumRegister bellState = bellCircuit.execute(initialState);
 
     check(
-        shotVisualization.find(
-            "|00> [#####     ] 50 (50.00%)"
-        ) != std::string::npos,
-        "shot visualizer displays state 00 counts"
+        traceVisualization.find("Initial state:")
+        != std::string::npos,
+        "trace visualizer displays the initial state"
     );
 
     check(
-        shotVisualization.find(
-            "|01> [          ] 0 (0.00%)"
-        ) != std::string::npos,
-        "shot visualizer displays zero-count states"
+        traceVisualization.find("After H on qubit 0:")
+        != std::string::npos,
+        "trace visualizer displays the Hadamard step"
     );
 
     check(
-        shotVisualization.find(
-            "|11> [#####     ] 50 (50.00%)"
-        ) != std::string::npos,
-        "shot visualizer displays state 11 counts"
+        traceVisualization.find("After CNOT:")
+        != std::string::npos,
+        "trace visualizer displays the CNOT step"
     );
 
-    std::cout << visualization << std::endl;
-    std::cout << shotVisualization << std::endl;
+    check(
+        traceVisualization.find("|00> [##########] 100.00%")
+        != std::string::npos,
+        "trace visualizer displays the initial 00 state"
+    );
+
+    check(
+        traceVisualization.find("|10> [#####     ] 50.00%")
+        != std::string::npos,
+        "trace visualizer displays the state after Hadamard"
+    );
+
+    check(
+        traceVisualization.find("|11> [#####     ] 50.00%")
+        != std::string::npos,
+        "trace visualizer displays the Bell state after CNOT"
+    );
+
+    std::cout << traceVisualization;
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
