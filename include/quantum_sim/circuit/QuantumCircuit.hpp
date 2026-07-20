@@ -8,11 +8,45 @@
 #include <variant>
 #include <random>
 #include <string>
+#include <optional>
 
 namespace quantum_sim::circuit {
+    /**
+     * Represents a single step in the execution trace of a quantum circuit or process.
+     *
+     * This class encapsulates information about an individual operation
+     * or transformation performed during the execution of a quantum computation.
+     */
     struct TraceStep {
+        /**
+         * A string that provides a human-readable description of a specific step
+         * in the execution trace of a quantum circuit.
+         *
+         * This description typically explains the operation performed or the
+         * transformation applied to the quantum state at this step.
+         */
         std::string description;
+        /**
+         * Represents the current configuration or status of a system, process,
+         * or component at a specific point in time.
+         *
+         * This variable typically holds information about the present conditions,
+         * enabling logic to make decisions or track changes over time.
+         */
         quantum::QuantumRegister state;
+    };
+
+    enum class CircuitInstructionKind {
+        SingleQubit,
+        FullRegister
+    };
+
+    struct CircuitInstructionInfo {
+        std::string name;
+        CircuitInstructionKind kind;
+        std::optional<std::size_t> targetQubit;
+        std::optional<std::size_t> controlQubit;
+        std::optional<std::size_t> secondaryTargetQubit;
     };
 
     /**
@@ -95,6 +129,11 @@ namespace quantum_sim::circuit {
 
         [[nodiscard]] std::vector<TraceStep> executeWithTrace(const quantum::QuantumRegister &initialState) const;
 
+        [[nodiscard]] std::vector<CircuitInstructionInfo> instructionInfo() const;
+
+        void addControlledGate(std::string name, math::ComplexMatrix gate, std::size_t controlQubit,
+                               std::size_t targetQubit);
+
         /**
          * A structure representing an instruction for a single-qubit quantum gate.
          *
@@ -155,6 +194,8 @@ namespace quantum_sim::circuit {
              * executed as part of a quantum circuit.
              */
             math::ComplexMatrix gate;
+            std::optional<std::size_t> controlQubit;
+            std::optional<std::size_t> targetQubit;
         };
 
         using Instruction = std::variant<SingleQubitInstruction, FullRegisterInstruction>;

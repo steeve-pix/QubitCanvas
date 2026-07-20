@@ -89,4 +89,60 @@ namespace quantum_sim::visualization {
             printProbabilityBars(step.state, output, barWidth);
         }
     }
+
+    void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output) {
+        const std::vector<circuit::CircuitInstructionInfo> instructions =
+                circuit.instructionInfo();
+
+        for (std::size_t qubit = 0; qubit < circuit.qubitCount(); ++qubit) {
+            output
+                    << "q"
+                    << qubit
+                    << ": |0> ";
+
+            for (const circuit::CircuitInstructionInfo &instruction: instructions) {
+                if (instruction.kind == circuit::CircuitInstructionKind::SingleQubit) {
+                    if (instruction.targetQubit.value() == qubit) {
+                        output
+                                << "--"
+                                << instruction.name
+                                << "--";
+                    } else {
+                        output << "-----";
+                    }
+                } else {
+                    if (instruction.controlQubit.has_value() && instruction.secondaryTargetQubit.has_value()) {
+                        if (qubit == instruction.controlQubit.value()) {
+                            output << "--C--";
+                        } else if (
+                            qubit ==
+                            instruction.secondaryTargetQubit.value()
+                        ) {
+                            output << "--X--";
+                        } else {
+                            output << "-----";
+                        }
+                    } else {
+                        output
+                                << "--"
+                                << instruction.name
+                                << "--";
+                    }
+                }
+            }
+
+            output << '\n';
+        }
+
+        for (const circuit::CircuitInstructionInfo &instruction: instructions) {
+            if (instruction.controlQubit.has_value() && instruction.secondaryTargetQubit.has_value()) {
+                output
+                        << "            control q"
+                        << instruction.controlQubit.value()
+                        << " --> target q"
+                        << instruction.secondaryTargetQubit.value()
+                        << '\n';
+            }
+        }
+    }
 }

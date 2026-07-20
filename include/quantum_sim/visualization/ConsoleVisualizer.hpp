@@ -17,4 +17,6 @@ namespace quantum_sim::visualization {
 
     void printExecutionTrace(const quantum::QuantumRegister &initialState, const std::vector<circuit::TraceStep> &trace,
                              std::ostream &output, std::size_t barWidth = 50);
+
+    void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output);
 }
