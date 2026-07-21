@@ -180,6 +180,16 @@ namespace quantum_sim::visualization {
                     afterStates[stateIndex].probability;
 
             const double change = afterProbability - beforeProbability;
+            constexpr double epsilon = 1e-10;
+
+            const auto &beforeAmplitude =
+                    beforeStates[stateIndex].amplitude;
+            const auto &afterAmplitude =
+                    afterStates[stateIndex].amplitude;
+
+            const bool amplitudeChanged =
+                    std::abs(afterAmplitude.real() - beforeAmplitude.real()) > epsilon || std::abs(
+                        afterAmplitude.imaginary() - beforeAmplitude.imaginary()) > epsilon;
 
             output
                     << beforeStates[stateIndex].label
@@ -195,6 +205,8 @@ namespace quantum_sim::visualization {
                 output << " (+" << change * 100.0 << "%)";
             } else if (change < 0.0) {
                 output << " (" << change * 100.0 << "%)";
+            } else if (amplitudeChanged) {
+                output << " (amplitude changed, probability unchanged)";
             } else {
                 output << " (unchanged)";
             }

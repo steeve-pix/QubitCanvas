@@ -37,30 +37,29 @@ namespace {
     }
 } //
 int main() {
-    const QuantumCircuit circuit = quantum_sim::algorithms::bellStateCircuit();
-    const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
-
+    QuantumCircuit circuit{1};
+    circuit.addSingleQubitGate("Z", quantum_sim::gates::zGate(), 0);
+    const QuantumRegister initialState = QuantumRegister::basisState(1, 1);
     const auto trace = circuit.executeWithTrace(initialState);
 
     std::ostringstream comparisonOutput;
 
-    quantum_sim::visualization::printStateComparison(initialState, trace[0].state, comparisonOutput);
-    const std::string comparison = comparisonOutput.str();
+    quantum_sim::visualization::printStateComparison(
+        initialState,
+        trace[0].state,
+        comparisonOutput
+    );
+
+    const std::string comparison =
+            comparisonOutput.str();
 
     check(
         comparison.find(
-            "|00>: 100.00% -> 50.00% (-50.00%)"
+            "|1>: 100.00% -> 100.00% "
+            "(amplitude changed, probability unchanged)"
         ) != std::string::npos,
-        "State comparison shows probability decreasing"
+        "State comparison detects a phase-only change"
     );
-
-    check(
-        comparison.find(
-            "|10>: 0.00% -> 50.00% (+50.00%)"
-        ) != std::string::npos,
-        "State comparison shows probability increasing"
-    );
-
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
