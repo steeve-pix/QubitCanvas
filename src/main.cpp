@@ -35,7 +35,7 @@ int main() {
     std::cout << "\n";
     std::cout << "----------------------------------------------------\n";
     // std::cout << "Circuit diagram:\n";
-    quantum_sim::debug::printCircuitDiagram(bellCircuit, std::cout);
+    quantum_sim::visualization::printCircuitDiagram(bellCircuit, std::cout);
 
     std::cout << '\n';
 
