@@ -63,5 +63,6 @@ namespace quantum_sim::visualization {
      * @param circuit Reference to the QuantumCircuit object containing the circuit's qubits and instructions.
      * @param output Reference to the std::ostream object where the circuit diagram will be printed.
      */
-    void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output);
+    void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output,
+                             std::optional<std::size_t> currentInstruction = std::nullopt);
 }

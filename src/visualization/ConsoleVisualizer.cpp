@@ -90,7 +90,8 @@ namespace quantum_sim::visualization {
         }
     }
 
-    void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output) {
+    void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output,
+                             std::optional<std::size_t> currentInstruction) {
         const std::vector<circuit::CircuitInstructionInfo> instructions =
                 circuit.instructionInfo();
 
@@ -100,25 +101,27 @@ namespace quantum_sim::visualization {
                     << qubit
                     << ": |0> ";
 
-            for (const circuit::CircuitInstructionInfo &instruction: instructions) {
+            for (std::size_t instructionIndex = 0; instructionIndex < instructions.size(); ++instructionIndex) {
+                const circuit::CircuitInstructionInfo &instruction =
+                        instructions[instructionIndex];
+
+                const bool isCurrentInstruction =
+                        currentInstruction == instructionIndex;
+
                 if (instruction.kind == circuit::CircuitInstructionKind::SingleQubit) {
                     if (instruction.targetQubit.value() == qubit) {
-                        output
-                                << "--"
-                                << instruction.name
-                                << "--";
+                        output << (isCurrentInstruction ? "-[" : "--") << instruction.name << (
+                            isCurrentInstruction ? "]-" : "--");
                     } else {
                         output << "-----";
                     }
                 } else {
                     if (instruction.controlQubit.has_value() && instruction.secondaryTargetQubit.has_value()) {
                         if (qubit == instruction.controlQubit.value()) {
-                            output << "--C--";
-                        } else if (
-                            qubit ==
-                            instruction.secondaryTargetQubit.value()
+                            output << (isCurrentInstruction ? "-[C]-" : "--C--");
+                        } else if (qubit == instruction.secondaryTargetQubit.value()
                         ) {
-                            output << "--X--";
+                            output << (isCurrentInstruction ? "-[X]-" : "--X--");
                         } else {
                             output << "-----";
                         }
