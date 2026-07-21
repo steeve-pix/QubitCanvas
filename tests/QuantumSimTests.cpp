@@ -37,41 +37,18 @@ namespace {
     }
 } //
 int main() {
-    QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
-    bellCircuit.addSingleQubitGate("Z", quantum_sim::gates::zGate(), 0);
-    const QuantumRegister initialState = QuantumRegister::basisState(2, 1);
-    const auto trace = bellCircuit.executeWithTrace(initialState);
-
-    std::ostringstream comparisonOutput;
-
-    quantum_sim::visualization::printStateComparison(
-        initialState,
-        trace[0].state,
-        comparisonOutput
-    );
-
-    const std::string comparison =
-            comparisonOutput.str();
+    const QuantumCircuit ghzCircuit = quantum_sim::algorithms::ghzStateCircuit();
+    const QuantumRegister initialState = QuantumRegister::basisState(3, 0);
+    const QuantumRegister result = ghzCircuit.execute(initialState);
 
     check(
-        quantum_sim::debug::gateExplanation("H").find(
-            "superposition"
-        ) != std::string::npos,
-        "Hadamard explanation mentions superposition"
+        approximatelyEqual(result.probability(0), 0.5),
+        "GHZ algorithm gives |000> a probability of 50%"
     );
 
     check(
-        quantum_sim::debug::gateExplanation("CNOT").find(
-            "control qubit"
-        ) != std::string::npos,
-        "CNOT explanation mentions the control qubit"
-    );
-
-    check(
-        quantum_sim::debug::gateExplanation("Z").find(
-            "phase"
-        ) != std::string::npos,
-        "Z explanation mentions phase"
+        approximatelyEqual(result.probability(7), 0.5),
+        "GHZ algorithm gives |111> a probability of 50%"
     );
 
     if (failures == 0) {

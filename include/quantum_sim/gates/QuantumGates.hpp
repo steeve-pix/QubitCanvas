@@ -74,4 +74,7 @@ namespace quantum_sim::gates {
      * @return A 4x4 ComplexMatrix representing the SWAP gate.
      */
     [[nodiscard]] math::ComplexMatrix swapGate();
+
+    [[nodiscard]] math::ComplexMatrix cnotGate(std::size_t qubitCount, std::size_t controlQubit,
+                                                      std::size_t targetQubit);
 }
