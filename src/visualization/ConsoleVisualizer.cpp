@@ -162,4 +162,43 @@ namespace quantum_sim::visualization {
                     << "i\n";
         }
     }
+
+    void printStateComparison(const quantum::QuantumRegister &beforeState, const quantum::QuantumRegister &afterState,
+                              std::ostream &output) {
+        if (beforeState.stateCount() != afterState.stateCount()) {
+            throw std::invalid_argument{"Compared quantum states must have the same size."};
+        }
+
+        const auto beforeStates = beforeState.states();
+        const auto afterStates = afterState.states();
+
+        for (std::size_t stateIndex = 0; stateIndex < beforeStates.size(); ++stateIndex) {
+            const double beforeProbability =
+                    beforeStates[stateIndex].probability;
+
+            const double afterProbability =
+                    afterStates[stateIndex].probability;
+
+            const double change = afterProbability - beforeProbability;
+
+            output
+                    << beforeStates[stateIndex].label
+                    << ": "
+                    << std::fixed
+                    << std::setprecision(2)
+                    << beforeProbability * 100.0
+                    << "% -> "
+                    << afterProbability * 100.0
+                    << "%";
+
+            if (change > 0.0) {
+                output << " (+" << change * 100.0 << "%)";
+            } else if (change < 0.0) {
+                output << " (" << change * 100.0 << "%)";
+            } else {
+                output << " (unchanged)";
+            }
+            output << '\n';
+        }
+    }
 }
