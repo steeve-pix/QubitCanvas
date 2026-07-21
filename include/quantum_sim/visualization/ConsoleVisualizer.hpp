@@ -88,4 +88,6 @@ namespace quantum_sim::visualization {
                               std::ostream &output);
 
     void printBlochVector(const quantum::QuantumRegister &state, std::ostream &output);
+
+    void printAsciiBlochSphere(const quantum::QuantumRegister &state, std::ostream &output);
 }
