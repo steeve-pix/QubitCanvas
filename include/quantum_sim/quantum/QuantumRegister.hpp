@@ -20,6 +20,10 @@ namespace quantum_sim::quantum {
         double x, y, z;
     };
 
+    struct BlochAngles {
+        double theta, phi;
+    };
+
     /**
      * Represents a quantum register composed of qubits, enabling the simulation and manipulation
      * of quantum states through operations such as quantum gates.
@@ -198,7 +202,17 @@ namespace quantum_sim::quantum {
          */
         [[nodiscard]] std::vector<StateInfo> states() const;
 
+        /**
+         * Computes the Bloch vector representation of the quantum state, which is a geometric
+         * representation of a single qubit's state on the Bloch sphere.
+         *
+         * @throws std::invalid_argument If the quantum register does not represent a single qubit.
+         * @return The Bloch vector as a BlockVector object, containing x, y, and z components
+         *         corresponding to the state of the qubit.
+         */
         [[nodiscard]] BlockVector blockVector() const;
+
+        [[nodiscard]] BlochAngles blochAngles() const;
 
     private:
         /**

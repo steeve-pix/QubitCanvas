@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vector>
 #include <utility>
+#include <algorithm>
 
 namespace quantum_sim::quantum {
     QuantumRegister::QuantumRegister(std::size_t qubitCount, math::ComplexVector amplitudes)
@@ -267,5 +268,20 @@ namespace quantum_sim::quantum {
         const double z = alpha.magnitudeSquared() - beta.magnitudeSquared();
 
         return BlockVector{x, y, z};
+    }
+
+    BlochAngles QuantumRegister::blochAngles() const {
+        const BlockVector vector = blockVector();
+
+        const double clampedZ =
+                std::clamp(vector.z, -1.0, 1.0);
+
+        const double theta =
+                std::acos(clampedZ);
+
+        const double phi =
+                std::atan2(vector.y, vector.x);
+
+        return BlochAngles{theta, phi};
     }
 }
