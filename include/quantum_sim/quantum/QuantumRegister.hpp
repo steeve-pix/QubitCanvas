@@ -16,6 +16,10 @@ namespace quantum_sim::quantum {
         double probability;
     };
 
+    struct BlockVector {
+        double x, y, z;
+    };
+
     /**
      * Represents a quantum register composed of qubits, enabling the simulation and manipulation
      * of quantum states through operations such as quantum gates.
@@ -193,6 +197,8 @@ namespace quantum_sim::quantum {
          * @return A set or group of distinct states applicable within a specific context.
          */
         [[nodiscard]] std::vector<StateInfo> states() const;
+
+        [[nodiscard]] BlockVector blockVector() const;
 
     private:
         /**

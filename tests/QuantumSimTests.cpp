@@ -46,23 +46,25 @@ int main() {
         ComplexVector{
             std::vector{
                 Complex{amplitude, 0.0},
-                Complex{amplitude, 0.0}
+                Complex{0.0, amplitude}
             }
         }
     };
-
-    const QuantumCircuit rzCircuit =
-            quantum_sim::algorithms::rzRotationCircuit(
-                std::numbers::pi
-            );
-
-    const QuantumRegister result =
-            rzCircuit.execute(plusState);
+    const quantum_sim::quantum::BlockVector vector = plusState.blockVector();
 
     check(
-        approximatelyEqual(result.probability(0), 0.5) &&
-        approximatelyEqual(result.probability(1), 0.5),
-        "Rz(pi) preserves the probabilities of |+>"
+        approximatelyEqual(vector.x, 0.0),
+        "|+i> has Bloch x coordinate 0"
+    );
+
+    check(
+        approximatelyEqual(vector.y, 1.0),
+        "|+i> has Bloch y coordinate 0"
+    );
+
+    check(
+        approximatelyEqual(vector.z, 0.0),
+        "|+i> is at the north pole of the Bloch sphere"
     );
 
     if (failures == 0) {
