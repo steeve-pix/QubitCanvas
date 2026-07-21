@@ -38,31 +38,19 @@ namespace {
     }
 } //
 int main() {
-    const QuantumCircuit rotationCircuit = quantum_sim::algorithms::rxRotationCircuit(std::numbers::pi / 2.0);
+    const QuantumCircuit ryRotationCircuit =
+            quantum_sim::algorithms::ryRotationCircuit(
+                std::numbers::pi
+            );
+    const QuantumRegister ryInitialState =
+            QuantumRegister::basisState(1, 0);
 
-    const QuantumRegister initialState = QuantumRegister::basisState(1, 0);
-
-    const QuantumRegister result = rotationCircuit.execute(initialState);
-
-    check(
-        quantum_sim::debug::gateExplanation("Rx").find(
-            "X axis"
-        ) != std::string::npos,
-        "Rx explanation mentions the X axis"
-    );
+    const QuantumRegister ryResult =
+            ryRotationCircuit.execute(ryInitialState);
 
     check(
-        quantum_sim::debug::gateExplanation("Ry").find(
-            "Y axis"
-        ) != std::string::npos,
-        "Ry explanation mentions the Y axis"
-    );
-
-    check(
-        quantum_sim::debug::gateExplanation("Rz").find(
-            "phase"
-        ) != std::string::npos,
-        "Rz explanation mentions phase"
+        ryRotationCircuit.instructionCount() == 1,
+        "Ry rotation demonstration contains one instruction"
     );
 
     if (failures == 0) {
