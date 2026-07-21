@@ -1,15 +1,12 @@
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
-#include "quantum_sim/gates/QuantumGates.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
+#include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
+#include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 
 #include <cstddef>
 #include <iostream>
 #include <random>
-
-#include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
-#include "quantum_sim/circuit/QuantumCircuit.hpp"
-#include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
-#include "quantum_sim/visualization/ConsoleVisualizer.hpp"
+#include <stdexcept>
 
 int readAlgorithmChoice();
 
@@ -19,15 +16,24 @@ int main() {
 
     const int choice = readAlgorithmChoice();
 
-    if (choice != 1 && choice != 2) {
-        std::cerr << "Invalid choice. Please enter 1 or 2.\n";
+    if (choice < 1 || choice > 3) {
+        std::cerr << "Invalid choice. Please enter 1, 2 or 3.\n";
         return 1;
     }
 
-    const QuantumCircuit circuit =
-            choice == 2
-                ? quantum_sim::algorithms::equalSuperpositionCircuit(3)
-                : quantum_sim::algorithms::bellStateCircuit();
+    const QuantumCircuit circuit = [&]() {
+        switch (choice) {
+            case 1:
+                return quantum_sim::algorithms::bellStateCircuit();
+            case 2:
+                return quantum_sim::algorithms::equalSuperpositionCircuit(3);
+            case 3:
+                return quantum_sim::algorithms::ghzStateCircuit();
+            default:
+                throw std::invalid_argument{"Unsupported algorithm choice."};
+        }
+    }();
+
 
     const QuantumRegister initialState =
             QuantumRegister::basisState(circuit.qubitCount(), 0);
@@ -51,6 +57,7 @@ int readAlgorithmChoice() {
             << "Choose a quantum demonstration:\n"
             << "1. Bell state\n"
             << "2. Equal superposition\n"
+            << "3. GHZ state\n"
             << "Choice: ";
 
     int choice{};
