@@ -50,21 +50,19 @@ int main() {
             }
         }
     };
-    const quantum_sim::quantum::BlockVector vector = plusState.blockVector();
+    const quantum_sim::quantum::BlochAngles angles = plusState.blochAngles();
 
     check(
-        approximatelyEqual(vector.x, 0.0),
-        "|+i> has Bloch x coordinate 0"
+        approximatelyEqual(
+            angles.theta,
+            std::numbers::pi / 2.0
+        ),
+        "|+> has Bloch polar angle pi/2 radians"
     );
 
     check(
-        approximatelyEqual(vector.y, 1.0),
-        "|+i> has Bloch y coordinate 0"
-    );
-
-    check(
-        approximatelyEqual(vector.z, 0.0),
-        "|+i> is at the north pole of the Bloch sphere"
+        approximatelyEqual(angles.phi, 0.0),
+        "|+> has Bloch azimuth angle 0 radians"
     );
 
     if (failures == 0) {
