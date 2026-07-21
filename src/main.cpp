@@ -11,23 +11,50 @@
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 
+int readAlgorithmChoice();
+
 int main() {
     using quantum_sim::circuit::QuantumCircuit;
     using quantum_sim::quantum::QuantumRegister;
 
-    const QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
+    const int choice = readAlgorithmChoice();
 
-    const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
+    if (choice != 1 && choice != 2) {
+        std::cerr << "Invalid choice. Please enter 1 or 2.\n";
+        return 1;
+    }
+
+    const QuantumCircuit circuit =
+            choice == 2
+                ? quantum_sim::algorithms::equalSuperpositionCircuit(3)
+                : quantum_sim::algorithms::bellStateCircuit();
+
+    const QuantumRegister initialState =
+            QuantumRegister::basisState(circuit.qubitCount(), 0);
 
     std::random_device seedSource{};
 
-    const QuantumRegister bellState = bellCircuit.execute(initialState);
+    const QuantumRegister bellState = circuit.execute(initialState);
 
     const std::vector<quantum_sim::circuit::TraceStep> trace =
-            bellCircuit.executeWithTrace(initialState);
+            circuit.executeWithTrace(initialState);
 
     std::cout << "Circuit execution trace:\n\n";
-    quantum_sim::debug::runInteractiveDebugger(bellCircuit, initialState);
+    quantum_sim::debug::runInteractiveDebugger(circuit, initialState);
 
     return 0;
+}
+
+
+int readAlgorithmChoice() {
+    std::cout
+            << "Choose a quantum demonstration:\n"
+            << "1. Bell state\n"
+            << "2. Equal superposition\n"
+            << "Choice: ";
+
+    int choice{};
+    std::cin >> choice;
+
+    return choice;
 }
