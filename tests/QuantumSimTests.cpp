@@ -55,9 +55,9 @@ int main() {
 
     check(
         comparison.find(
-            "Amplitude: 1.00 + 0.00i -> -1.00 + 0.00i"
+            "Phase: 0.00 rad -> 3.14 rad"
         ) != std::string::npos,
-        "State comparison shows the amplitude transition"
+        "State comparison shows the phase transition in radians"
     );
 
     if (failures == 0) {

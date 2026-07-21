@@ -191,6 +191,12 @@ namespace quantum_sim::visualization {
                     std::abs(afterAmplitude.real() - beforeAmplitude.real()) > epsilon || std::abs(
                         afterAmplitude.imaginary() - beforeAmplitude.imaginary()) > epsilon;
 
+            const double beforePhase =
+                    std::atan2(beforeAmplitude.imaginary(), beforeAmplitude.real());
+
+            const double afterPhase =
+                    std::atan2(afterAmplitude.imaginary(), afterAmplitude.real());
+
             output
                     << beforeStates[stateIndex].label
                     << ": "
@@ -227,6 +233,13 @@ namespace quantum_sim::visualization {
                 output << " -> ";
 
                 printAmplitude(afterAmplitude);
+
+                output
+                        << "\n  Phase: "
+                        << beforePhase
+                        << " rad -> "
+                        << afterPhase
+                        << " rad";
             }
         }
     }
