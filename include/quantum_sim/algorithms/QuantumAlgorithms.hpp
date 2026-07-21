@@ -9,7 +9,7 @@ namespace quantum_sim::algorithms {
      *
      * The function creates a two-qubit quantum circuit and applies the following gates:
      * - A Hadamard gate on the first qubit to create superposition.
-     * - A CNOT gate with the first qubit as the control and the second qubit as the target.
+     * - A CX gate with the first qubit as the control and the second qubit as the target.
      *
      * @return A quantum circuit representing the Bell state generation process.
      */
@@ -29,8 +29,8 @@ namespace quantum_sim::algorithms {
      *
      * The function initializes a three-qubit quantum circuit and applies the following gates:
      * - A Hadamard gate on the first qubit to create superposition.
-     * - A CNOT gate with the first qubit as the control and the second qubit as the target.
-     * - Another CNOT gate with the second qubit as the control and the third qubit as the target.
+     * - A CX gate with the first qubit as the control and the second qubit as the target.
+     * - Another CX gate with the second qubit as the control and the third qubit as the target.
      *
      * @return A quantum circuit configured to produce a GHZ state.
      */

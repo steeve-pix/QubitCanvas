@@ -10,6 +10,7 @@
 
 #include <sstream>
 #include <iostream>
+#include <numbers>
 
 namespace {
     using quantum_sim::math::ComplexVector;
@@ -37,18 +38,43 @@ namespace {
     }
 } //
 int main() {
-    const QuantumCircuit ghzCircuit = quantum_sim::algorithms::ghzStateCircuit();
-    const QuantumRegister initialState = QuantumRegister::basisState(3, 0);
-    const QuantumRegister result = ghzCircuit.execute(initialState);
+    const ComplexMatrix rxPi = quantum_sim::gates::rxGate(std::numbers::pi);
+    const ComplexMatrix ryPi = quantum_sim::gates::ryGate(std::numbers::pi);
+    const ComplexMatrix rzPi = quantum_sim::gates::rzGate(std::numbers::pi);
+    const ComplexVector zeroState{
+        std::vector{
+            Complex{1.0, 0.0},
+            Complex{0.0, 0.0},
+        }
+    };
+
+    const ComplexVector resultRxPi = rxPi * zeroState;
+    const ComplexVector resultRyPi = ryPi * zeroState;
+    const ComplexVector resultRzPi = rzPi * zeroState;
 
     check(
-        approximatelyEqual(result.probability(0), 0.5),
-        "GHZ algorithm gives |000> a probability of 50%"
+        approximatelyEqual(resultRxPi.at(0).real(), 0.0) &&
+        approximatelyEqual(resultRyPi.at(0).real(), 0.0) &&
+        approximatelyEqual(resultRzPi.at(0).real(), 0.0) &&
+        approximatelyEqual(resultRxPi.at(0).imaginary(), 0.0) &&
+        approximatelyEqual(resultRyPi.at(0).imaginary(), 0.0)
+        && approximatelyEqual(resultRzPi.at(0).imaginary(), -1.0),
+        "Rx(pi) & Ry(pi) removes the |0> amplitude"
     );
 
     check(
-        approximatelyEqual(result.probability(7), 0.5),
-        "GHZ algorithm gives |111> a probability of 50%"
+        approximatelyEqual(resultRxPi.at(1).real(), 0.0) &&
+        approximatelyEqual(resultRyPi.at(1).real(), 1.0) &&
+        approximatelyEqual(resultRzPi.at(1).real(), 0.0) &&
+        approximatelyEqual(resultRxPi.at(1).imaginary(), -1.0) &&
+        approximatelyEqual(resultRyPi.at(1).imaginary(), 0.0)
+        && approximatelyEqual(resultRzPi.at(1).imaginary(), 0.0),
+        "Rx(pi) & Ry(pi) transforms |0> into -i|1>"
+    );
+
+    check(
+        rxPi.isUnitary() && ryPi.isUnitary() && rzPi.isUnitary(),
+        "Rx, Ry & Rz gate is unitary"
     );
 
     if (failures == 0) {

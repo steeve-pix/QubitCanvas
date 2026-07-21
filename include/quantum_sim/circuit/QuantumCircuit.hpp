@@ -72,7 +72,7 @@ namespace quantum_sim::circuit {
          * Represents the optional index of the control qubit in a quantum circuit operation.
          *
          * This variable denotes the qubit that acts as the control for a controlled quantum gate,
-         * such as a CNOT or controlled phase gate. If the value is present, it specifies the index
+         * such as a CX or controlled phase gate. If the value is present, it specifies the index
          * of the control qubit within the circuit. Otherwise, the operation does not have a control qubit.
          */
         std::optional<std::size_t> controlQubit;
@@ -81,7 +81,7 @@ namespace quantum_sim::circuit {
          *
          * This variable is used in quantum circuits to specify a secondary
          * target qubit that is involved in multi-qubit operations, such as
-         * controlled gates (e.g., CNOT). When set, it identifies the index
+         * controlled gates (e.g., CX). When set, it identifies the index
          * of the additional qubit required by the operation. If nullopt, no
          * secondary target qubit is involved.
          */

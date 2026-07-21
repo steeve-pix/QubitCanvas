@@ -17,6 +17,24 @@ namespace quantum_sim::gates {
         };
     }
 
+    math::ComplexMatrix rxGate(const double angleRadians) {
+        const double cosine =
+                std::cos(angleRadians / 2.0);
+
+        const double sine =
+                std::sin(angleRadians / 2.0);
+
+        return math::ComplexMatrix{
+            2, 2,
+            std::vector{
+                math::Complex{cosine, 0.0},
+                math::Complex{0.0, -sine},
+                math::Complex{0.0, -sine},
+                math::Complex{cosine, 0.0},
+            }
+        };
+    }
+
     math::ComplexMatrix yGate() {
         return math::ComplexMatrix{
             2, 2,
@@ -29,6 +47,24 @@ namespace quantum_sim::gates {
         };
     }
 
+    math::ComplexMatrix ryGate(const double angleRadians) {
+        const double cosine =
+                std::cos(angleRadians / 2.0);
+
+        const double sine =
+                std::sin(angleRadians / 2.0);
+
+        return math::ComplexMatrix{
+            2, 2,
+            std::vector{
+                math::Complex{cosine, 0.0},
+                math::Complex{-sine, 0.0},
+                math::Complex{sine, 0.0},
+                math::Complex{cosine, 0.0}
+            }
+        };
+    }
+
     math::ComplexMatrix zGate() {
         return math::ComplexMatrix{
             2, 2,
@@ -37,6 +73,25 @@ namespace quantum_sim::gates {
                 math::Complex{},
                 math::Complex{},
                 math::Complex{-1.0, 0.0},
+            }
+        };
+    }
+
+    math::ComplexMatrix rzGate(const double angleRadians) {
+        const double cosine =
+                std::cos(angleRadians / 2.0);
+
+        const double sine =
+                std::sin(angleRadians / 2.0);
+
+        return math::ComplexMatrix{
+            2,
+            2,
+            std::vector{
+                math::Complex{cosine, -sine},
+                math::Complex{0.0, 0.0},
+                math::Complex{0.0, 0.0},
+                math::Complex{cosine, sine}
             }
         };
     }
@@ -80,7 +135,7 @@ namespace quantum_sim::gates {
         };
     }
 
-    math::ComplexMatrix cnotGate() {
+    math::ComplexMatrix cxGate() {
         return math::ComplexMatrix{
             4, 4,
             std::vector{
@@ -134,9 +189,9 @@ namespace quantum_sim::gates {
         };
     }
 
-    math::ComplexMatrix cnotGate(std::size_t qubitCount, std::size_t controlQubit, std::size_t targetQubit) {
+    math::ComplexMatrix cxGate(std::size_t qubitCount, std::size_t controlQubit, std::size_t targetQubit) {
         if (qubitCount == 0) {
-            throw std::invalid_argument{"A CNOT gate requires at least one qubit."};
+            throw std::invalid_argument{"A CX gate requires at least one qubit."};
         }
 
         if (qubitCount >= std::numeric_limits<std::size_t>::digits) {
@@ -144,11 +199,11 @@ namespace quantum_sim::gates {
         }
 
         if (controlQubit >= qubitCount || targetQubit >= qubitCount) {
-            throw std::out_of_range{"CNOT qubit index is outside the register."};
+            throw std::out_of_range{"CX qubit index is outside the register."};
         }
 
         if (controlQubit == targetQubit) {
-            throw std::invalid_argument{"CNOT control and target qubits must be different."};
+            throw std::invalid_argument{"CX control and target qubits must be different."};
         }
 
         const std::size_t stateCount =
