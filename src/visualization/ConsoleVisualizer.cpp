@@ -1,12 +1,46 @@
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 
 #include <algorithm>
-#include <format>
 #include <iomanip>
 #include <ostream>
 #include <string>
 #include <stdexcept>
 #include <cmath>
+#include <numbers>
+#include <sstream>
+
+namespace {
+    std::string formatPhaseAsPi(double phase) {
+        constexpr double epsilon = 1e-10;
+        constexpr double pi = std::numbers::pi;
+
+        struct KnownPhase {
+            double value;
+            const char *text;
+        };
+
+        constexpr KnownPhase knownPhases[] = {
+            {0.0, "0.00"},
+            {pi / 4.0, "pi/4"},
+            {pi / 2.0, "pi/2"},
+            {3.0 * pi / 4.0, "3pi/4"},
+            {pi, "pi"},
+            {-pi / 4.0, "-pi/4"},
+            {-pi / 2.0, "-pi/2"},
+            {-3.0 * pi / 4.0, "-3pi/4"},
+            {-pi, "-pi"}
+        };
+
+        for (const auto &knownPhase: knownPhases) {
+            if (std::abs(phase - knownPhase.value) < epsilon) {
+                return knownPhase.text;
+            }
+        }
+        std::ostringstream output;
+        output << std::fixed << std::setprecision(2) << phase;
+        return output.str();
+    }
+}
 
 namespace quantum_sim::visualization {
     void printProbabilityBars(const quantum::QuantumRegister &state, std::ostream &output, std::size_t barWidth) {
@@ -226,7 +260,7 @@ namespace quantum_sim::visualization {
                             << 'i';
                 };
 
-                output << "\n  Amplitude: ";
+                output << "  Amplitude: ";
 
                 printAmplitude(beforeAmplitude);
 
@@ -234,11 +268,17 @@ namespace quantum_sim::visualization {
 
                 printAmplitude(afterAmplitude);
 
+                const std::string beforePhaseText =
+                        formatPhaseAsPi(beforePhase);
+
+                const std::string afterPhaseText =
+                        formatPhaseAsPi(afterPhase);
+
                 output
                         << "\n  Phase: "
-                        << beforePhase
+                        << beforePhaseText
                         << " rad -> "
-                        << afterPhase
+                        << afterPhaseText
                         << " rad";
             }
         }
