@@ -279,8 +279,10 @@ namespace quantum_sim::visualization {
                         << beforePhaseText
                         << " rad -> "
                         << afterPhaseText
-                        << " rad";
+                        << " rad"
+                        << '\n';
             }
+            output << '\n';
         }
     }
 }

@@ -71,7 +71,21 @@ namespace quantum_sim::debug {
                     "Exchanges the quantum states of two qubits. "
                     "The first qubit receives the second qubit's state, and vice versa.";
         }
-        
+        if (gateName == "Rx") {
+            return
+                    "Rotates the qubit around the X axis of the Bloch sphere. "
+                    "The rotation angle is measured in radians.";
+        }
+        if (gateName == "Ry") {
+            return
+                    "Rotates the qubit around the Y axis of the Bloch sphere. "
+                    "The rotation angle is measured in radians.";
+        }
+        if (gateName == "Rz") {
+            return
+                    "Rotates the qubit around the Z axis of the Bloch sphere. "
+                    "This changes phase while preserving basis-state probabilities.";
+        }
         return "No explanation is available for this gate yet.";
     }
 
