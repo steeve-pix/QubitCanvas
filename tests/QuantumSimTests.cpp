@@ -55,11 +55,11 @@ int main() {
 
     check(
         comparison.find(
-            "|1>: 100.00% -> 100.00% "
-            "(amplitude changed, probability unchanged)"
+            "Amplitude: 1.00 + 0.00i -> -1.00 + 0.00i"
         ) != std::string::npos,
-        "State comparison detects a phase-only change"
+        "State comparison shows the amplitude transition"
     );
+
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }

@@ -211,6 +211,23 @@ namespace quantum_sim::visualization {
                 output << " (unchanged)";
             }
             output << '\n';
+            if (amplitudeChanged) {
+                const auto printAmplitude = [&output]<typename T0>(const T0 &amplitude) {
+                    output
+                            << amplitude.real()
+                            << (amplitude.imaginary() < 0.0 ? " - " : " + ")
+                            << std::abs(amplitude.imaginary())
+                            << 'i';
+                };
+
+                output << "\n  Amplitude: ";
+
+                printAmplitude(beforeAmplitude);
+
+                output << " -> ";
+
+                printAmplitude(afterAmplitude);
+            }
         }
     }
 }
