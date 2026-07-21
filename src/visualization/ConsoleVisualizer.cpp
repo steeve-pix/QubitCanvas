@@ -8,6 +8,7 @@
 #include <cmath>
 #include <numbers>
 #include <sstream>
+#include <vector>
 
 namespace {
     std::string formatPhaseAsPi(double phase) {
@@ -316,6 +317,53 @@ namespace quantum_sim::visualization {
             output
                     << formatPhaseAsPi(angles.phi)
                     << ") rad\n";
+        }
+    }
+
+    void printAsciiBlochSphere(const quantum::QuantumRegister &state, std::ostream &output) {
+        const quantum::BlockVector vector =
+                state.blockVector();
+
+        constexpr double centerRow = 5.0;
+        constexpr double centerColumn = 14.0;
+
+        constexpr double verticalRadius = 3.0;
+        constexpr double horizontalRadius = 9.0;
+
+        const double clampedX =
+                std::clamp(vector.x, -1.0, 1.0);
+
+        const double clampedZ =
+                std::clamp(vector.z, -1.0, 1.0);
+
+        const std::size_t markerRow =
+                static_cast<std::size_t>(std::lround(centerRow - clampedZ * verticalRadius));
+
+        const std::size_t markerColumn =
+                static_cast<std::size_t>(std::lround(centerColumn + clampedX * horizontalRadius));
+        std::vector<std::string> canvas{
+            "          +Z |0>",
+            "             |",
+            "        .-----------.",
+            "      .'             '.",
+            "     /                 \\",
+            "-X  |         +         |  +X",
+            "     \\                 /",
+            "      '.             .'",
+            "        '-----------'",
+            "             |",
+            "          -Z |1>"
+        };
+
+        constexpr std::size_t canvasWidth = 29;
+        for (std::string &row: canvas) {
+            row.resize(canvasWidth, ' ');
+        }
+
+        canvas.at(markerRow).at(markerColumn) = 'Q';
+
+        for (const std::string &row: canvas) {
+            output << row << '\n';
         }
     }
 }

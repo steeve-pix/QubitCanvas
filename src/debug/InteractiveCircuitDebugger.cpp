@@ -166,6 +166,10 @@ namespace quantum_sim::debug {
                     std::cout << '\n';
 
                     visualization::printBlochVector(step.state, std::cout);
+
+                    std::cout << '\n';
+
+                    visualization::printAsciiBlochSphere(step.state, std::cout);
                 }
             } else if (command == 'h') {
                 std::cout
