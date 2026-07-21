@@ -4,10 +4,12 @@
 #include <iostream>
 #include <limits>
 #include <cctype>
+#include <chrono>
+#include <thread>
 
 namespace quantum_sim::debug {
     char readDebuggerCommand() {
-        std::cout << "\n[n] Next, [p] Previous, [r] Restart, " << "[h] Help, [q] Quit: ";
+        std::cout << "\n[n] Next, [p] Previous, [r] Restart, " << "[a] Auto-play, [h] Help, [q] Quit: ";
 
         char command{};
         std::cin >> command;
@@ -19,6 +21,10 @@ namespace quantum_sim::debug {
         return command;
     };
 
+    void waitForAutoPlay() {
+        std::this_thread::sleep_for(std::chrono::milliseconds{750});
+    }
+
     void runInteractiveDebugger(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState) {
         const auto trace = circuit.executeWithTrace(initialState);
 
@@ -26,6 +32,7 @@ namespace quantum_sim::debug {
         visualization::printProbabilityBars(initialState, std::cout);
 
         std::size_t currentStep{};
+        bool autoPlay = false;
         while (currentStep < trace.size()) {
             const auto &step = trace[currentStep];
 
@@ -37,6 +44,11 @@ namespace quantum_sim::debug {
             std::cout << step.description << "\n";
 
             visualization::printProbabilityBars(step.state, std::cout);
+            if (autoPlay) {
+                waitForAutoPlay();
+                ++currentStep;
+                continue;
+            }
 
             char command = readDebuggerCommand();
 
@@ -54,9 +66,13 @@ namespace quantum_sim::debug {
                 }
             } else if (command == 'r') {
                 currentStep = 0;
+            } else if (command == 'a') {
+                autoPlay = true;
+                ++currentStep;
             } else if (command == 'h') {
                 std::cout
                         << "\nDebugger commands:\n"
+                        << "  a - Automatically execute remaining instructions\n"
                         << "  n - Move to the next instruction\n"
                         << "  p - Move to the previous instruction\n"
                         << "  r - Restart from the first instruction\n"
