@@ -288,6 +288,7 @@ namespace quantum_sim::visualization {
 
     void printBlochVector(const quantum::QuantumRegister &state, std::ostream &output) {
         const quantum::BlockVector vector = state.blockVector();
+        const quantum::BlochAngles angles = state.blochAngles();
 
         output
                 << "Bloch vector:\n"
@@ -299,5 +300,22 @@ namespace quantum_sim::visualization {
                 << ", "
                 << vector.z
                 << ")\n";
+        output
+                << "(theta, phi) -> ("
+                << formatPhaseAsPi(angles.theta)
+                << ", ";
+
+        constexpr double epsilon = 1e-10;
+
+        const bool isAtPole =
+                std::abs(vector.x) < epsilon && std::abs(vector.y) < epsilon;
+
+        if (isAtPole) {
+            output << "NaN) rad\n";
+        } else {
+            output
+                    << formatPhaseAsPi(angles.phi)
+                    << ") rad\n";
+        }
     }
 }
