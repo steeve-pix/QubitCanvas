@@ -5,12 +5,11 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/quantum/Qubit.hpp"
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
+#include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
+#include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 
 #include <sstream>
 #include <iostream>
-
-#include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
-#include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 
 namespace {
     using quantum_sim::math::ComplexVector;
@@ -38,9 +37,29 @@ namespace {
     }
 } //
 int main() {
-    QuantumRegister initialState = QuantumRegister::basisState(2, 0);
+    const QuantumCircuit circuit = quantum_sim::algorithms::bellStateCircuit();
+    const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
-    const QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
+    const auto trace = circuit.executeWithTrace(initialState);
+
+    std::ostringstream comparisonOutput;
+
+    quantum_sim::visualization::printStateComparison(initialState, trace[0].state, comparisonOutput);
+    const std::string comparison = comparisonOutput.str();
+
+    check(
+        comparison.find(
+            "|00>: 100.00% -> 50.00% (-50.00%)"
+        ) != std::string::npos,
+        "State comparison shows probability decreasing"
+    );
+
+    check(
+        comparison.find(
+            "|10>: 0.00% -> 50.00% (+50.00%)"
+        ) != std::string::npos,
+        "State comparison shows probability increasing"
+    );
 
     if (failures == 0) {
         std::cout << "All tests passed.\n";

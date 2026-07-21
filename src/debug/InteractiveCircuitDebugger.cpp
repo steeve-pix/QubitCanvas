@@ -9,8 +9,10 @@
 
 namespace quantum_sim::debug {
     char readDebuggerCommand() {
-        std::cout << "\n[n] Next, [p] Previous, [r] Restart, " << "[a] Auto-play, [i] Inspect amplitudes, " <<
-                "[h] Help, [q] Quit: ";
+        std::cout
+                << "\n[n] Next, [p] Previous, [r] Restart, "
+                << "[a] Auto-play, [i] Inspect amplitudes, "
+                << "[c] Compare changes, [h] Help, [q] Quit: ";
 
         char command{};
         std::cin >> command;
@@ -77,6 +79,17 @@ namespace quantum_sim::debug {
                     step.state,
                     std::cout
                 );
+            } else if (command == 'c') {
+                const quantum::QuantumRegister &beforeState = currentStep == 0
+                                                                  ? initialState
+                                                                  : trace[currentStep - 1].state;
+                const quantum::QuantumRegister &afterState = step.state;
+                std::cout
+                        << "\nChanges caused by "
+                        << step.description
+                        << ":\n";
+
+                visualization::printStateComparison(beforeState, afterState, std::cout);
             } else if (command == 'h') {
                 std::cout
                         << "\nDebugger commands:\n"
@@ -85,6 +98,7 @@ namespace quantum_sim::debug {
                         << "  p - Move to the previous instruction\n"
                         << "  r - Restart from the first instruction\n"
                         << "  i - Inspect the current state's amplitudes\n"
+                        << "  c - Compare the state before and after the current instruction\n"
                         << "  h - Show this help menu\n"
                         << "  q - Quit the debugger\n";
             } else {
