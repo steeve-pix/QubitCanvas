@@ -16,6 +16,44 @@ char readRotationAxis();
 
 double readRotationAngle();
 
+int readRotationInitialState();
+
+quantum_sim::quantum::QuantumRegister createRotationInitialState(const int choice) {
+    const double amplitude =
+            1.0 / std::sqrt(2.0);
+
+    switch (choice) {
+        case 1: return quantum_sim::quantum::QuantumRegister::basisState(1, 0);
+        case 2: return quantum_sim::quantum::QuantumRegister::basisState(1, 1);
+        case 3:
+            return quantum_sim::quantum::QuantumRegister{
+                1,
+                quantum_sim::math::ComplexVector{
+                    std::vector{
+                        quantum_sim::math::Complex{amplitude, 0.0},
+                        quantum_sim::math::Complex{amplitude, 0.0}
+                    }
+                }
+            };
+
+        case 4:
+            return quantum_sim::quantum::QuantumRegister{
+                1,
+                quantum_sim::math::ComplexVector{
+                    std::vector{
+                        quantum_sim::math::Complex{amplitude, 0.0},
+                        quantum_sim::math::Complex{-amplitude, 0.0}
+                    }
+                }
+            };
+
+        default:
+            throw std::invalid_argument{
+                "Unsupported rotation initial state."
+            };
+    }
+}
+
 int main() {
     using quantum_sim::circuit::QuantumCircuit;
     using quantum_sim::quantum::QuantumRegister;
@@ -29,6 +67,7 @@ int main() {
 
     char rotationAxis{};
     double rotationAngle{};
+    int rotationInitialStateChoice{};
     if (choice == 4) {
         rotationAxis = readRotationAxis();
         if (rotationAxis != 'x' &&
@@ -40,6 +79,15 @@ int main() {
             return 1;
         }
         rotationAngle = readRotationAngle();
+        rotationInitialStateChoice = readRotationInitialState();
+
+        if (rotationInitialStateChoice < 1 ||
+            rotationInitialStateChoice > 4) {
+            std::cerr
+                    << "Invalid initial state. Please enter 1, 2, 3, or 4.\n";
+
+            return 1;
+        }
     }
 
     const QuantumCircuit circuit = [&]() {
@@ -63,11 +111,10 @@ int main() {
     }();
 
     const QuantumRegister initialState =
-            QuantumRegister::basisState(circuit.qubitCount(), 0);
-
+            choice == 4
+                ? createRotationInitialState(rotationInitialStateChoice)
+                : QuantumRegister::basisState(circuit.qubitCount(), 0);
     std::random_device seedSource{};
-
-    const QuantumRegister bellState = circuit.execute(initialState);
 
     const std::vector<quantum_sim::circuit::TraceStep> trace =
             circuit.executeWithTrace(initialState);
@@ -117,4 +164,19 @@ double readRotationAngle() {
     std::cin >> angleRadians;
 
     return angleRadians;
+}
+
+int readRotationInitialState() {
+    std::cout
+            << "\nChoose the initial qubit state:\n"
+            << "1. |0>\n"
+            << "2. |1>\n"
+            << "3. |+>\n"
+            << "4. |->\n"
+            << "Choice: ";
+
+    int choice{};
+    std::cin >> choice;
+
+    return choice;
 }
