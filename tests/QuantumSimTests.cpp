@@ -55,7 +55,7 @@ int main() {
 
     check(
         comparison.find(
-            "Phase: 0.00 rad -> 3.14 rad"
+            "Phase: 0.00 rad -> pi rad"
         ) != std::string::npos,
         "State comparison shows the phase transition in radians"
     );
