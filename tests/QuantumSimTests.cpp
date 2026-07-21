@@ -38,19 +38,31 @@ namespace {
     }
 } //
 int main() {
-    const QuantumCircuit ryRotationCircuit =
-            quantum_sim::algorithms::ryRotationCircuit(
+    const double amplitude =
+            1.0 / std::sqrt(2.0);
+
+    const QuantumRegister plusState{
+        1,
+        ComplexVector{
+            std::vector{
+                Complex{amplitude, 0.0},
+                Complex{amplitude, 0.0}
+            }
+        }
+    };
+
+    const QuantumCircuit rzCircuit =
+            quantum_sim::algorithms::rzRotationCircuit(
                 std::numbers::pi
             );
-    const QuantumRegister ryInitialState =
-            QuantumRegister::basisState(1, 0);
 
-    const QuantumRegister ryResult =
-            ryRotationCircuit.execute(ryInitialState);
+    const QuantumRegister result =
+            rzCircuit.execute(plusState);
 
     check(
-        ryRotationCircuit.instructionCount() == 1,
-        "Ry rotation demonstration contains one instruction"
+        approximatelyEqual(result.probability(0), 0.5) &&
+        approximatelyEqual(result.probability(1), 0.5),
+        "Rz(pi) preserves the probabilities of |+>"
     );
 
     if (failures == 0) {
