@@ -65,4 +65,6 @@ namespace quantum_sim::visualization {
      */
     void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output,
                              std::optional<std::size_t> currentInstruction = std::nullopt);
+
+    void printAmplitudes(const quantum_sim::quantum::QuantumRegister &state, std::ostream &output);
 }

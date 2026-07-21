@@ -1,10 +1,12 @@
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 
 #include <algorithm>
+#include <format>
 #include <iomanip>
 #include <ostream>
 #include <string>
 #include <stdexcept>
+#include <cmath>
 
 namespace quantum_sim::visualization {
     void printProbabilityBars(const quantum::QuantumRegister &state, std::ostream &output, std::size_t barWidth) {
@@ -146,6 +148,18 @@ namespace quantum_sim::visualization {
                         << instruction.secondaryTargetQubit.value()
                         << '\n';
             }
+        }
+    }
+
+    void printAmplitudes(const quantum_sim::quantum::QuantumRegister &state, std::ostream &output) {
+        for (const quantum::StateInfo &info: state.states()) {
+            output
+                    << info.label
+                    << ": "
+                    << info.amplitude.real()
+                    << (info.amplitude.imaginary() < 0 ? " - " : " + ")
+                    << std::abs(info.amplitude.imaginary())
+                    << "i\n";
         }
     }
 }
