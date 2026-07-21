@@ -30,13 +30,12 @@ int main() {
             bellCircuit.executeWithTrace(initialState);
 
     std::cout << "Circuit execution trace:\n\n";
-    QuantumRegister state = initialState;
-    quantum_sim::debug::runInteractiveDebugger(bellCircuit, state);
+    quantum_sim::debug::runInteractiveDebugger(bellCircuit, initialState);
 
     std::cout << "\n";
     std::cout << "----------------------------------------------------\n";
-    std::cout << "Circuit diagram:\n";
-    quantum_sim::visualization::printCircuitDiagram(bellCircuit, std::cout);
+    // std::cout << "Circuit diagram:\n";
+    quantum_sim::debug::printCircuitDiagram(bellCircuit, std::cout);
 
     std::cout << '\n';
 
