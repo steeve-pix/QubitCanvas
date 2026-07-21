@@ -134,7 +134,7 @@ namespace quantum_sim::math {
          * @param other The ComplexMatrix with which the tensor product is computed.
          * @return A new ComplexMatrix representing the tensor product of this matrix and the provided matrix.
          */
-        [[nodiscard]] ComplexMatrix tensorProduct(const ComplexMatrix& other) const;
+        [[nodiscard]] ComplexMatrix tensorProduct(const ComplexMatrix &other) const;
 
         /**
          * @brief Overloads an operator to perform a specific operation.

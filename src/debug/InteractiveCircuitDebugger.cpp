@@ -6,6 +6,7 @@
 #include <cctype>
 #include <chrono>
 #include <thread>
+#include <string>
 
 namespace quantum_sim::debug {
     char readDebuggerCommand() {
@@ -28,8 +29,55 @@ namespace quantum_sim::debug {
         std::this_thread::sleep_for(std::chrono::milliseconds{750});
     }
 
+    std::string gateExplanation(const std::string &gateName) {
+        if (gateName == "H") {
+            return
+                    "Create a superposition by mixing the |0> "
+                    "and |1> amplitudes.";
+        }
+
+        if (gateName == "CNOT") {
+            return
+                    "Flips the target qubit when the control qubit is |1>. "
+                    "It can create entanglement.";
+        }
+        if (gateName == "X") {
+            return
+                    "Flips |0> to |1> and |1> to |0>. "
+                    "It is the quantum equivalent of a classical NOT gate.";
+        }
+        if (gateName == "Y") {
+            return
+                    "Flips the qubit like X, while also changing its phase. "
+                    "It maps |0> to i|1> and |1> to -i|0>.";
+        }
+        if (gateName == "Z") {
+            return
+                    "Leaves |0> unchanged and multiplies the |1> amplitude by -1. "
+                    "This changes phase without changing measurement probabilities.";
+        }
+        if (gateName == "S") {
+            return
+                    "Leaves |0> unchanged and multiplies the |1> amplitude by i. "
+                    "This adds a phase of pi/2 radians.";
+        }
+        if (gateName == "T") {
+            return
+                    "Leaves |0> unchanged and adds a phase of pi/4 radians "
+                    "to the |1> amplitude.";
+        }
+        if (gateName == "SWAP") {
+            return
+                    "Exchanges the quantum states of two qubits. "
+                    "The first qubit receives the second qubit's state, and vice versa.";
+        }
+        
+        return "No explanation is available for this gate yet.";
+    }
+
     void runInteractiveDebugger(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState) {
         const auto trace = circuit.executeWithTrace(initialState);
+        const auto instructions = circuit.instructionInfo();
 
         std::cout << "Initial state:\n";
         visualization::printProbabilityBars(initialState, std::cout);
@@ -38,6 +86,7 @@ namespace quantum_sim::debug {
         bool autoPlay = false;
         while (currentStep < trace.size()) {
             const auto &step = trace[currentStep];
+            const auto &instruction = instructions[currentStep];
 
             std::cout << "\nCircuit:\n";
             visualization::printCircuitDiagram(circuit, std::cout, currentStep);
@@ -45,6 +94,10 @@ namespace quantum_sim::debug {
 
             std::cout << "\n========== Step " << (currentStep + 1) << " / " << trace.size() << " ==========\n";
             std::cout << step.description << "\n";
+            std::cout
+                    << "Explanation: "
+                    << gateExplanation(instruction.name)
+                    << '\n';
 
             visualization::printProbabilityBars(step.state, std::cout);
             if (autoPlay) {
