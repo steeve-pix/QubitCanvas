@@ -285,4 +285,19 @@ namespace quantum_sim::visualization {
             output << '\n';
         }
     }
+
+    void printBlochVector(const quantum::QuantumRegister &state, std::ostream &output) {
+        const quantum::BlockVector vector = state.blockVector();
+
+        output
+                << "Bloch vector:\n"
+                << std::fixed << std::setprecision(2)
+                << "("
+                << vector.x
+                << ", "
+                << vector.y
+                << ", "
+                << vector.z
+                << ")\n";
+    }
 }
