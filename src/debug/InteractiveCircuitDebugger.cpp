@@ -13,7 +13,7 @@ namespace quantum_sim::debug {
         std::cout
                 << "\n[n] Next, [p] Previous, [r] Restart, "
                 << "[a] Auto-play, [i] Inspect amplitudes, "
-                << "[c] Compare changes, [h] Help, [q] Quit: ";
+                << "[c] Compare changes, [b] Bloch vector, [h] Help, [q] Quit: ";
 
         char command{};
         std::cin >> command;
@@ -157,6 +157,16 @@ namespace quantum_sim::debug {
                         << ":\n";
 
                 visualization::printStateComparison(beforeState, afterState, std::cout);
+            } else if (command == 'b') {
+                if (step.state.qubitCount() != 1) {
+                    std::cout
+                            << "\nA Bloch vector can only represent "
+                            << "a single-qubit state.\n";
+                } else {
+                    std::cout << '\n';
+
+                    visualization::printBlochVector(step.state, std::cout);
+                }
             } else if (command == 'h') {
                 std::cout
                         << "\nDebugger commands:\n"
@@ -166,6 +176,7 @@ namespace quantum_sim::debug {
                         << "  r - Restart from the first instruction\n"
                         << "  i - Inspect the current state's amplitudes\n"
                         << "  c - Compare the state before and after the current instruction\n"
+                        << "  b - Display the current state's Bloch vector\n"
                         << "  h - Show this help menu\n"
                         << "  q - Quit the debugger\n";
             } else {

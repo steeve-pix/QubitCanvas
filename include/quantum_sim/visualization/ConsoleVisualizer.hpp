@@ -86,4 +86,6 @@ namespace quantum_sim::visualization {
      */
     void printStateComparison(const quantum::QuantumRegister &beforeState, const quantum::QuantumRegister &afterState,
                               std::ostream &output);
+
+    void printBlochVector(const quantum::QuantumRegister &state, std::ostream &output);
 }
