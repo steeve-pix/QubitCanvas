@@ -15,7 +15,9 @@ int main() {
     using quantum_sim::circuit::QuantumCircuit;
     using quantum_sim::quantum::QuantumRegister;
 
-    const QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
+    QuantumCircuit circuit{2};
+
+    circuit.addSingleQubitGate("Z", quantum_sim::gates::zGate(), 0);
 
     const QuantumRegister initialState = QuantumRegister::basisState(2, 0);
 
@@ -24,13 +26,13 @@ int main() {
 
     constexpr std::size_t shotCount = 1'000;
 
-    const QuantumRegister bellState = bellCircuit.execute(initialState);
+    const QuantumRegister bellState = circuit.execute(initialState);
 
     const std::vector<quantum_sim::circuit::TraceStep> trace =
-            bellCircuit.executeWithTrace(initialState);
+            circuit.executeWithTrace(initialState);
 
     std::cout << "Circuit execution trace:\n\n";
-    quantum_sim::debug::runInteractiveDebugger(bellCircuit, initialState);
+    quantum_sim::debug::runInteractiveDebugger(circuit, initialState);
 
     return 0;
 }
