@@ -66,8 +66,24 @@ namespace quantum_sim::visualization {
     void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output,
                              std::optional<std::size_t> currentInstruction = std::nullopt);
 
+    /**
+     * @brief Outputs the amplitudes of all quantum states in the given quantum register.
+     *
+     * @param state The quantum register containing the states and their amplitudes to be displayed.
+     * @param output The output stream where the state labels and their amplitudes will be written.
+     */
     void printAmplitudes(const quantum::QuantumRegister &state, std::ostream &output);
 
+    /**
+     * @brief Compares two quantum states before and after a specific transformation or operation
+     *        and outputs the differences in probabilities, amplitudes, and phases for each state.
+     *
+     * @param beforeState The initial quantum register containing the states and probabilities before the operation.
+     * @param afterState The quantum register containing the states and probabilities after the operation.
+     * @param output The output stream where the comparison results are written.
+     *
+     * @throws std::invalid_argument If the quantum registers being compared do not have the same number of states.
+     */
     void printStateComparison(const quantum::QuantumRegister &beforeState, const quantum::QuantumRegister &afterState,
                               std::ostream &output);
 }

@@ -37,10 +37,10 @@ namespace {
     }
 } //
 int main() {
-    QuantumCircuit circuit{1};
-    circuit.addSingleQubitGate("Z", quantum_sim::gates::zGate(), 0);
-    const QuantumRegister initialState = QuantumRegister::basisState(1, 1);
-    const auto trace = circuit.executeWithTrace(initialState);
+    QuantumCircuit bellCircuit = quantum_sim::algorithms::bellStateCircuit();
+    bellCircuit.addSingleQubitGate("Z", quantum_sim::gates::zGate(), 0);
+    const QuantumRegister initialState = QuantumRegister::basisState(2, 1);
+    const auto trace = bellCircuit.executeWithTrace(initialState);
 
     std::ostringstream comparisonOutput;
 
@@ -54,10 +54,24 @@ int main() {
             comparisonOutput.str();
 
     check(
-        comparison.find(
-            "Phase: 0.00 rad -> pi rad"
+        quantum_sim::debug::gateExplanation("H").find(
+            "superposition"
         ) != std::string::npos,
-        "State comparison shows the phase transition in radians"
+        "Hadamard explanation mentions superposition"
+    );
+
+    check(
+        quantum_sim::debug::gateExplanation("CNOT").find(
+            "control qubit"
+        ) != std::string::npos,
+        "CNOT explanation mentions the control qubit"
+    );
+
+    check(
+        quantum_sim::debug::gateExplanation("Z").find(
+            "phase"
+        ) != std::string::npos,
+        "Z explanation mentions phase"
     );
 
     if (failures == 0) {
