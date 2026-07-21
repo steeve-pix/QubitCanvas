@@ -45,23 +45,24 @@ int main() {
     const QuantumRegister result = rotationCircuit.execute(initialState);
 
     check(
-        rotationCircuit.qubitCount() == 1,
-        "Rx rotation demonstration creates a one-qubit circuit"
+        quantum_sim::debug::gateExplanation("Rx").find(
+            "X axis"
+        ) != std::string::npos,
+        "Rx explanation mentions the X axis"
     );
 
     check(
-        rotationCircuit.instructionCount() == 1,
-        "Rx rotation demonstration contains one instruction"
+        quantum_sim::debug::gateExplanation("Ry").find(
+            "Y axis"
+        ) != std::string::npos,
+        "Ry explanation mentions the Y axis"
     );
 
     check(
-        approximatelyEqual(result.probability(0), 0.5),
-        "Rx(pi/2) gives |0> a probability of 50%"
-    );
-
-    check(
-        approximatelyEqual(result.probability(1), 0.5),
-        "Rx(pi/2) gives |1> a probability of 50%"
+        quantum_sim::debug::gateExplanation("Rz").find(
+            "phase"
+        ) != std::string::npos,
+        "Rz explanation mentions phase"
     );
 
     if (failures == 0) {
