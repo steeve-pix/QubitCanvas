@@ -8,8 +8,13 @@
 #include <numbers>
 #include <random>
 #include <stdexcept>
+#include <cctype>
 
 int readAlgorithmChoice();
+
+char readRotationAxis();
+
+double readRotationAngle();
 
 int main() {
     using quantum_sim::circuit::QuantumCircuit;
@@ -22,6 +27,21 @@ int main() {
         return 1;
     }
 
+    char rotationAxis{};
+    double rotationAngle{};
+    if (choice == 4) {
+        rotationAxis = readRotationAxis();
+        if (rotationAxis != 'x' &&
+            rotationAxis != 'y' &&
+            rotationAxis != 'z') {
+            std::cerr
+                    << "Invalid rotation axis. Please enter x, y, or z.\n";
+
+            return 1;
+        }
+        rotationAngle = readRotationAngle();
+    }
+
     const QuantumCircuit circuit = [&]() {
         switch (choice) {
             case 1:
@@ -31,7 +51,12 @@ int main() {
             case 3:
                 return quantum_sim::algorithms::ghzStateCircuit();
             case 4:
-                return quantum_sim::algorithms::rxRotationCircuit(std::numbers::pi / 2);
+                switch (rotationAxis) {
+                    case 'x': return quantum_sim::algorithms::rxRotationCircuit(rotationAngle);
+                    case 'y': return quantum_sim::algorithms::ryRotationCircuit(rotationAngle);
+                    case 'z': return quantum_sim::algorithms::rzRotationCircuit(rotationAngle);
+                    default: throw std::invalid_argument{"Unsupported rotation axis."};;
+                }
             default:
                 throw std::invalid_argument{"Unsupported algorithm choice."};
         }
@@ -60,11 +85,36 @@ int readAlgorithmChoice() {
             << "1. Bell state\n"
             << "2. Equal superposition\n"
             << "3. GHZ state\n"
-            << "4. Rx(pi/2) rotation\n"
+            << "4. Rotation playground\n"
             << "Choice: ";
 
     int choice{};
     std::cin >> choice;
 
     return choice;
+}
+
+char readRotationAxis() {
+    std::cout
+            << "\nChoose a rotation axis:\n"
+            << "x. Rx\n"
+            << "y. Ry\n"
+            << "z. Rz\n"
+            << "Choice: ";
+
+    char axis{};
+    std::cin >> axis;
+
+    return static_cast<char>(
+        std::tolower(static_cast<unsigned char>(axis))
+    );
+}
+
+double readRotationAngle() {
+    std::cout << "Enter the rotation angle in radians: ";
+
+    double angleRadians{};
+    std::cin >> angleRadians;
+
+    return angleRadians;
 }

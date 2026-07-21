@@ -37,4 +37,7 @@ namespace quantum_sim::algorithms {
     [[nodiscard]] circuit::QuantumCircuit ghzStateCircuit();
 
     [[nodiscard]] circuit::QuantumCircuit rxRotationCircuit(double angleRadians);
+
+    [[nodiscard]] circuit::QuantumCircuit ryRotationCircuit(double angleRadians);
+    [[nodiscard]] circuit::QuantumCircuit rzRotationCircuit(double angleRadians);
 }

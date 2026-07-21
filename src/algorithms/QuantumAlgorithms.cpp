@@ -55,4 +55,20 @@ namespace quantum_sim::algorithms {
 
         return circuit;
     }
+
+    circuit::QuantumCircuit ryRotationCircuit(double angleRadians) {
+        circuit::QuantumCircuit circuit{1};
+
+        circuit.addSingleQubitGate("Ry", gates::ryGate(angleRadians), 0);
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit rzRotationCircuit(double angleRadians) {
+        circuit::QuantumCircuit circuit{1};
+
+        circuit.addSingleQubitGate("Rz", gates::rzGate(angleRadians), 0);
+
+        return circuit;
+    }
 }
