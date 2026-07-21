@@ -253,4 +253,19 @@ namespace quantum_sim::quantum {
 
         return result;
     }
+
+    BlockVector QuantumRegister::blockVector() const {
+        if (qubitCount_ != 1) {
+            throw std::invalid_argument{"A Bloch vector can only represent a single qubit."};
+        }
+
+        const math::Complex alpha = amplitude(0);
+        const math::Complex beta = amplitude(1);
+
+        const double x = 2.0 * (alpha.real() * beta.real() + alpha.imaginary() * beta.imaginary());
+        const double y = 2.0 * (alpha.real() * beta.imaginary() - alpha.imaginary() * beta.real());
+        const double z = alpha.magnitudeSquared() - beta.magnitudeSquared();
+
+        return BlockVector{x, y, z};
+    }
 }
