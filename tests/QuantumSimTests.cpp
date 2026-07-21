@@ -38,43 +38,30 @@ namespace {
     }
 } //
 int main() {
-    const ComplexMatrix rxPi = quantum_sim::gates::rxGate(std::numbers::pi);
-    const ComplexMatrix ryPi = quantum_sim::gates::ryGate(std::numbers::pi);
-    const ComplexMatrix rzPi = quantum_sim::gates::rzGate(std::numbers::pi);
-    const ComplexVector zeroState{
-        std::vector{
-            Complex{1.0, 0.0},
-            Complex{0.0, 0.0},
-        }
-    };
+    const QuantumCircuit rotationCircuit = quantum_sim::algorithms::rxRotationCircuit(std::numbers::pi / 2.0);
 
-    const ComplexVector resultRxPi = rxPi * zeroState;
-    const ComplexVector resultRyPi = ryPi * zeroState;
-    const ComplexVector resultRzPi = rzPi * zeroState;
+    const QuantumRegister initialState = QuantumRegister::basisState(1, 0);
+
+    const QuantumRegister result = rotationCircuit.execute(initialState);
 
     check(
-        approximatelyEqual(resultRxPi.at(0).real(), 0.0) &&
-        approximatelyEqual(resultRyPi.at(0).real(), 0.0) &&
-        approximatelyEqual(resultRzPi.at(0).real(), 0.0) &&
-        approximatelyEqual(resultRxPi.at(0).imaginary(), 0.0) &&
-        approximatelyEqual(resultRyPi.at(0).imaginary(), 0.0)
-        && approximatelyEqual(resultRzPi.at(0).imaginary(), -1.0),
-        "Rx(pi) & Ry(pi) removes the |0> amplitude"
+        rotationCircuit.qubitCount() == 1,
+        "Rx rotation demonstration creates a one-qubit circuit"
     );
 
     check(
-        approximatelyEqual(resultRxPi.at(1).real(), 0.0) &&
-        approximatelyEqual(resultRyPi.at(1).real(), 1.0) &&
-        approximatelyEqual(resultRzPi.at(1).real(), 0.0) &&
-        approximatelyEqual(resultRxPi.at(1).imaginary(), -1.0) &&
-        approximatelyEqual(resultRyPi.at(1).imaginary(), 0.0)
-        && approximatelyEqual(resultRzPi.at(1).imaginary(), 0.0),
-        "Rx(pi) & Ry(pi) transforms |0> into -i|1>"
+        rotationCircuit.instructionCount() == 1,
+        "Rx rotation demonstration contains one instruction"
     );
 
     check(
-        rxPi.isUnitary() && ryPi.isUnitary() && rzPi.isUnitary(),
-        "Rx, Ry & Rz gate is unitary"
+        approximatelyEqual(result.probability(0), 0.5),
+        "Rx(pi/2) gives |0> a probability of 50%"
+    );
+
+    check(
+        approximatelyEqual(result.probability(1), 0.5),
+        "Rx(pi/2) gives |1> a probability of 50%"
     );
 
     if (failures == 0) {

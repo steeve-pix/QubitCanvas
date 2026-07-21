@@ -35,4 +35,6 @@ namespace quantum_sim::algorithms {
      * @return A quantum circuit configured to produce a GHZ state.
      */
     [[nodiscard]] circuit::QuantumCircuit ghzStateCircuit();
+
+    [[nodiscard]] circuit::QuantumCircuit rxRotationCircuit(double angleRadians);
 }

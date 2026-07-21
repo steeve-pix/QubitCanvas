@@ -33,17 +33,25 @@ namespace quantum_sim::algorithms {
 
         circuit.addControlledGate(
             "CX",
-            gates::cxGate(3,0,1),
+            gates::cxGate(3, 0, 1),
             0,
             1
         );
 
         circuit.addControlledGate(
             "CX",
-            gates::cxGate(3,1,2),
+            gates::cxGate(3, 1, 2),
             1,
             2
         );
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit rxRotationCircuit(double angleRadians) {
+        circuit::QuantumCircuit circuit{1};
+
+        circuit.addSingleQubitGate("Rx", gates::rxGate(angleRadians), 0);
 
         return circuit;
     }
