@@ -32,12 +32,5 @@ int main() {
     std::cout << "Circuit execution trace:\n\n";
     quantum_sim::debug::runInteractiveDebugger(bellCircuit, initialState);
 
-    std::cout << "\n";
-    std::cout << "----------------------------------------------------\n";
-    // std::cout << "Circuit diagram:\n";
-    quantum_sim::visualization::printCircuitDiagram(bellCircuit, std::cout);
-
-    std::cout << '\n';
-
     return 0;
 }
