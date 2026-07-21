@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <iostream>
+#include <numbers>
 #include <random>
 #include <stdexcept>
 
@@ -16,8 +17,8 @@ int main() {
 
     const int choice = readAlgorithmChoice();
 
-    if (choice < 1 || choice > 3) {
-        std::cerr << "Invalid choice. Please enter 1, 2 or 3.\n";
+    if (choice < 1 || choice > 4) {
+        std::cerr << "Invalid choice. Please enter 1, 2, 3 or 4.\n";
         return 1;
     }
 
@@ -29,11 +30,12 @@ int main() {
                 return quantum_sim::algorithms::equalSuperpositionCircuit(3);
             case 3:
                 return quantum_sim::algorithms::ghzStateCircuit();
+            case 4:
+                return quantum_sim::algorithms::rxRotationCircuit(std::numbers::pi / 2);
             default:
                 throw std::invalid_argument{"Unsupported algorithm choice."};
         }
     }();
-
 
     const QuantumRegister initialState =
             QuantumRegister::basisState(circuit.qubitCount(), 0);
@@ -58,6 +60,7 @@ int readAlgorithmChoice() {
             << "1. Bell state\n"
             << "2. Equal superposition\n"
             << "3. GHZ state\n"
+            << "4. Rx(pi/2) rotation\n"
             << "Choice: ";
 
     int choice{};
