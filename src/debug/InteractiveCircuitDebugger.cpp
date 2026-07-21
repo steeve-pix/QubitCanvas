@@ -36,7 +36,7 @@ namespace quantum_sim::debug {
                     "and |1> amplitudes.";
         }
 
-        if (gateName == "CNOT") {
+        if (gateName == "CX") {
             return
                     "Flips the target qubit when the control qubit is |1>. "
                     "It can create entanglement.";

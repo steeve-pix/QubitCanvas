@@ -11,6 +11,16 @@ namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix xGate();
 
     /**
+     * Constructs the RX rotation gate for a single qubit as a 2x2 complex matrix.
+     * The RX gate performs a counterclockwise rotation around the X-axis of the Bloch sphere
+     * by an angle specified in radians.
+     *
+     * @param angleRadians The rotation angle in radians.
+     * @return A 2x2 ComplexMatrix representing the RX rotation gate.
+     */
+    [[nodiscard]] math::ComplexMatrix rxGate(double angleRadians);
+
+    /**
      * Constructs the Y gate (Pauli-Y gate) matrix for single-qubit quantum operations.
      * The Y gate is represented as a 2x2 complex matrix.
      *
@@ -21,12 +31,31 @@ namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix yGate();
 
     /**
+     * Constructs the RY (rotation around the Y axis) gate for a single qubit
+     * as a 2x2 complex matrix. The RY gate applies a rotation by the specified angle
+     * about the Y axis in the Bloch sphere representation of a qubit's state.
+     *
+     * @param angleRadians The rotation angle in radians.
+     * @return A 2x2 ComplexMatrix representing the RY gate.
+     */
+    [[nodiscard]] math::ComplexMatrix ryGate(double angleRadians);
+
+    /**
      * Constructs the Z (Pauli-Z) gate for a single qubit in the form of a 2x2 complex matrix.
      * The Z gate applies a phase flip to the state of a qubit. It maps |0⟩ to |0⟩ and |1⟩ to -|1⟩.
      *
      * @return A 2x2 ComplexMatrix representing the Pauli-Z gate.
      */
     [[nodiscard]] math::ComplexMatrix zGate();
+
+    /**
+     * Constructs the Rz (rotation around the Z-axis) gate for a single qubit in the form of a 2x2 complex matrix.
+     * The Rz gate applies a phase shift dependent on the given angle in radians.
+     *
+     * @param angleRadians The rotation angle in radians. The phase shift is calculated as a function of this angle.
+     * @return A 2x2 ComplexMatrix representing the Rz gate.
+     */
+    [[nodiscard]] math::ComplexMatrix rzGate(double angleRadians);
 
     /**
      * Constructs the S gate matrix, which is a single-qubit quantum gate used in quantum computing.
@@ -58,13 +87,13 @@ namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix hadamardGate();
 
     /**
-     * Constructs the CNOT (Controlled-NOT) gate as a 4x4 complex matrix.
-     * The CNOT gate is a two-qubit quantum gate that flips the state of the target qubit
+     * Constructs the CX (Controlled-NOT) gate as a 4x4 complex matrix.
+     * The CX gate is a two-qubit quantum gate that flips the state of the target qubit
      * if and only if the control qubit is in the |1⟩ state.
      *
-     * @return A 4x4 ComplexMatrix representing the CNOT gate.
+     * @return A 4x4 ComplexMatrix representing the CX gate.
      */
-    [[nodiscard]] math::ComplexMatrix cnotGate();
+    [[nodiscard]] math::ComplexMatrix cxGate();
 
     /**
      * Constructs the SWAP gate for two qubits in the form of a 4x4 complex matrix.
@@ -75,6 +104,6 @@ namespace quantum_sim::gates {
      */
     [[nodiscard]] math::ComplexMatrix swapGate();
 
-    [[nodiscard]] math::ComplexMatrix cnotGate(std::size_t qubitCount, std::size_t controlQubit,
-                                                      std::size_t targetQubit);
+    [[nodiscard]] math::ComplexMatrix cxGate(std::size_t qubitCount, std::size_t controlQubit,
+                                             std::size_t targetQubit);
 }

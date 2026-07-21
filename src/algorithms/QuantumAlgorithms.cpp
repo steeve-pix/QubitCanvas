@@ -7,7 +7,7 @@ namespace quantum_sim::algorithms {
         circuit::QuantumCircuit circuit{2};
 
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
-        circuit.addControlledGate("CNOT", gates::cnotGate(), 0, 1);
+        circuit.addControlledGate("CX", gates::cxGate(), 0, 1);
 
         return circuit;
     }
@@ -32,15 +32,15 @@ namespace quantum_sim::algorithms {
         );
 
         circuit.addControlledGate(
-            "CNOT",
-            gates::cnotGate(3,0,1),
+            "CX",
+            gates::cxGate(3,0,1),
             0,
             1
         );
 
         circuit.addControlledGate(
-            "CNOT",
-            gates::cnotGate(3,1,2),
+            "CX",
+            gates::cxGate(3,1,2),
             1,
             2
         );
