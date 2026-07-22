@@ -8,7 +8,9 @@
 #include <thread>
 #include <string>
 
-namespace quantum_sim::debug {
+#include "quantum_sim/debug/DebuggerSession.hpp"
+
+namespace {
     char readDebuggerCommand() {
         std::cout
                 << "\n[n] Next, [p] Previous, [r] Restart, "
@@ -18,17 +20,29 @@ namespace quantum_sim::debug {
         char command{};
         std::cin >> command;
 
-        command = static_cast<char>(
-            std::tolower(static_cast<unsigned char>(command))
-        );
-
-        return command;
+        return static_cast<char>(std::tolower(static_cast<unsigned char>(command)));
     };
 
     void waitForAutoPlay() {
         std::this_thread::sleep_for(std::chrono::milliseconds{750});
     }
 
+    void printDebuggerHelp() {
+        std::cout
+                << "\nDebugger commands:\n"
+                << "  n - Move to the next instruction\n"
+                << "  p - Move to the previous instruction\n"
+                << "  r - Restart from the first instruction\n"
+                << "  a - Automatically execute remaining instructions\n"
+                << "  i - Inspect the current state's amplitudes\n"
+                << "  c - Compare the state before and after the current instruction\n"
+                << "  b - Display the current state's Bloch vector\n"
+                << "  h - Show this help menu\n"
+                << "  q - Quit the debugger\n";
+    }
+}
+
+namespace quantum_sim::debug {
     std::string gateExplanation(const std::string &gateName) {
         if (gateName == "H") {
             return
@@ -90,23 +104,32 @@ namespace quantum_sim::debug {
     }
 
     void runInteractiveDebugger(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState) {
-        const auto trace = circuit.executeWithTrace(initialState);
+        DebuggerSession session{circuit, initialState};
         const auto instructions = circuit.instructionInfo();
 
         std::cout << "Initial state:\n";
         visualization::printProbabilityBars(initialState, std::cout);
 
-        std::size_t currentStep{};
+        if (session.stepCount() == 0) {
+            std::cout << "\nThe circuit contains no instructions.\n";
+            return;
+        }
         bool autoPlay = false;
-        while (currentStep < trace.size()) {
-            const auto &step = trace[currentStep];
-            const auto &instruction = instructions[currentStep];
+        while (true) {
+            const circuit::TraceStep &step =
+                    session.currentStep();
+
+            const std::size_t currentStep =
+                    session.currentStepIndex();
+
+            const circuit::CircuitInstructionInfo &instruction =
+                    instructions.at(currentStep);
+
 
             std::cout << "\nCircuit:\n";
             visualization::printCircuitDiagram(circuit, std::cout, currentStep);
 
-
-            std::cout << "\n========== Step " << (currentStep + 1) << " / " << trace.size() << " ==========\n";
+            std::cout << "\n========== Step " << (currentStep + 1) << " / " << session.stepCount() << " ==========\n";
             std::cout << step.description << "\n";
             std::cout
                     << "Explanation: "
@@ -116,29 +139,36 @@ namespace quantum_sim::debug {
             visualization::printProbabilityBars(step.state, std::cout);
             if (autoPlay) {
                 waitForAutoPlay();
-                ++currentStep;
+                if (!session.moveNext()) {
+                    break;
+                }
+
                 continue;
             }
 
-            char command = readDebuggerCommand();
+            const char command =
+                    readDebuggerCommand();
 
             if (command == 'q') {
                 std::cout << "\nDebugger closed.\n";
                 return;
             }
             if (command == 'n') {
-                ++currentStep;
+                if (!session.moveNext()) {
+                    break;
+                }
             } else if (command == 'p') {
-                if (currentStep > 0) {
-                    --currentStep;
-                } else {
-                    std::cout << "\nAlready at the first step.\n";
+                if (!session.movePrevious()) {
+                    std::cout
+                            << "\nAlready at the first step.\n";
                 }
             } else if (command == 'r') {
-                currentStep = 0;
+                session.restart();
             } else if (command == 'a') {
                 autoPlay = true;
-                ++currentStep;
+                if (!session.moveNext()) {
+                    break;
+                }
             } else if (command == 'i') {
                 std::cout << "\nCurrent amplitudes:\n";
 
@@ -147,42 +177,37 @@ namespace quantum_sim::debug {
                     std::cout
                 );
             } else if (command == 'c') {
-                const quantum::QuantumRegister &beforeState = currentStep == 0
-                                                                  ? initialState
-                                                                  : trace[currentStep - 1].state;
-                const quantum::QuantumRegister &afterState = step.state;
+                const quantum::QuantumRegister &beforeState =
+                        session.stateBeforeCurrentStep();
+
+                const quantum::QuantumRegister &afterState =
+                        session.currentStep().state;
+
                 std::cout
                         << "\nChanges caused by "
-                        << step.description
+                        << session.currentStep().description
                         << ":\n";
 
                 visualization::printStateComparison(beforeState, afterState, std::cout);
             } else if (command == 'b') {
-                if (step.state.qubitCount() != 1) {
+                const quantum::QuantumRegister &currentState =
+                        session.currentStep().state;
+
+                if (currentState.qubitCount() != 1) {
                     std::cout
                             << "\nA Bloch vector can only represent "
                             << "a single-qubit state.\n";
                 } else {
                     std::cout << '\n';
 
-                    visualization::printBlochVector(step.state, std::cout);
+                    visualization::printBlochVector(currentState, std::cout);
 
                     std::cout << '\n';
 
-                    visualization::printAsciiBlochSphere(step.state, std::cout);
+                    visualization::printAsciiBlochSphere(currentState, std::cout);
                 }
             } else if (command == 'h') {
-                std::cout
-                        << "\nDebugger commands:\n"
-                        << "  a - Automatically execute remaining instructions\n"
-                        << "  n - Move to the next instruction\n"
-                        << "  p - Move to the previous instruction\n"
-                        << "  r - Restart from the first instruction\n"
-                        << "  i - Inspect the current state's amplitudes\n"
-                        << "  c - Compare the state before and after the current instruction\n"
-                        << "  b - Display the current state's Bloch vector\n"
-                        << "  h - Show this help menu\n"
-                        << "  q - Quit the debugger\n";
+                printDebuggerHelp();
             } else {
                 std::cout << "\nUnknown command. Type 'h' to view available commands.\n";
             }
