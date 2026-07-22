@@ -115,27 +115,30 @@ namespace quantum_sim::debug {
         }
         bool autoPlay = false;
         while (true) {
-            const circuit::TraceStep &step =
-                    session.currentStep();
+            const DebuggerSnapshot snapshot =
+                    session.snapshot();
+
+            const quantum::QuantumRegister &currentState =
+                    snapshot.afterState.get();
 
             const std::size_t currentStep =
-                    session.currentStepIndex();
+                    snapshot.currentStepIndex;
 
             const circuit::CircuitInstructionInfo &instruction =
-                    session.currentInstruction();
+                    snapshot.instruction.get();
 
 
             std::cout << "\nCircuit:\n";
             visualization::printCircuitDiagram(circuit, std::cout, currentStep);
 
-            std::cout << "\n========== Step " << (currentStep + 1) << " / " << session.stepCount() << " ==========\n";
-            std::cout << step.description << "\n";
+            std::cout << "\n========== Step " << (currentStep + 1) << " / " << snapshot.stepCount << " ==========\n";
+            std::cout << instruction.name << "\n";
             std::cout
                     << "Explanation: "
                     << gateExplanation(instruction.name)
                     << '\n';
 
-            visualization::printProbabilityBars(step.state, std::cout);
+            visualization::printProbabilityBars(currentState, std::cout);
             if (autoPlay) {
                 waitForAutoPlay();
                 if (!session.moveNext()) {
@@ -172,26 +175,23 @@ namespace quantum_sim::debug {
                 std::cout << "\nCurrent amplitudes:\n";
 
                 visualization::printAmplitudes(
-                    step.state,
+                    currentState,
                     std::cout
                 );
             } else if (command == 'c') {
                 const quantum::QuantumRegister &beforeState =
-                        session.stateBeforeCurrentStep();
+                        snapshot.beforeState.get();
 
                 const quantum::QuantumRegister &afterState =
-                        session.currentStep().state;
+                        currentState;
 
                 std::cout
                         << "\nChanges caused by "
-                        << session.currentStep().description
+                        << instruction.name
                         << ":\n";
 
                 visualization::printStateComparison(beforeState, afterState, std::cout);
             } else if (command == 'b') {
-                const quantum::QuantumRegister &currentState =
-                        session.currentStep().state;
-
                 if (currentState.qubitCount() != 1) {
                     std::cout
                             << "\nA Bloch vector can only represent "
