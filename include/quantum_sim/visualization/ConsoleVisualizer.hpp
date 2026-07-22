@@ -87,7 +87,25 @@ namespace quantum_sim::visualization {
     void printStateComparison(const quantum::QuantumRegister &beforeState, const quantum::QuantumRegister &afterState,
                               std::ostream &output);
 
+    /**
+     * @brief Outputs the Bloch vector and corresponding spherical coordinates of
+     *        the quantum state to the specified output stream.
+     *
+     * @param state The quantum register representing the quantum state for which
+     *              the Bloch vector and angles are to be calculated.
+     * @param output The output stream where the Bloch vector and angles
+     *               (theta, phi) will be written.
+     */
     void printBlochVector(const quantum::QuantumRegister &state, std::ostream &output);
 
+    /**
+     * @brief Renders a textual representation of a Bloch sphere annotated with
+     *        the quantum state vector's position and outputs it to the specified stream.
+     *
+     * @param state The quantum register containing the state vector whose
+     *              Bloch sphere representation will be visualized.
+     * @param output The output stream where the ASCII Bloch sphere visualization
+     *               and directional information will be written.
+     */
     void printAsciiBlochSphere(const quantum::QuantumRegister &state, std::ostream &output);
 }
