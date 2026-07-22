@@ -12,6 +12,8 @@
 #include <iostream>
 #include <numbers>
 
+#include "quantum_sim/debug/DebuggerSession.hpp"
+
 namespace {
     using quantum_sim::math::ComplexVector;
     using quantum_sim::math::ComplexMatrix;
@@ -38,33 +40,26 @@ namespace {
     }
 } //
 int main() {
-    const double amplitude =
-            1.0 / std::sqrt(2.0);
+    const QuantumCircuit circuit =
+            quantum_sim::algorithms::ghzStateCircuit();
 
-    const QuantumRegister plusState{
-        1,
-        ComplexVector{
-            std::vector{
-                Complex{amplitude, 0.0},
-                Complex{0.0, amplitude}
-            }
-        }
+    const QuantumRegister initialState =
+            QuantumRegister::basisState(3, 0);
+
+    quantum_sim::debug::DebuggerSession session{
+        circuit,
+        initialState
     };
-    const quantum_sim::quantum::BlochAngles angles = plusState.blochAngles();
+
+    session.restart();
 
     check(
         approximatelyEqual(
-            angles.theta,
-            std::numbers::pi / 2.0
+            session.stateBeforeCurrentStep().probability(0),
+            1.0
         ),
-        "|+> has Bloch polar angle pi/2 radians"
+        "The state before the first instruction is the initial state"
     );
-
-    check(
-        approximatelyEqual(angles.phi, 0.0),
-        "|+> has Bloch azimuth angle 0 radians"
-    );
-
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
