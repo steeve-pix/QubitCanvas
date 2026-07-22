@@ -362,6 +362,14 @@ namespace quantum_sim::visualization {
 
         canvas.at(markerRow).at(markerColumn) = 'Q';
 
+        constexpr double epsilon = 1e-10;
+
+        output << (vector.y > epsilon
+                       ? "Y direction: +Y, out of the screen\n"
+                       : (vector.y < -epsilon
+                              ? "Y direction: -Y, into the screen\n"
+                              : "Y direction: 0, in the X-Z plane\n"));
+
         for (const std::string &row: canvas) {
             output << row << '\n';
         }
