@@ -64,4 +64,16 @@ namespace quantum_sim::debug {
     const circuit::CircuitInstructionInfo &DebuggerSession::currentInstruction() const {
         return instructions_.at(currentStep_);
     }
+
+    DebuggerSnapshot DebuggerSession::snapshot() const {
+        return DebuggerSnapshot{
+            currentStepIndex(),
+            stepCount(),
+            std::cref(currentInstruction()),
+            std::cref(stateBeforeCurrentStep()),
+            std::cref(currentStep().state),
+            canMoveNext(),
+            canMovePrevious()
+        };
+    }
 }

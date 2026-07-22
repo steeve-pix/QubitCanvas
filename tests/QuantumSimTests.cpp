@@ -53,13 +53,17 @@ int main() {
 
     session.restart();
 
+    const quantum_sim::debug::DebuggerSnapshot snapshot =
+            session.snapshot();
+
     check(
         approximatelyEqual(
-            session.stateBeforeCurrentStep().probability(0),
+            snapshot.beforeState.get().probability(0),
             1.0
         ),
-        "The state before the first instruction is the initial state"
+        "Debugger snapshot exposes the state before the current instruction"
     );
+
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }

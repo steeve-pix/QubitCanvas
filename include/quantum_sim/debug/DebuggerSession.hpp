@@ -1,12 +1,21 @@
 #pragma once
 #include <cstddef>
 #include <vector>
+#include <functional>
 
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 
 
 namespace quantum_sim::debug {
+    struct DebuggerSnapshot {
+        std::size_t currentStepIndex, stepCount;
+        std::reference_wrapper<const circuit::CircuitInstructionInfo> instruction;
+        std::reference_wrapper<const quantum::QuantumRegister> beforeState;
+        std::reference_wrapper<const quantum::QuantumRegister> afterState;
+        bool canMoveNext, canMovePrevious;
+    };
+
     class DebuggerSession {
     public:
         /**
@@ -129,6 +138,8 @@ namespace quantum_sim::debug {
         [[nodiscard]] const quantum::QuantumRegister &stateBeforeCurrentStep() const noexcept;
 
         [[nodiscard]] const circuit::CircuitInstructionInfo &currentInstruction() const;
+
+        [[nodiscard]] DebuggerSnapshot snapshot() const;
 
         /**
          * Represents the initial state of the quantum register for the debugging session.
