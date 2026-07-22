@@ -3,7 +3,8 @@
 namespace quantum_sim::debug {
     DebuggerSession::DebuggerSession(const circuit::QuantumCircuit &circuit,
                                      const quantum::QuantumRegister &initialState)
-        : initialState_(initialState), trace_(circuit.executeWithTrace(initialState)) {
+        : initialState_{initialState}, trace_{circuit.executeWithTrace(initialState)},
+          instructions_{circuit.instructionInfo()} {
     }
 
     std::size_t DebuggerSession::stepCount() const noexcept {
@@ -58,5 +59,9 @@ namespace quantum_sim::debug {
         }
 
         return trace_[currentStep_ - 1].state;
+    }
+
+    const circuit::CircuitInstructionInfo &DebuggerSession::currentInstruction() const {
+        return instructions_.at(currentStep_);
     }
 }

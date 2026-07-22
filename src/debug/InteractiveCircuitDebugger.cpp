@@ -105,7 +105,6 @@ namespace quantum_sim::debug {
 
     void runInteractiveDebugger(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState) {
         DebuggerSession session{circuit, initialState};
-        const auto instructions = circuit.instructionInfo();
 
         std::cout << "Initial state:\n";
         visualization::printProbabilityBars(initialState, std::cout);
@@ -123,7 +122,7 @@ namespace quantum_sim::debug {
                     session.currentStepIndex();
 
             const circuit::CircuitInstructionInfo &instruction =
-                    instructions.at(currentStep);
+                    session.currentInstruction();
 
 
             std::cout << "\nCircuit:\n";
