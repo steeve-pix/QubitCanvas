@@ -89,7 +89,20 @@ namespace quantum_sim::gui {
                     session_.snapshot();
 
             ImGui::Begin("Circuit");
-            circuitRenderer_.draw(circuit_, snapshot);
+            if (pendingGate_.has_value()) {
+                ImGui::TextColored(
+                    ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
+                    "Placement mode: %s",
+                    pendingGate_->c_str()
+                );
+
+                ImGui::SameLine();
+
+                if (ImGui::SmallButton("Cancel")) {
+                    pendingGate_.reset();
+                }
+            }
+            circuitRenderer_.draw(circuit_, snapshot, pendingGate_);
 
             const auto selectedInstructionIndex =
                     circuitRenderer_.selectedInstructionIndex();
@@ -112,7 +125,14 @@ namespace quantum_sim::gui {
 
             ImGui::Begin("Gate Library");
 
-            ImGui::Text("Drag-and-drop gates comming soon.");
+            gateLibraryPanel_.draw();
+
+            const std::optional<std::string> selectedGate =
+                    gateLibraryPanel_.consumeSelectedGate();
+
+            if (selectedGate.has_value()) {
+                pendingGate_ = selectedGate.value();
+            }
 
             ImGui::End();
 

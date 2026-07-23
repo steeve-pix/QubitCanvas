@@ -80,6 +80,7 @@ add_library(qubit_canvas_gui STATIC
         src/gui/panels/InspectorPanel.cpp
         src/gui/rendering/CircuitRenderer.cpp
         src/gui/rendering/BlochSphereRenderer.cpp
+        src/gui/panels/GateLibraryPanel.cpp
 )
 
 target_include_directories(qubit_canvas_gui PUBLIC ${PROJECT_SOURCE_DIR}/include)

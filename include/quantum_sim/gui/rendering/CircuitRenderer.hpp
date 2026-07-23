@@ -12,7 +12,9 @@ struct ImVec2;
 namespace quantum_sim::gui {
     class CircuitRenderer {
     public:
-        void draw(const circuit::QuantumCircuit &circuit, const debug::DebuggerSnapshot &snapshot);
+        void draw(const circuit::QuantumCircuit &circuit, const debug::DebuggerSnapshot &snapshot,
+                  const std::optional<std::string> &
+                  pendingGate);
 
         explicit CircuitRenderer(CircuitStyle style = {});
 
@@ -24,6 +26,8 @@ namespace quantum_sim::gui {
 
         void clearSelection() noexcept;
 
+        [[nodiscard]] bool hasCompletedControlledPlacement() const noexcept;
+
     private:
         void drawGate(ImDrawList *drawList, const ImVec2 &center, const std::string &label, bool highlighted,
                       bool hovered, bool selected);
@@ -31,5 +35,7 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> selectedInstructionIndex_;
 
         CircuitStyle style_;
+        std::optional<std::size_t> pendingControlQubit_;
+        std::optional<std::size_t> pendingTargetQubit_;
     };
 }
