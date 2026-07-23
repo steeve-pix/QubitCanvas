@@ -1,4 +1,5 @@
 #include "quantum_sim/debug/DebuggerSession.hpp"
+#include <stdexcept>
 
 namespace quantum_sim::debug {
     DebuggerSession::DebuggerSession(const circuit::QuantumCircuit &circuit,
@@ -75,5 +76,15 @@ namespace quantum_sim::debug {
             canMoveNext(),
             canMovePrevious()
         };
+    }
+
+    const circuit::TraceStep &DebuggerSession::stepAt(std::size_t index) const {
+        if (index >= trace_.size()) {
+            throw std::out_of_range(
+                "DebuggerSession::stepAt index out of range"
+            );
+        }
+
+        return trace_[index];
     }
 }

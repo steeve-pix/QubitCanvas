@@ -2,6 +2,7 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/gui/GuiApplication.hpp"
 
 #include <cstddef>
 #include <iostream>
@@ -114,13 +115,9 @@ int main() {
             choice == 4
                 ? createRotationInitialState(rotationInitialStateChoice)
                 : QuantumRegister::basisState(circuit.qubitCount(), 0);
-    std::random_device seedSource{};
 
-    const std::vector<quantum_sim::circuit::TraceStep> trace =
-            circuit.executeWithTrace(initialState);
-
-    std::cout << "Circuit execution trace:\n\n";
-    quantum_sim::debug::runInteractiveDebugger(circuit, initialState);
+    quantum_sim::gui::GuiApplication application{circuit, initialState};
+    application.run();
 
     return 0;
 }

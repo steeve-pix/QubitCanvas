@@ -141,6 +141,8 @@ namespace quantum_sim::debug {
 
         [[nodiscard]] DebuggerSnapshot snapshot() const;
 
+        [[nodiscard]] const circuit::TraceStep &stepAt(std::size_t index) const;
+
         /**
          * Represents the initial state of the quantum register for the debugging session.
          *
