@@ -102,7 +102,12 @@ namespace quantum_sim::gui {
             ImGui::Separator();
 
             ImGui::Begin("Inspector");
-            inspectorPanel_.draw(session_, snapshot, circuit_, selectedInstructionIndex, jetBrainsMonoHeadingFont_);
+            const bool jumpToInstruction = inspectorPanel_.draw(session_, snapshot, circuit_, selectedInstructionIndex,
+                                                                jetBrainsMonoHeadingFont_);
+            if (jumpToInstruction) {
+                circuitRenderer_.clearSelection();
+            }
+
             ImGui::End();
 
             ImGui::Begin("Gate Library");

@@ -598,6 +598,10 @@ namespace quantum_sim::gui {
         return selectedInstructionIndex_;
     }
 
+    void CircuitRenderer::clearSelection() noexcept {
+        selectedInstructionIndex_.reset();
+    }
+
     void CircuitRenderer::drawGate(ImDrawList *drawList, const ImVec2 &center, const std::string &label,
                                    const bool highlighted, const bool hovered, const bool selected
     ) {

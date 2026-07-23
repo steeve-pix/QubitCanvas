@@ -87,4 +87,12 @@ namespace quantum_sim::debug {
 
         return trace_[index];
     }
+
+    void DebuggerSession::moveToStep(std::size_t index) {
+        if (index >= trace_.size()) {
+            throw std::out_of_range{"DebuggerSession::moveToStep index out of range"};
+        }
+
+        currentStep_ = index;
+    }
 }

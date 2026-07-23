@@ -5,41 +5,212 @@
 
 #include <cmath>
 #include <string>
+#include <utility>
 
 namespace quantum_sim::gui {
-    void InspectorPanel::draw(
+    bool InspectorPanel::draw(
         debug::DebuggerSession &session,
         const debug::DebuggerSnapshot &snapshot,
         const circuit::QuantumCircuit &circuit,
         std::optional<std::size_t> selectedInstructionIndex,
         ImFont *headingFont
     ) {
-        if (headingFont != nullptr) {
-            ImGui::PushFont(headingFont);
-        }
+        drawHeader(snapshot, selectedInstructionIndex, headingFont);
 
-        ImGui::TextUnformatted("Inspector");
+        const bool jumpedToInstruction =
+                drawInstructionSummary(session, snapshot, circuit, selectedInstructionIndex);
 
-        if (headingFont != nullptr) {
-            ImGui::PopFont();
-        }
+        const quantum::QuantumRegister &currentState =
+                resolveInspectedState(session, snapshot, selectedInstructionIndex);
 
-        ImGui::Text(
-            "Step %d / %d",
-            static_cast<int>(snapshot.currentStepIndex + 1),
-            static_cast<int>(snapshot.stepCount)
+        drawQuantumState(currentState);
+
+        drawDebuggerControls(session, snapshot);
+
+        return jumpedToInstruction;
+    }
+
+    void InspectorPanel::showNavigationConfirmation(
+        std::string message
+    ) {
+        navigationConfirmationMessage_ =
+                std::move(message);
+
+        navigationConfirmationUntil_ =
+                ImGui::GetTime() + 1.5;
+    }
+
+    void InspectorPanel::moveToPreviousInstruction(
+        debug::DebuggerSession &session
+    ) {
+        session.movePrevious();
+
+        showNavigationConfirmation(
+            "Moved to the previous instruction."
         );
+    }
 
-        if (selectedInstructionIndex.has_value()) {
-            ImGui::TextDisabled(
-                "Showing state after instruction %zu.",
-                selectedInstructionIndex.value()
-            );
-        } else {
-            ImGui::TextDisabled(
-                "Showing state after the current debugger step."
+    void InspectorPanel::moveToNextInstruction(
+        debug::DebuggerSession &session
+    ) {
+        session.moveNext();
+
+        showNavigationConfirmation(
+            "Moved to the next instruction."
+        );
+    }
+
+    void InspectorPanel::restartDebugger(
+        debug::DebuggerSession &session
+    ) {
+        session.restart();
+
+        showNavigationConfirmation(
+            "Debugger restarted."
+        );
+    }
+
+    void InspectorPanel::jumpToInstruction(debug::DebuggerSession &session, std::size_t instructionIndex) {
+        session.moveToStep(instructionIndex);
+
+        showNavigationConfirmation(
+            "Jumped to the selected instruction."
+        );
+    }
+
+    void InspectorPanel::drawNavigationConfirmation() const {
+        if (
+            ImGui::GetTime() >= navigationConfirmationUntil_ ||
+            navigationConfirmationMessage_.empty()
+        ) {
+            return;
+        }
+
+        ImGui::TextColored(
+            ImVec4{0.35F, 0.85F, 0.55F, 1.0F},
+            "%s",
+            navigationConfirmationMessage_.c_str()
+        );
+    }
+
+    void InspectorPanel::drawDebuggerControls(
+        debug::DebuggerSession &session,
+        const debug::DebuggerSnapshot &snapshot
+    ) {
+        ImGui::Spacing();
+        ImGui::SeparatorText("Debugger Controls");
+
+        const float availableButtonWidth =
+                ImGui::GetContentRegionAvail().x;
+
+        const float buttonSpacing =
+                ImGui::GetStyle().ItemSpacing.x;
+
+        const float debuggerButtonWidth =
+                (availableButtonWidth - buttonSpacing * 2.0F)
+                / 3.0F;
+
+        const ImGuiIO &io =
+                ImGui::GetIO();
+
+        if (
+            !io.WantTextInput &&
+            ImGui::IsWindowFocused(
+                ImGuiFocusedFlags_RootAndChildWindows
+            )
+        ) {
+            if (
+                ImGui::IsKeyPressed(ImGuiKey_LeftArrow) &&
+                snapshot.canMovePrevious
+            ) {
+                moveToPreviousInstruction(session);
+            }
+
+            if (
+                ImGui::IsKeyPressed(ImGuiKey_RightArrow) &&
+                snapshot.canMoveNext
+            ) {
+                moveToNextInstruction(session);
+            }
+
+            if (ImGui::IsKeyPressed(ImGuiKey_R)) {
+                restartDebugger(session);
+            }
+        }
+
+        if (!snapshot.canMovePrevious) {
+            ImGui::BeginDisabled();
+        }
+
+        if (
+            ImGui::Button(
+                "Previous  [←]",
+                ImVec2{debuggerButtonWidth, 0.0F}
+            )
+        ) {
+            moveToPreviousInstruction(session);
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Go to the previous instruction. Shortcut: Left Arrow"
             );
         }
+
+        if (!snapshot.canMovePrevious) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+
+        if (!snapshot.canMoveNext) {
+            ImGui::BeginDisabled();
+        }
+
+        if (
+            ImGui::Button(
+                "Next  [→]",
+                ImVec2{debuggerButtonWidth, 0.0F}
+            )
+        ) {
+            moveToNextInstruction(session);
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Go to the next instruction. Shortcut: Right Arrow"
+            );
+        }
+
+        if (!snapshot.canMoveNext) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+
+        if (
+            ImGui::Button(
+                "Restart  [R]",
+                ImVec2{debuggerButtonWidth, 0.0F}
+            )
+        ) {
+            restartDebugger(session);
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Return to the first instruction. Shortcut: R"
+            );
+        }
+    }
+
+    bool InspectorPanel::drawInstructionSummary(
+        debug::DebuggerSession &session,
+        const debug::DebuggerSnapshot &snapshot,
+        const circuit::QuantumCircuit &circuit,
+        std::optional<std::size_t> selectedInstructionIndex
+    ) {
+        bool jumpedToInstruction = false;
 
         const std::size_t inspectedInstructionIndex =
                 selectedInstructionIndex.value_or(
@@ -81,11 +252,58 @@ namespace quantum_sim::gui {
             inspectedInstruction->name.c_str()
         );
 
+        if (
+            selectedInstructionIndex.has_value() &&
+            selectedInstructionIndex.value() != snapshot.currentStepIndex
+        ) {
+            const std::size_t selectedIndex =
+                    selectedInstructionIndex.value();
+
+            if (
+                ImGui::Button(
+                    "Jump to instruction  [J]",
+                    ImVec2{-1.0F, 0.0F}
+                )
+            ) {
+                jumpToInstruction(
+                    session,
+                    selectedIndex
+                );
+
+                jumpedToInstruction = true;
+            }
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Move debugger execution to instruction %zu",
+                    selectedIndex
+                );
+            }
+
+            const ImGuiIO &io =
+                    ImGui::GetIO();
+
+            if (
+                !io.WantTextInput &&
+                ImGui::IsKeyPressed(ImGuiKey_J)
+            ) {
+                jumpToInstruction(
+                    session,
+                    selectedIndex
+                );
+
+                jumpedToInstruction = true;
+            }
+        }
+
+        drawNavigationConfirmation();
+
         const std::string explanation =
-                debug::gateExplanation(inspectedInstruction->name);
+                debug::gateExplanation(
+                    inspectedInstruction->name
+                );
 
         ImGui::Spacing();
-
         ImGui::TextDisabled("Explanation");
 
         ImGui::TextWrapped(
@@ -93,39 +311,36 @@ namespace quantum_sim::gui {
             explanation.c_str()
         );
 
+        return jumpedToInstruction;
+    }
 
-        const quantum::QuantumRegister *inspectedState =
-                &snapshot.afterState.get();
-
-        if (
-            selectedInstructionIndex.has_value() &&
-            selectedInstructionIndex.value() < session.stepCount()
-        ) {
-            inspectedState =
-                    &session
-                    .stepAt(selectedInstructionIndex.value())
-                    .state;
-        }
-
-        const quantum::QuantumRegister &currentState =
-                *inspectedState;
-
+    void InspectorPanel::drawQuantumState(const quantum::QuantumRegister &state) {
         ImGui::Spacing();
         ImGui::SeparatorText("Quantum State");
 
+        drawProbabilities(state);
+        drawAmplitudes(state);
+        drawBlochInformation(state);
+    }
+
+    void InspectorPanel::drawProbabilities(const quantum::QuantumRegister &state) {
         ImGui::TextDisabled("Probabilities");
 
-        for (const quantum::StateInfo &stateInfo: currentState.states()) {
+        for (const quantum::StateInfo &stateInfo: state.states()) {
             const float probability =
                     static_cast<float>(stateInfo.probability);
 
             ImGui::Text("%s", stateInfo.label.c_str());
             ImGui::SameLine();
 
-            ImGui::ProgressBar(probability, ImVec2{-1.0F, 0.0F});
+            ImGui::ProgressBar(
+                probability,
+                ImVec2{-1.0F, 0.0F}
+            );
         }
+    }
 
-
+    void InspectorPanel::drawAmplitudes(const quantum::QuantumRegister &state) {
         ImGui::TextDisabled("Amplitudes");
 
         if (ImGui::BeginTable("AmplitudeTable", 3)) {
@@ -134,7 +349,7 @@ namespace quantum_sim::gui {
             ImGui::TableSetupColumn("Imaginary");
             ImGui::TableHeadersRow();
 
-            for (const quantum::StateInfo &stateInfo: currentState.states()) {
+            for (const quantum::StateInfo &stateInfo: state.states()) {
                 ImGui::TableNextRow();
 
                 ImGui::TableSetColumnIndex(0);
@@ -155,23 +370,34 @@ namespace quantum_sim::gui {
 
             ImGui::EndTable();
         }
+    }
 
-        if (currentState.qubitCount() == 1) {
+    void InspectorPanel::drawBlochInformation(const quantum::QuantumRegister &state) {
+        if (state.qubitCount() == 1) {
             const quantum::BlochVector bloch =
-                    currentState.blockVector();
+                    state.blockVector();
+
             const quantum::BlochAngles angles =
-                    currentState.blochAngles();
+                    state.blochAngles();
 
             ImGui::Spacing();
             ImGui::SeparatorText("Bloch Sphere");
 
             ImGui::TextDisabled("Vector and angles");
 
-            ImGui::Text("(%.4f, %.4f, %.4f)", bloch.x, bloch.y, bloch.z);
+            ImGui::Text(
+                "(%.4f, %.4f, %.4f)",
+                bloch.x,
+                bloch.y,
+                bloch.z
+            );
 
             ImGui::Spacing();
 
-            ImGui::Text("theta = %.4f rad", angles.theta);
+            ImGui::Text(
+                "theta = %.4f rad",
+                angles.theta
+            );
 
             constexpr double epsilon = 1e-10;
 
@@ -179,108 +405,74 @@ namespace quantum_sim::gui {
                     std::abs(bloch.x) < epsilon &&
                     std::abs(bloch.y) < epsilon;
 
-            isAtPole
-                ? ImGui::TextUnformatted("phi = undefined at the pole")
-                : ImGui::Text("phi = %.4f rad", angles.phi);
+            if (isAtPole) {
+                ImGui::TextUnformatted(
+                    "phi = undefined at the pole"
+                );
+            } else {
+                ImGui::Text(
+                    "phi = %.4f rad",
+                    angles.phi
+                );
+            }
 
             ImGui::Spacing();
             ImGui::TextDisabled("Visualization");
 
             blochSphereRenderer_.draw(bloch);
+
             ImGui::Text(
                 "Depth: y = %.4f",
                 bloch.y
             );
         }
+    }
 
-        ImGui::Spacing();
-        ImGui::SeparatorText("Debugger Controls");
+    void InspectorPanel::drawHeader(const debug::DebuggerSnapshot &snapshot,
+                                    std::optional<std::size_t> selectedInstructionIndex, ImFont *headingFont) {
+        if (headingFont != nullptr) {
+            ImGui::PushFont(headingFont);
+        }
 
-        const float availableButtonWidth =
-                ImGui::GetContentRegionAvail().x;
+        ImGui::TextUnformatted("Inspector");
 
-        const float buttonSpacing =
-                ImGui::GetStyle().ItemSpacing.x;
+        if (headingFont != nullptr) {
+            ImGui::PopFont();
+        }
 
-        const float debuggerButtonWidth =
-                (availableButtonWidth - buttonSpacing * 2.0F) / 3.0F;
+        ImGui::Text(
+            "Step %d / %d",
+            static_cast<int>(snapshot.currentStepIndex + 1),
+            static_cast<int>(snapshot.stepCount)
+        );
 
-        const ImGuiIO &io =
-                ImGui::GetIO();
+        if (selectedInstructionIndex.has_value()) {
+            ImGui::TextDisabled(
+                "Showing state after instruction %zu.",
+                selectedInstructionIndex.value()
+            );
+        } else {
+            ImGui::TextDisabled(
+                "Showing state after the current debugger step."
+            );
+        }
+    }
 
+    const quantum::QuantumRegister &
+    InspectorPanel::resolveInspectedState(
+        const debug::DebuggerSession &session,
+        const debug::DebuggerSnapshot &snapshot,
+        std::optional<std::size_t> selectedInstructionIndex
+    ) const {
         if (
-            !io.WantTextInput &&
-            ImGui::IsWindowFocused(
-                ImGuiFocusedFlags_RootAndChildWindows
-            )
+            selectedInstructionIndex.has_value() &&
+            selectedInstructionIndex.value() < session.stepCount()
         ) {
-            if (
-                ImGui::IsKeyPressed(ImGuiKey_LeftArrow) &&
-                snapshot.canMovePrevious
-            ) {
-                session.movePrevious();
-            }
-
-            if (
-                ImGui::IsKeyPressed(ImGuiKey_RightArrow) &&
-                snapshot.canMoveNext
-            ) {
-                session.moveNext();
-            }
-
-            if (ImGui::IsKeyPressed(ImGuiKey_R)) {
-                session.restart();
-            }
+            return session
+                    .stepAt(selectedInstructionIndex.value())
+                    .state;
         }
 
-        if (!snapshot.canMovePrevious) {
-            ImGui::BeginDisabled();
-        }
-
-        if (ImGui::Button("Previous  [←]", ImVec2{debuggerButtonWidth, 0.0F})) {
-            session.movePrevious();
-        }
-
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Go to the previous instruction. Shortcut: Left Arrow"
-            );
-        }
-
-        if (!snapshot.canMovePrevious) {
-            ImGui::EndDisabled();
-        }
-
-        ImGui::SameLine();
-
-        if (!snapshot.canMoveNext) {
-            ImGui::BeginDisabled();
-        }
-
-        if (ImGui::Button("Next  [→]", ImVec2{debuggerButtonWidth, 0.0F})) {
-            session.moveNext();
-        }
-
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Go to the next instruction. Shortcut: Right Arrow"
-            );
-        }
-
-        if (!snapshot.canMoveNext) {
-            ImGui::EndDisabled();
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Restart  [R]", ImVec2{debuggerButtonWidth, 0.0F})) {
-            session.restart();
-        }
-
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip(
-                "Return to the first instruction. Shortcut: R"
-            );
-        }
+        return snapshot.afterState.get();
     }
 }

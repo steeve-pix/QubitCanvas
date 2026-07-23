@@ -22,6 +22,8 @@ namespace quantum_sim::gui {
 
         [[nodiscard]] std::optional<std::size_t> selectedInstructionIndex() const noexcept;
 
+        void clearSelection() noexcept;
+
     private:
         void drawGate(ImDrawList *drawList, const ImVec2 &center, const std::string &label, bool highlighted,
                       bool hovered, bool selected);
