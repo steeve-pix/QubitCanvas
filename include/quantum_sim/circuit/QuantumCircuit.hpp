@@ -223,6 +223,8 @@ namespace quantum_sim::circuit {
 
         [[nodiscard]] bool removeLastInstruction() noexcept;
 
+        [[nodiscard]] bool removeInstruction(std::size_t index);
+
         /**
          * A structure representing an instruction for a single-qubit quantum gate.
          *

@@ -193,4 +193,14 @@ namespace quantum_sim::circuit {
         instructions_.pop_back();
         return true;
     }
+
+    bool QuantumCircuit::removeInstruction(std::size_t index) {
+        if (index >= instructions_.size()) {
+            return false;
+        }
+
+        instructions_.erase(instructions_.begin() + static_cast<ptrdiff_t>(index));
+
+        return true;
+    }
 }

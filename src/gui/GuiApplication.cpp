@@ -139,12 +139,7 @@ namespace quantum_sim::gui {
             const bool redoShortcutPressed =
                     canRedo &&
                     !io.WantTextInput &&
-                    io.KeyCtrl &&
-                    ImGui::IsKeyPressed(ImGuiKey_Y) ||
-                    (
-                        io.KeyShift &&
-                        ImGui::IsKeyPressed(ImGuiKey_Z)
-                    );
+                    io.KeyCtrl && (ImGui::IsKeyPressed(ImGuiKey_Y) || (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z)));
 
             const bool undoShortcutPressed =
                     canUndo &&
@@ -236,6 +231,39 @@ namespace quantum_sim::gui {
             const auto selectedInstructionIndex =
                     circuitRenderer_.selectedInstructionIndex();
 
+            const bool canDeleteSelectedInstruction =
+                    selectedInstructionIndex.has_value() &&
+                    !pendingGate_.has_value();
+
+            if (!canDeleteSelectedInstruction) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool deleteButtonPressed =
+                    ImGui::Button(
+                        "Delete selected gate  [Delete]"
+                    );
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Remove the selected circuit instruction. Shortcut: Delete"
+                );
+            }
+
+            const bool deleteShortcutPressed =
+                    canDeleteSelectedInstruction &&
+                    !io.WantTextInput &&
+                    ImGui::IsKeyPressed(ImGuiKey_Delete);
+
+            if (canDeleteSelectedInstruction && (deleteButtonPressed || deleteShortcutPressed)) {
+                queuedInstructionDeletion_ =
+                        selectedInstructionIndex.value();
+            }
+
+            if (!canDeleteSelectedInstruction) {
+                ImGui::EndDisabled();
+            }
+
             ImGui::End();
 
             // Description of interface for this frame
@@ -318,6 +346,25 @@ namespace quantum_sim::gui {
     }
 
     void GuiApplication::applyQueuedCircuitEdits() {
+        if (queuedInstructionDeletion_.has_value()) {
+            const std::size_t instructionIndex =
+                    queuedInstructionDeletion_.value();
+
+            recordCircuitForUndo();
+
+            const bool removed =
+                    circuit_.removeInstruction(instructionIndex);
+
+            queuedInstructionDeletion_.reset();
+
+            if (removed) {
+                rebuildDebuggerAfterCircuitEdit();
+                circuitRenderer_.cancelPlacement();
+            }
+
+            return;
+        }
+
         if (queuedSingleQubitPlacement_.has_value()) {
             const std::string &gateName =
                     queuedSingleQubitPlacement_->gateName;

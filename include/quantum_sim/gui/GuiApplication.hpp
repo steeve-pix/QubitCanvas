@@ -39,12 +39,14 @@ namespace quantum_sim::gui {
         std::optional<std::string> pendingGate_;
         std::optional<ControlledPlacement> queuedControlledPlacement_;
         std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
+        std::optional<std::size_t> queuedInstructionDeletion_;
         std::vector<circuit::QuantumCircuit> undoHistory_;
         std::vector<circuit::QuantumCircuit> redoHistory_;
 
         void rebuildDebuggerAfterCircuitEdit();
 
         void recordCircuitForUndo();
+
         bool showHistoryDebugInfo_{false};
     };
 }
