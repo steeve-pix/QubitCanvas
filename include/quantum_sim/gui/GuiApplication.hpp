@@ -14,18 +14,27 @@
 namespace quantum_sim::gui {
     class GuiApplication {
     public:
-        GuiApplication(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState);
+        GuiApplication(circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState);
 
         void run();
+
+        [[nodiscard]] math::ComplexMatrix createSingleQubitGateMatrix(const std::string &gateName) const;
+
+        void applyQueuedCircuitEdits();
 
     private:
         ImFont *jetBrainsMonoFont_{nullptr};
         ImFont *jetBrainsMonoHeadingFont_{nullptr};
-        circuit::QuantumCircuit circuit_;
+        circuit::QuantumCircuit &circuit_;
+        quantum::QuantumRegister initialState_;
         debug::DebuggerSession session_;
         InspectorPanel inspectorPanel_;
         CircuitRenderer circuitRenderer_;
         GateLibraryPanel gateLibraryPanel_;
         std::optional<std::string> pendingGate_;
+        std::optional<ControlledPlacement> queuedControlledPlacement_;
+        std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
+
+        void rebuildDebuggerAfterCircuitEdit();
     };
 }

@@ -91,7 +91,7 @@ int main() {
         }
     }
 
-    const QuantumCircuit circuit = [&]() {
+    QuantumCircuit circuit = [&]() {
         switch (choice) {
             case 1:
                 return quantum_sim::algorithms::bellStateCircuit();

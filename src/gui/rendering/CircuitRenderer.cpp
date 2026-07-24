@@ -98,6 +98,11 @@ namespace quantum_sim::gui {
                 placementModeActive &&
                 pendingGate.value() == "CX";
 
+        if (!controlledPlacement) {
+            pendingControlQubit_.reset();
+            pendingTargetQubit_.reset();
+        }
+
         const bool singleQubitPlacement =
                 placementModeActive &&
                 !controlledPlacement;
@@ -147,10 +152,42 @@ namespace quantum_sim::gui {
         const float wireEndX =
                 lastGateX + style_.rightPadding;
 
+        const float placementX =
+                wireEndX + style_.gateSpacing;
+
+        const float displayedWireEndX =
+                placementModeActive
+                    ? placementX
+                    : wireEndX;
+
         const float firstWireY =
                 origin.y + style_.topMargin;
 
         const float lastWireY = firstWireY + style_.wireSpacing * static_cast<float>(qubitCount - 1);
+
+        if (placementModeActive) {
+            const float guideStartY =
+                    firstWireY - style_.columnGuideVerticalPadding;
+
+            const float guideEndY =
+                    lastWireY - style_.columnGuideVerticalPadding;
+
+            const float dashStep =
+                    style_.placementGuideDashLength +
+                    style_.placementGuideDashLength;
+            for (float y = 0; y < guideEndY; y += dashStep) {
+                const float dashEndY =
+                        std::min(y + style_.placementGuideDashLength, guideEndY);
+
+
+                drawList->AddLine(
+                    ImVec2{placementX, y},
+                    ImVec2{placementX, dashEndY},
+                    style_.placementGuideColor,
+                    style_.placementGuideThickness
+                );
+            }
+        }
 
         const float pulse =
                 animationPulse(style_.animationSpeed);
@@ -210,24 +247,17 @@ namespace quantum_sim::gui {
 
             drawList->AddLine(
                 ImVec2{wireStartX, y},
-                ImVec2{wireEndX, y},
+                ImVec2{displayedWireEndX, y},
                 style_.wireColor,
                 style_.wireThickness
             );
         }
 
-        const float placementX =
-                wireEndX + style_.gateSpacing;
-
         const ImVec2 mousePosition =
                 ImGui::GetMousePos();
 
         if (singleQubitPlacement) {
-            for (
-                std::size_t qubit = 0;
-                qubit < circuit.qubitCount();
-                ++qubit
-            ) {
+            for (std::size_t qubit = 0; qubit < circuit.qubitCount(); ++qubit) {
                 const float y =
                         firstWireY +
                         style_.wireSpacing *
@@ -247,10 +277,21 @@ namespace quantum_sim::gui {
                             }
                         );
 
+                const bool clicked =
+                        hovered &&
+                        ImGui::IsMouseClicked(
+                            ImGuiMouseButton_Left
+                        );
+
                 if (hovered) {
                     ImGui::SetMouseCursor(
                         ImGuiMouseCursor_Hand
                     );
+                }
+
+                if (clicked) {
+                    completedSingleQubitPlacement_ =
+                            SingleQubitPlacement{pendingGate.value(), qubit};
                 }
 
                 drawGate(
@@ -259,7 +300,7 @@ namespace quantum_sim::gui {
                     pendingGate.value(),
                     false,
                     hovered,
-                    false
+                    false, true
                 );
             }
         }
@@ -334,7 +375,7 @@ namespace quantum_sim::gui {
                     previewLabel,
                     false,
                     hovered,
-                    isSelectedControl || isSelectedTarget
+                    isSelectedControl || isSelectedTarget, true
                 );
             }
         }
@@ -453,7 +494,7 @@ namespace quantum_sim::gui {
                 }
 
                 const bool clicked =
-                        hovered &&
+                        !placementModeActive && hovered &&
                         ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
                 if (clicked) {
@@ -691,7 +732,7 @@ namespace quantum_sim::gui {
                     selectedInstructionIndex_.has_value() &&
                     selectedInstructionIndex_.value() == instructionIndex;
 
-            drawGate(drawList, ImVec2{x, y}, instruction.name, highlighted, hovered, selected);
+            drawGate(drawList, ImVec2{x, y}, instruction.name, highlighted, hovered, selected, false);
         }
 
         const float circuitContentWidth =
@@ -735,13 +776,57 @@ namespace quantum_sim::gui {
         selectedInstructionIndex_.reset();
     }
 
-    bool CircuitRenderer::hasCompletedControlledPlacement() const noexcept {
-        return pendingControlQubit_.has_value()&&
-            pendingTargetQubit_.has_value();
+    std::optional<ControlledPlacement> CircuitRenderer::completedControlledPlacement() const noexcept {
+        if (!pendingControlQubit_.has_value() || !pendingTargetQubit_.has_value()) {
+            return std::nullopt;
+        }
+
+        return ControlledPlacement{
+            pendingControlQubit_.value(),
+            pendingTargetQubit_.value()
+        };
+    }
+
+    std::optional<ControlledPlacement> CircuitRenderer::consumeCompletedControlledPlacement() noexcept {
+        const auto placement =
+                completedControlledPlacement();
+
+        if (!placement.has_value()) {
+            return std::nullopt;
+        }
+
+        pendingControlQubit_.reset();
+        pendingTargetQubit_.reset();
+
+        return placement;
+    }
+
+    std::optional<SingleQubitPlacement> CircuitRenderer::consumeCompletedSingleQubitPlacement() {
+        if (!completedSingleQubitPlacement_.has_value()) {
+            return std::nullopt;
+        }
+
+        std::optional<SingleQubitPlacement> placement =
+                std::move(completedSingleQubitPlacement_);
+
+        completedSingleQubitPlacement_.reset();
+
+        return placement;
+    }
+
+    bool CircuitRenderer::hasPendingControlQubit() const noexcept {
+        return pendingControlQubit_.has_value();
+    }
+
+    void CircuitRenderer::cancelPlacement() noexcept {
+        pendingControlQubit_.reset();
+        pendingTargetQubit_.reset();
+        completedSingleQubitPlacement_.reset();
     }
 
     void CircuitRenderer::drawGate(ImDrawList *drawList, const ImVec2 &center, const std::string &label,
-                                   const bool highlighted, const bool hovered, const bool selected
+                                   const bool highlighted, const bool hovered, const bool selected,
+                                   bool placementPreview
     ) {
         const ImVec2 topLeft{
             center.x - style_.gateHalfWidth,
@@ -760,14 +845,18 @@ namespace quantum_sim::gui {
                     ? activeOrange(style_, pulse)
                     : hovered
                           ? style_.hoveredGateFillColor
-                          : style_.gateFillColor;
+                          : placementPreview
+                                ? style_.placementPreviewFillColor
+                                : style_.gateFillColor;
 
         const ImU32 outlineColor =
                 highlighted
                     ? style_.activeGateOutlineColor
                     : hovered
                           ? style_.hoveredGateOutlineColor
-                          : style_.inactiveGateColor;
+                          : placementPreview
+                                ? style_.placementPreviewOutlineColor
+                                : style_.inactiveGateColor;
 
         if (selected) {
             drawList->AddRect(

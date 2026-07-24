@@ -10,6 +10,16 @@ struct ImDrawList;
 struct ImVec2;
 
 namespace quantum_sim::gui {
+    struct ControlledPlacement {
+        std::size_t controlQubit;
+        std::size_t targetQubit;
+    };
+
+    struct SingleQubitPlacement {
+        std::string gateName;
+        std::size_t targetQubit;
+    };
+
     class CircuitRenderer {
     public:
         void draw(const circuit::QuantumCircuit &circuit, const debug::DebuggerSnapshot &snapshot,
@@ -26,16 +36,26 @@ namespace quantum_sim::gui {
 
         void clearSelection() noexcept;
 
-        [[nodiscard]] bool hasCompletedControlledPlacement() const noexcept;
+        [[nodiscard]] std::optional<ControlledPlacement> completedControlledPlacement() const noexcept;
+
+        [[nodiscard]] std::optional<ControlledPlacement> consumeCompletedControlledPlacement() noexcept;
+
+        [[nodiscard]] std::optional<SingleQubitPlacement> consumeCompletedSingleQubitPlacement();
+
+        [[nodiscard]] bool hasPendingControlQubit() const noexcept;
+
+        void cancelPlacement() noexcept;
+
 
     private:
         void drawGate(ImDrawList *drawList, const ImVec2 &center, const std::string &label, bool highlighted,
-                      bool hovered, bool selected);
+                      bool hovered, bool selected, bool placementPreview);
 
         std::optional<std::size_t> selectedInstructionIndex_;
 
         CircuitStyle style_;
         std::optional<std::size_t> pendingControlQubit_;
         std::optional<std::size_t> pendingTargetQubit_;
+        std::optional<SingleQubitPlacement> completedSingleQubitPlacement_;
     };
 }

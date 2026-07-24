@@ -4,16 +4,18 @@
 #include <GLFW/glfw3.h>
 #include <stdexcept>
 #include <cmath>
+#include <utility>
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_internal.h"
+#include "quantum_sim/gates/QuantumGates.hpp"
 
 namespace quantum_sim::gui {
-    GuiApplication::GuiApplication(const circuit::QuantumCircuit &circuit,
+    GuiApplication::GuiApplication(circuit::QuantumCircuit &circuit,
                                    const quantum::QuantumRegister &initialState)
-        : circuit_{circuit}, session_{circuit, initialState} {
+        : circuit_{circuit}, initialState_{initialState}, session_{circuit_, initialState_} {
     }
 
     void GuiApplication::run() {
@@ -85,24 +87,62 @@ namespace quantum_sim::gui {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
+            applyQueuedCircuitEdits();
+
             const debug::DebuggerSnapshot snapshot =
                     session_.snapshot();
 
             ImGui::Begin("Circuit");
             if (pendingGate_.has_value()) {
-                ImGui::TextColored(
-                    ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
-                    "Placement mode: %s",
-                    pendingGate_->c_str()
-                );
+                if (
+                    pendingGate_.value() == "CX" &&
+                    circuitRenderer_.hasPendingControlQubit()
+                ) {
+                    ImGui::TextColored(
+                        ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
+                        "Placement mode: CX — choose target qubit"
+                    );
+                } else if (pendingGate_.value() == "CX") {
+                    ImGui::TextColored(
+                        ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
+                        "Placement mode: CX — choose control qubit"
+                    );
+                } else {
+                    ImGui::TextColored(
+                        ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
+                        "Placement mode: %s — choose target qubit",
+                        pendingGate_->c_str()
+                    );
+                }
 
                 ImGui::SameLine();
 
                 if (ImGui::SmallButton("Cancel")) {
                     pendingGate_.reset();
+                    circuitRenderer_.cancelPlacement();
                 }
             }
             circuitRenderer_.draw(circuit_, snapshot, pendingGate_);
+
+            const auto singleQubitPlacement =
+                    circuitRenderer_.consumeCompletedSingleQubitPlacement();
+
+            if (singleQubitPlacement.has_value()) {
+                queuedSingleQubitPlacement_ =
+                        std::move(singleQubitPlacement);
+
+                pendingGate_.reset();
+            }
+
+            const auto controlledPlacement =
+                    circuitRenderer_.consumeCompletedControlledPlacement();
+
+            if (controlledPlacement.has_value()) {
+                queuedControlledPlacement_ =
+                        controlledPlacement;
+
+                pendingGate_.reset();
+            }
 
             const auto selectedInstructionIndex =
                     circuitRenderer_.selectedInstructionIndex();
@@ -165,5 +205,71 @@ namespace quantum_sim::gui {
 
         glfwDestroyWindow(window);
         glfwTerminate();
+    }
+
+    math::ComplexMatrix GuiApplication::createSingleQubitGateMatrix(const std::string &gateName) const {
+        if (gateName == "H") {
+            return gates::hadamardGate();
+        }
+
+        if (gateName == "X") {
+            return gates::xGate();
+        }
+
+        if (gateName == "Y") {
+            return gates::yGate();
+        }
+
+        if (gateName == "Z") {
+            return gates::zGate();
+        }
+
+        throw std::invalid_argument("Unsupported single-qubit gate " + gateName);
+    }
+
+    void GuiApplication::applyQueuedCircuitEdits() {
+        if (queuedSingleQubitPlacement_.has_value()) {
+            const std::string &gateName =
+                    queuedSingleQubitPlacement_->gateName;
+
+            const std::size_t targetQubit =
+                    queuedSingleQubitPlacement_->targetQubit;
+
+            circuit_.addSingleQubitGate(
+                gateName,
+                createSingleQubitGateMatrix(gateName),
+                targetQubit
+            );
+
+            queuedSingleQubitPlacement_.reset();
+
+            rebuildDebuggerAfterCircuitEdit();
+        } else if (queuedControlledPlacement_.has_value()) {
+            const std::size_t controlQubit =
+                    queuedControlledPlacement_->controlQubit;
+
+            const std::size_t targetQubit =
+                    queuedControlledPlacement_->targetQubit;
+
+            circuit_.addControlledGate(
+                "CX",
+                gates::cxGate(
+                    circuit_.qubitCount(),
+                    controlQubit,
+                    targetQubit
+                ),
+                controlQubit,
+                targetQubit
+            );
+
+            queuedControlledPlacement_.reset();
+
+            rebuildDebuggerAfterCircuitEdit();
+        }
+    }
+
+    void GuiApplication::rebuildDebuggerAfterCircuitEdit() {
+        session_.rebuild(circuit_, initialState_);
+        circuitRenderer_.clearSelection();
     }
 }

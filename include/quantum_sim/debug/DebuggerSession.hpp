@@ -145,6 +145,8 @@ namespace quantum_sim::debug {
 
         void moveToStep(std::size_t index);
 
+        void rebuild(const circuit::QuantumCircuit&circuit,const quantum::QuantumRegister& initialState);
+
         /**
          * Represents the initial state of the quantum register for the debugging session.
          *

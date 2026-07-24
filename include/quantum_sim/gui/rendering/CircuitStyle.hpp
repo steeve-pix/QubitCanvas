@@ -106,5 +106,16 @@ namespace quantum_sim::gui {
         float selectedGateOutlinePadding{4.0F};
         float selectedGateOutlineThickness{2.0F};
         float selectedGateOutlineCornerRadius{8.0F};
+
+        ImU32 placementGuideColor{IM_COL32(70, 170, 220, 90)};
+
+        float placementGuideThickness{1.5F};
+
+        ImU32 placementPreviewFillColor{IM_COL32(24, 70, 92, 220)};
+
+        ImU32 placementPreviewOutlineColor{IM_COL32(70, 190, 235, 255)};
+
+        float placementGuideDashLength{6.0F};
+        float placementGuideGapLength{5.0F};
     };
 }

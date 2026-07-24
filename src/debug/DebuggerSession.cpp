@@ -4,8 +4,8 @@
 namespace quantum_sim::debug {
     DebuggerSession::DebuggerSession(const circuit::QuantumCircuit &circuit,
                                      const quantum::QuantumRegister &initialState)
-        : initialState_{initialState}, trace_{circuit.executeWithTrace(initialState)},
-          instructions_{circuit.instructionInfo()} {
+        : initialState_{initialState} {
+        rebuild(circuit, initialState);
     }
 
     std::size_t DebuggerSession::stepCount() const noexcept {
@@ -94,5 +94,15 @@ namespace quantum_sim::debug {
         }
 
         currentStep_ = index;
+    }
+
+    void DebuggerSession::rebuild(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState) {
+        initialState_ = initialState;
+        trace_ =
+                circuit.executeWithTrace(initialState_);
+
+        instructions_ = circuit.instructionInfo();
+
+        currentStep_ = 0;
     }
 }
