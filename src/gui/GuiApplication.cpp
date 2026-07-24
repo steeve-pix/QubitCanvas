@@ -123,8 +123,28 @@ namespace quantum_sim::gui {
                 }
             }
 
+            if (ImGui::CollapsingHeader("Developer")) {
+                ImGui::Checkbox(
+                    "Show history debug info",
+                    &showHistoryDebugInfo_
+                );
+            }
+
             const bool canUndo =
-                    circuit_.instructionCount() > 0;
+                    !undoHistory_.empty();
+
+            const bool canRedo =
+                    !redoHistory_.empty();
+
+            const bool redoShortcutPressed =
+                    canRedo &&
+                    !io.WantTextInput &&
+                    io.KeyCtrl &&
+                    ImGui::IsKeyPressed(ImGuiKey_Y) ||
+                    (
+                        io.KeyShift &&
+                        ImGui::IsKeyPressed(ImGuiKey_Z)
+                    );
 
             const bool undoShortcutPressed =
                     canUndo &&
@@ -141,6 +161,12 @@ namespace quantum_sim::gui {
                         "Undo last gate  [Ctrl+Z]"
                     );
 
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Restore the previous circuit edit. Shortcut: Ctrl+Z"
+                );
+            }
+
             if (!canUndo) {
                 ImGui::EndDisabled();
             }
@@ -150,6 +176,39 @@ namespace quantum_sim::gui {
                 undoShortcutPressed
             ) {
                 undoLastCircuitEdit();
+            }
+
+            ImGui::SameLine();
+
+            if (!canRedo) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool redoButtonPressed =
+                    ImGui::Button("Redo [Ctrl+Y]");
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Reapply the most recently undone edit.\n"
+                    "Shortcuts: Ctrl+Y or Ctrl+Shift+Z"
+                );
+            }
+
+            if (!canRedo) {
+                ImGui::EndDisabled();
+            }
+
+            if (redoButtonPressed || redoShortcutPressed) {
+                redoLastCircuitEdit();
+            }
+
+
+            if (showHistoryDebugInfo_) {
+                ImGui::TextDisabled(
+                    "Undo: %zu   Redo: %zu",
+                    undoHistory_.size(),
+                    redoHistory_.size()
+                );
             }
 
             circuitRenderer_.draw(circuit_, snapshot, pendingGate_);
@@ -266,6 +325,8 @@ namespace quantum_sim::gui {
             const std::size_t targetQubit =
                     queuedSingleQubitPlacement_->targetQubit;
 
+            recordCircuitForUndo();
+
             circuit_.addSingleQubitGate(
                 gateName,
                 createSingleQubitGateMatrix(gateName),
@@ -281,6 +342,8 @@ namespace quantum_sim::gui {
 
             const std::size_t targetQubit =
                     queuedControlledPlacement_->targetQubit;
+
+            recordCircuitForUndo();
 
             circuit_.addControlledGate(
                 "CX",
@@ -300,9 +363,42 @@ namespace quantum_sim::gui {
     }
 
     void GuiApplication::undoLastCircuitEdit() {
-        if (!circuit_.removeLastInstruction()) {
+        if (undoHistory_.empty()) {
             return;
         }
+
+        redoHistory_.push_back(
+            circuit_
+        );
+
+        circuit_ =
+                std::move(
+                    undoHistory_.back()
+                );
+
+        undoHistory_.pop_back();
+
+        rebuildDebuggerAfterCircuitEdit();
+
+        pendingGate_.reset();
+        circuitRenderer_.cancelPlacement();
+    }
+
+    void GuiApplication::redoLastCircuitEdit() {
+        if (redoHistory_.empty()) {
+            return;
+        }
+
+        undoHistory_.push_back(
+            circuit_
+        );
+
+        circuit_ =
+                std::move(
+                    redoHistory_.back()
+                );
+
+        redoHistory_.pop_back();
 
         rebuildDebuggerAfterCircuitEdit();
 
@@ -313,5 +409,10 @@ namespace quantum_sim::gui {
     void GuiApplication::rebuildDebuggerAfterCircuitEdit() {
         session_.rebuild(circuit_, initialState_);
         circuitRenderer_.clearSelection();
+    }
+
+    void GuiApplication::recordCircuitForUndo() {
+        undoHistory_.push_back(circuit_);
+        redoHistory_.clear();
     }
 }

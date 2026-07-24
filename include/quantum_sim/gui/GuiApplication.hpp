@@ -10,6 +10,7 @@
 #include "rendering/CircuitRenderer.hpp"
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace quantum_sim::gui {
     class GuiApplication {
@@ -24,6 +25,7 @@ namespace quantum_sim::gui {
 
         void undoLastCircuitEdit();
 
+        void redoLastCircuitEdit();
 
     private:
         ImFont *jetBrainsMonoFont_{nullptr};
@@ -37,7 +39,12 @@ namespace quantum_sim::gui {
         std::optional<std::string> pendingGate_;
         std::optional<ControlledPlacement> queuedControlledPlacement_;
         std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
+        std::vector<circuit::QuantumCircuit> undoHistory_;
+        std::vector<circuit::QuantumCircuit> redoHistory_;
 
         void rebuildDebuggerAfterCircuitEdit();
+
+        void recordCircuitForUndo();
+        bool showHistoryDebugInfo_{false};
     };
 }
