@@ -122,6 +122,36 @@ namespace quantum_sim::gui {
                     circuitRenderer_.cancelPlacement();
                 }
             }
+
+            const bool canUndo =
+                    circuit_.instructionCount() > 0;
+
+            const bool undoShortcutPressed =
+                    canUndo &&
+                    !io.WantTextInput &&
+                    io.KeyCtrl &&
+                    ImGui::IsKeyPressed(ImGuiKey_Z);
+
+            if (!canUndo) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool undoButtonPressed =
+                    ImGui::Button(
+                        "Undo last gate  [Ctrl+Z]"
+                    );
+
+            if (!canUndo) {
+                ImGui::EndDisabled();
+            }
+
+            if (
+                undoButtonPressed ||
+                undoShortcutPressed
+            ) {
+                undoLastCircuitEdit();
+            }
+
             circuitRenderer_.draw(circuit_, snapshot, pendingGate_);
 
             const auto singleQubitPlacement =
@@ -146,6 +176,7 @@ namespace quantum_sim::gui {
 
             const auto selectedInstructionIndex =
                     circuitRenderer_.selectedInstructionIndex();
+
             ImGui::End();
 
             // Description of interface for this frame
@@ -266,6 +297,17 @@ namespace quantum_sim::gui {
 
             rebuildDebuggerAfterCircuitEdit();
         }
+    }
+
+    void GuiApplication::undoLastCircuitEdit() {
+        if (!circuit_.removeLastInstruction()) {
+            return;
+        }
+
+        rebuildDebuggerAfterCircuitEdit();
+
+        pendingGate_.reset();
+        circuitRenderer_.cancelPlacement();
     }
 
     void GuiApplication::rebuildDebuggerAfterCircuitEdit() {

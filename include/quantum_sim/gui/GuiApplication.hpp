@@ -22,6 +22,9 @@ namespace quantum_sim::gui {
 
         void applyQueuedCircuitEdits();
 
+        void undoLastCircuitEdit();
+
+
     private:
         ImFont *jetBrainsMonoFont_{nullptr};
         ImFont *jetBrainsMonoHeadingFont_{nullptr};

@@ -236,12 +236,25 @@ namespace quantum_sim::gui {
         const circuit::CircuitInstructionInfo *inspectedInstruction =
                 nullptr;
 
+        if (            instructions.empty() ||
+            !snapshot.instruction.has_value()        ) {
+            ImGui::SeparatorText("Instruction");
+
+            ImGui::TextDisabled(
+                "The circuit contains no instructions."
+            );
+
+            drawNavigationConfirmation();
+
+            return false;
+        }
+
         if (inspectedInstructionIndex < instructions.size()) {
             inspectedInstruction =
                     &instructions[inspectedInstructionIndex];
         } else {
             inspectedInstruction =
-                    &snapshot.instruction.get();
+                    &snapshot.instruction->get();
         }
 
         ImGui::SeparatorText("Instruction");

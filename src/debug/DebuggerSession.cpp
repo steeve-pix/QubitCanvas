@@ -16,8 +16,12 @@ namespace quantum_sim::debug {
         return currentStep_;
     }
 
-    const circuit::TraceStep &DebuggerSession::currentStep() const noexcept {
-        return trace_.at(currentStep_);
+    const circuit::TraceStep &DebuggerSession::currentStep() const {
+        if (trace_.empty()) {
+            throw std::logic_error{"DebuggerSession::currentStep called with an empty trace"};
+        }
+
+        return trace_[currentStep_];
     }
 
     bool DebuggerSession::canMoveNext() const noexcept {
@@ -67,6 +71,17 @@ namespace quantum_sim::debug {
     }
 
     DebuggerSnapshot DebuggerSession::snapshot() const {
+        if (trace_.empty()) {
+            return DebuggerSnapshot{
+                .currentStepIndex = 0,
+                .stepCount = 0,
+                .instruction = std::nullopt,
+                .beforeState = initialState_,
+                .afterState = initialState_,
+                .canMoveNext = false,
+                .canMovePrevious = false
+            };
+        }
         return DebuggerSnapshot{
             currentStepIndex(),
             stepCount(),
@@ -96,7 +111,8 @@ namespace quantum_sim::debug {
         currentStep_ = index;
     }
 
-    void DebuggerSession::rebuild(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState) {
+    void DebuggerSession::rebuild(const circuit::QuantumCircuit &circuit,
+                                  const quantum::QuantumRegister &initialState) {
         initialState_ = initialState;
         trace_ =
                 circuit.executeWithTrace(initialState_);
@@ -104,5 +120,9 @@ namespace quantum_sim::debug {
         instructions_ = circuit.instructionInfo();
 
         currentStep_ = 0;
+    }
+
+    bool DebuggerSession::hasSteps() const noexcept {
+        return !trace_.empty();
     }
 }

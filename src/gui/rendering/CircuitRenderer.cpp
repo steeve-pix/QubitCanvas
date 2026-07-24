@@ -163,7 +163,10 @@ namespace quantum_sim::gui {
         const float firstWireY =
                 origin.y + style_.topMargin;
 
-        const float lastWireY = firstWireY + style_.wireSpacing * static_cast<float>(qubitCount - 1);
+        const float lastWireY =
+                firstWireY +
+                style_.wireSpacing *
+                static_cast<float>(qubitCount - 1);
 
         if (placementModeActive) {
             const float guideStartY =
@@ -175,7 +178,8 @@ namespace quantum_sim::gui {
             const float dashStep =
                     style_.placementGuideDashLength +
                     style_.placementGuideDashLength;
-            for (float y = 0; y < guideEndY; y += dashStep) {
+
+            for (float y = guideStartY; y < guideEndY; y += dashStep) {
                 const float dashEndY =
                         std::min(y + style_.placementGuideDashLength, guideEndY);
 

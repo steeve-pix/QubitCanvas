@@ -124,8 +124,8 @@ namespace quantum_sim::debug {
             const std::size_t currentStep =
                     snapshot.currentStepIndex;
 
-            const circuit::CircuitInstructionInfo &instruction =
-                    snapshot.instruction.get();
+                const circuit::CircuitInstructionInfo &instruction =
+                       snapshot.instruction->get();
 
 
             std::cout << "\nCircuit:\n";

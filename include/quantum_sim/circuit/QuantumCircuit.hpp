@@ -221,6 +221,8 @@ namespace quantum_sim::circuit {
         void addControlledGate(std::string name, math::ComplexMatrix gate, std::size_t controlQubit,
                                std::size_t targetQubit);
 
+        [[nodiscard]] bool removeLastInstruction() noexcept;
+
         /**
          * A structure representing an instruction for a single-qubit quantum gate.
          *

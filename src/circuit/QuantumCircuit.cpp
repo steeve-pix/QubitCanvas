@@ -184,4 +184,13 @@ namespace quantum_sim::circuit {
                 targetQubit
             });
     }
+
+    bool QuantumCircuit::removeLastInstruction() noexcept {
+        if (instructions_.empty()) {
+            return false;
+        }
+
+        instructions_.pop_back();
+        return true;
+    }
 }
