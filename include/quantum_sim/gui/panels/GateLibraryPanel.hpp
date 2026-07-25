@@ -49,6 +49,11 @@ namespace quantum_sim::gui {
         [[nodiscard]] const std::optional<std::string> &selectedGate() const noexcept;
 
         /**
+         * @return Rotation angle captured for newly selected Rx, Ry, or Rz gates.
+         */
+        [[nodiscard]] double rotationAngleRadians() const noexcept;
+
+        /**
          * Clears any selected gate.
          */
         void clearSelection() noexcept;
@@ -63,6 +68,7 @@ namespace quantum_sim::gui {
     private:
         GateLibraryStyle style_;
         std::optional<std::string> selectedGate_;
+        float rotationAngleRadians_{1.57079632679F};
 
         /**
          * Draws one square gate button.
@@ -93,6 +99,11 @@ namespace quantum_sim::gui {
          * @param gateCount Number of descriptors in gates.
          */
         void drawGateCategory(const char *title, const GateDescriptor *gates, std::size_t gateCount);
+
+        /**
+         * Draws the radians slider and common-angle shortcuts for rotation gates.
+         */
+        void drawRotationAngleControl();
 
         /**
          * Draws the selected-gate readout and clear button.

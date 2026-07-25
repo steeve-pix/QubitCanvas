@@ -59,11 +59,15 @@ namespace quantum_sim::gui {
         /**
          * Creates a supported single-qubit gate by display name.
          *
-         * @param gateName Gate name such as H, X, Y, Z, S, or T.
+         * @param gateName Gate name such as H, X, Y, Z, S, T, Rx, Ry, or Rz.
+         * @param angleRadians Required rotation angle for Rx, Ry, and Rz.
          * @return 2x2 unitary gate matrix.
-         * @throws std::invalid_argument if gateName is not supported.
+         * @throws std::invalid_argument if the gate is unsupported or a rotation has no angle.
          */
-        [[nodiscard]] math::ComplexMatrix createSingleQubitGateMatrix(const std::string &gateName) const;
+        [[nodiscard]] math::ComplexMatrix createSingleQubitGateMatrix(
+            const std::string &gateName,
+            std::optional<double> angleRadians = std::nullopt
+        ) const;
 
         /**
          * Applies any queued insertion/deletion produced by the UI.
@@ -102,8 +106,10 @@ namespace quantum_sim::gui {
         CircuitRenderer circuitRenderer_;
         GateLibraryPanel gateLibraryPanel_;
         std::optional<std::string> pendingGate_;
+        std::optional<double> pendingRotationAngleRadians_;
         std::optional<ControlledPlacement> queuedControlledPlacement_;
         std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
+        std::optional<double> queuedSingleQubitRotationAngleRadians_;
         std::optional<std::size_t> queuedInstructionDeletion_;
         std::vector<circuit::QuantumCircuit> undoHistory_;
         std::vector<circuit::QuantumCircuit> redoHistory_;

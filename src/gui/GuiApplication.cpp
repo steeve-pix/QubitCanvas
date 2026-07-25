@@ -432,10 +432,19 @@ namespace quantum_sim::gui {
                     );
                 }
 
+                if (pendingRotationAngleRadians_.has_value()) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled(
+                        "%.3f rad",
+                        pendingRotationAngleRadians_.value()
+                    );
+                }
+
                 ImGui::SameLine();
 
                 if (ImGui::SmallButton("Cancel")) {
                     pendingGate_.reset();
+                    pendingRotationAngleRadians_.reset();
                     circuitRenderer_.cancelPlacement();
                 }
             }
@@ -532,7 +541,11 @@ namespace quantum_sim::gui {
                 queuedSingleQubitPlacement_ =
                         std::move(singleQubitPlacement);
 
+                queuedSingleQubitRotationAngleRadians_ =
+                        pendingRotationAngleRadians_;
+
                 pendingGate_.reset();
+                pendingRotationAngleRadians_.reset();
             }
 
             const auto controlledPlacement =
@@ -543,6 +556,7 @@ namespace quantum_sim::gui {
                         controlledPlacement;
 
                 pendingGate_.reset();
+                pendingRotationAngleRadians_.reset();
             }
 
             const auto selectedInstructionIndex =
@@ -643,7 +657,23 @@ namespace quantum_sim::gui {
                     gateLibraryPanel_.consumeSelectedGate();
 
             if (selectedGate.has_value()) {
-                pendingGate_ = selectedGate.value();
+                const std::string &gateName =
+                        selectedGate.value();
+
+                pendingGate_ =
+                        gateName;
+
+                const bool rotationGate =
+                        gateName == "Rx" ||
+                        gateName == "Ry" ||
+                        gateName == "Rz";
+
+                pendingRotationAngleRadians_ =
+                        rotationGate
+                            ? std::optional<double>{
+                                gateLibraryPanel_.rotationAngleRadians()
+                            }
+                            : std::nullopt;
             }
 
             ImGui::End();
@@ -1777,8 +1807,10 @@ namespace quantum_sim::gui {
 
         // Clear transient edit state so old placements do not leak into new circuits.
         pendingGate_.reset();
+        pendingRotationAngleRadians_.reset();
         queuedControlledPlacement_.reset();
         queuedSingleQubitPlacement_.reset();
+        queuedSingleQubitRotationAngleRadians_.reset();
         queuedInstructionDeletion_.reset();
         circuitRenderer_.cancelPlacement();
         circuitRenderer_.clearSelection();
@@ -1973,7 +2005,10 @@ namespace quantum_sim::gui {
         ImGui::End();
     }
 
-    math::ComplexMatrix GuiApplication::createSingleQubitGateMatrix(const std::string &gateName) const {
+    math::ComplexMatrix GuiApplication::createSingleQubitGateMatrix(
+        const std::string &gateName,
+        const std::optional<double> angleRadians
+    ) const {
         if (gateName == "H") {
             return gates::hadamardGate();
         }
@@ -1996,6 +2031,28 @@ namespace quantum_sim::gui {
 
         if (gateName == "T") {
             return gates::tGate();
+        }
+
+        if (
+            gateName == "Rx" ||
+            gateName == "Ry" ||
+            gateName == "Rz"
+        ) {
+            if (!angleRadians.has_value()) {
+                throw std::invalid_argument(
+                    gateName + " requires an angle in radians."
+                );
+            }
+
+            if (gateName == "Rx") {
+                return gates::rxGate(angleRadians.value());
+            }
+
+            if (gateName == "Ry") {
+                return gates::ryGate(angleRadians.value());
+            }
+
+            return gates::rzGate(angleRadians.value());
         }
 
         throw std::invalid_argument("Unsupported single-qubit gate " + gateName);
@@ -2029,6 +2086,9 @@ namespace quantum_sim::gui {
             const std::size_t targetQubit =
                     queuedSingleQubitPlacement_->targetQubit;
 
+            const std::optional<double> angleRadians =
+                    queuedSingleQubitRotationAngleRadians_;
+
             recordCircuitForUndo();
 
             // Placement stores the insertion slot picked by the circuit renderer.
@@ -2038,11 +2098,13 @@ namespace quantum_sim::gui {
             circuit_.insertSingleQubitGate(
                 instructionIndex,
                 gateName,
-                createSingleQubitGateMatrix(gateName),
-                targetQubit
+                createSingleQubitGateMatrix(gateName, angleRadians),
+                targetQubit,
+                angleRadians
             );
 
             queuedSingleQubitPlacement_.reset();
+            queuedSingleQubitRotationAngleRadians_.reset();
 
             rebuildDebuggerAfterCircuitEdit();
         } else if (queuedControlledPlacement_.has_value()) {

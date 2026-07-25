@@ -1,6 +1,7 @@
 #include "quantum_sim/gui/panels/GateLibraryPanel.hpp"
 
 #include "imgui.h"
+#include <numbers>
 #include <utility>
 
 namespace quantum_sim::gui {
@@ -28,6 +29,21 @@ namespace quantum_sim::gui {
         {
             "T",
             "T gate: applies an eighth-turn phase shift."
+        }
+    };
+
+    constexpr GateDescriptor rotationGates[] = {
+        {
+            "Rx",
+            "Rx gate: rotates around the Bloch X axis by the selected angle."
+        },
+        {
+            "Ry",
+            "Ry gate: rotates around the Bloch Y axis by the selected angle."
+        },
+        {
+            "Rz",
+            "Rz gate: rotates around the Bloch Z axis by the selected angle."
         }
     };
 
@@ -69,6 +85,11 @@ namespace quantum_sim::gui {
     void GateLibraryPanel::draw() {
         // Categories keep one-click gate selection compact as the palette grows.
         drawGateCategory("Single-qubit gates", singleQubitGates, std::size(singleQubitGates));
+
+        ImGui::Spacing();
+
+        drawRotationAngleControl();
+        drawGateCategory("Rotation gates", rotationGates, std::size(rotationGates));
 
         ImGui::Spacing();
 
@@ -175,6 +196,18 @@ namespace quantum_sim::gui {
         ImGui::Text("Selected gate: %s",
                     selectedGate_->c_str());
 
+        const bool rotationSelected =
+                selectedGate_.value() == "Rx" ||
+                selectedGate_.value() == "Ry" ||
+                selectedGate_.value() == "Rz";
+
+        if (rotationSelected) {
+            ImGui::Text(
+                "Angle: %.3f rad",
+                rotationAngleRadians_
+            );
+        }
+
         if (ImGui::Button("Clear selection")) {
             clearSelection();
         }
@@ -182,6 +215,10 @@ namespace quantum_sim::gui {
 
     const std::optional<std::string> &GateLibraryPanel::selectedGate() const noexcept {
         return selectedGate_;
+    }
+
+    double GateLibraryPanel::rotationAngleRadians() const noexcept {
+        return static_cast<double>(rotationAngleRadians_);
     }
 
     void GateLibraryPanel::clearSelection() noexcept {
@@ -200,5 +237,46 @@ namespace quantum_sim::gui {
         selectedGate_.reset();
 
         return result;
+    }
+
+    void GateLibraryPanel::drawRotationAngleControl() {
+        ImGui::TextDisabled("Rotation angle");
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::SliderFloat(
+            "##RotationAngleRadians",
+            &rotationAngleRadians_,
+            -std::numbers::pi_v<float>,
+            std::numbers::pi_v<float>,
+            "%.3f rad",
+            ImGuiSliderFlags_AlwaysClamp
+        );
+
+        const float availableWidth =
+                ImGui::GetContentRegionAvail().x;
+
+        const float spacing =
+                ImGui::GetStyle().ItemSpacing.x;
+
+        const float shortcutWidth =
+                (availableWidth - spacing * 2.0F) / 3.0F;
+
+        if (ImGui::Button("pi/4", ImVec2{shortcutWidth, 0.0F})) {
+            rotationAngleRadians_ =
+                    std::numbers::pi_v<float> / 4.0F;
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("pi/2", ImVec2{shortcutWidth, 0.0F})) {
+            rotationAngleRadians_ =
+                    std::numbers::pi_v<float> / 2.0F;
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("pi", ImVec2{shortcutWidth, 0.0F})) {
+            rotationAngleRadians_ =
+                    std::numbers::pi_v<float>;
+        }
     }
 }
