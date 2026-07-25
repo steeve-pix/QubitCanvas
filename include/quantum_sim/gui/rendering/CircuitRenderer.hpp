@@ -130,5 +130,7 @@ namespace quantum_sim::gui {
         std::optional<SingleQubitPlacement> completedSingleQubitPlacement_;
         std::optional<std::size_t> pendingInsertionIndex_;
         std::optional<std::string> pendingControlledGateName_;
+        std::optional<std::size_t> lastFocusedStepIndex_;
+        std::size_t lastFocusedInstructionCount_{0};
     };
 }
