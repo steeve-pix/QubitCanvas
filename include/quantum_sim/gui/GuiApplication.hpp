@@ -23,8 +23,13 @@ namespace quantum_sim::gui {
         Ghz,
         PlusRegister,
         Qft,
-        PhaseLadder,
-        EntangleChain,
+        InverseQft,
+        Grover,
+        DeutschJozsa,
+        BernsteinVazirani,
+        Toffoli,
+        Kickback,
+        Teleportation,
         Scramble
     };
 

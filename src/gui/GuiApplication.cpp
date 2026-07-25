@@ -1721,7 +1721,12 @@ namespace quantum_sim::gui {
                 (width - spacing) * 0.5F;
 
         const auto scriptButton =
-                [&](const char *label, CircuitPreset preset, bool sameLine) {
+                [&](
+                    const char *label,
+                    CircuitPreset preset,
+                    const char *description,
+                    bool sameLine
+                ) {
             if (sameLine) {
                 ImGui::SameLine();
             }
@@ -1729,15 +1734,84 @@ namespace quantum_sim::gui {
             if (ImGui::Button(label, ImVec2{buttonWidth, 42.0F})) {
                 loadPreset(preset);
             }
+
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+                ImGui::SetTooltip("%s", description);
+            }
         };
 
-        scriptButton("Bell", CircuitPreset::Bell, false);
-        scriptButton("GHZ", CircuitPreset::Ghz, true);
-        scriptButton("|+>^n", CircuitPreset::PlusRegister, false);
-        scriptButton("QFT", CircuitPreset::Qft, true);
-        scriptButton("Phase", CircuitPreset::PhaseLadder, false);
-        scriptButton("Entangle", CircuitPreset::EntangleChain, true);
-        scriptButton("Scramble", CircuitPreset::Scramble, false);
+        scriptButton(
+            "Bell",
+            CircuitPreset::Bell,
+            "2 qubits - maximally entangled Bell pair",
+            false
+        );
+        scriptButton(
+            "GHZ",
+            CircuitPreset::Ghz,
+            "3 qubits - GHZ entanglement chain",
+            true
+        );
+        scriptButton(
+            "|+>^n",
+            CircuitPreset::PlusRegister,
+            "Selected register size - uniform superposition",
+            false
+        );
+        scriptButton(
+            "QFT",
+            CircuitPreset::Qft,
+            "Selected register size - Fourier phase history",
+            true
+        );
+        scriptButton(
+            "iQFT",
+            CircuitPreset::InverseQft,
+            "Selected register size - exact inverse QFT history",
+            false
+        );
+        scriptButton(
+            "Grover",
+            CircuitPreset::Grover,
+            "2 qubits - searches for marked state |11>",
+            true
+        );
+        scriptButton(
+            "Deutsch-J",
+            CircuitPreset::DeutschJozsa,
+            "3 qubits - balanced f(x) = x0 XOR x1",
+            false
+        );
+        scriptButton(
+            "Bernstein",
+            CircuitPreset::BernsteinVazirani,
+            "4 qubits - recovers hidden string 101",
+            true
+        );
+        scriptButton(
+            "Toffoli",
+            CircuitPreset::Toffoli,
+            "3 qubits - decomposed controlled-controlled X",
+            false
+        );
+        scriptButton(
+            "Kickback",
+            CircuitPreset::Kickback,
+            "2 qubits - exposes controlled phase kickback",
+            true
+        );
+        scriptButton(
+            "Teleport",
+            CircuitPreset::Teleportation,
+            "3 qubits - coherent state teleportation to q2",
+            false
+        );
+        scriptButton(
+            "Scramble",
+            CircuitPreset::Scramble,
+            "Selected register size - mixed-gate visualization stress test",
+            true
+        );
 
         ImGui::Spacing();
         ImGui::SeparatorText("P Coloring");
@@ -1826,7 +1900,6 @@ namespace quantum_sim::gui {
                     std::clamp(presetQubitCount_, 1, 10)
                 );
 
-        // The classic demos keep their canonical qubit counts.
         if (preset == CircuitPreset::Bell) {
             return algorithms::bellStateCircuit();
         }
@@ -1843,97 +1916,41 @@ namespace quantum_sim::gui {
             return algorithms::qftCircuit(qubitCount);
         }
 
-        circuit::QuantumCircuit presetCircuit{qubitCount};
-
-        if (preset == CircuitPreset::EntangleChain) {
-            presetCircuit.addSingleQubitGate(
-                "H",
-                gates::hadamardGate(),
-                0
-            );
-
-            for (std::size_t qubit = 1; qubit < qubitCount; ++qubit) {
-                // Chain each qubit into the previous one to build GHZ-like correlation.
-                presetCircuit.addControlledGate(
-                    "CX",
-                    gates::cxGate(qubitCount, qubit - 1, qubit),
-                    qubit - 1,
-                    qubit
-                );
-            }
-
-            return presetCircuit;
+        if (preset == CircuitPreset::InverseQft) {
+            return algorithms::inverseQftCircuit(qubitCount);
         }
 
-        for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
-            // Phase and scramble presets begin from broad superposition.
-            presetCircuit.addSingleQubitGate(
-                "H",
-                gates::hadamardGate(),
-                qubit
-            );
+        if (preset == CircuitPreset::Grover) {
+            return algorithms::groverSearchCircuit();
         }
 
-        if (preset == CircuitPreset::PhaseLadder) {
-            for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
-                presetCircuit.addSingleQubitGate(
-                    qubit % 2 == 0 ? "S" : "T",
-                    qubit % 2 == 0 ? gates::sGate() : gates::tGate(),
-                    qubit
-                );
-            }
-
-            for (std::size_t qubit = 1; qubit < qubitCount; ++qubit) {
-                presetCircuit.addControlledGate(
-                    "CZ",
-                    gates::czGate(qubitCount, qubit - 1, qubit),
-                    qubit - 1,
-                    qubit
-                );
-            }
-
-            return presetCircuit;
+        if (preset == CircuitPreset::DeutschJozsa) {
+            return algorithms::deutschJozsaCircuit();
         }
 
-        for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
-            if (qubit % 3 == 0) {
-                presetCircuit.addSingleQubitGate(
-                    "X",
-                    gates::xGate(),
-                    qubit
-                );
-            }
-
-            if (qubit % 3 == 1) {
-                presetCircuit.addSingleQubitGate(
-                    "S",
-                    gates::sGate(),
-                    qubit
-                );
-            }
+        if (preset == CircuitPreset::BernsteinVazirani) {
+            return algorithms::bernsteinVaziraniCircuit(3, 0b101);
         }
 
-        for (std::size_t qubit = 0; qubit + 1 < qubitCount; ++qubit) {
-            presetCircuit.addControlledGate(
-                qubit % 2 == 0 ? "CX" : "CZ",
-                qubit % 2 == 0
-                    ? gates::cxGate(qubitCount, qubit, qubit + 1)
-                    : gates::czGate(qubitCount, qubit, qubit + 1),
-                qubit,
-                qubit + 1
-            );
+        if (preset == CircuitPreset::Toffoli) {
+            return algorithms::toffoliDemoCircuit();
         }
 
-        if (qubitCount > 2) {
-            presetCircuit.addControlledGate(
-                "SWAP",
-                gates::swapGate(qubitCount, 0, qubitCount - 1),
-                0,
-                qubitCount - 1
-            );
+        if (preset == CircuitPreset::Kickback) {
+            return algorithms::phaseKickbackCircuit();
         }
 
-        return presetCircuit;
+        if (preset == CircuitPreset::Teleportation) {
+            return algorithms::teleportationCircuit();
+        }
+
+        if (preset == CircuitPreset::Scramble) {
+            return algorithms::scrambleCircuit(qubitCount);
+        }
+
+        throw std::invalid_argument{
+            "Unsupported circuit preset."
+        };
     }
 
     void GuiApplication::sampleCurrentState(const quantum::QuantumRegister &state) {
