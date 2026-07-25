@@ -36,6 +36,7 @@ namespace quantum_sim::circuit {
         std::optional<std::size_t> targetQubit;
         std::optional<std::size_t> controlQubit;
         std::optional<std::size_t> secondaryTargetQubit;
+        std::optional<double> angleRadians;
     };
 
     /**
@@ -62,10 +63,16 @@ namespace quantum_sim::circuit {
          * @param name Display name for the gate.
          * @param gate 2x2 unitary matrix.
          * @param targetQubit Qubit index to transform.
+         * @param angleRadians Optional rotation angle retained for UI inspection.
          * @throws std::invalid_argument if gate is not a valid single-qubit unitary.
          * @throws std::out_of_range if targetQubit is outside the circuit.
          */
-        void addSingleQubitGate(std::string name, math::ComplexMatrix gate, std::size_t targetQubit);
+        void addSingleQubitGate(
+            std::string name,
+            math::ComplexMatrix gate,
+            std::size_t targetQubit,
+            std::optional<double> angleRadians = std::nullopt
+        );
 
         /**
          * Appends an instruction represented by a full-register matrix.
@@ -151,11 +158,17 @@ namespace quantum_sim::circuit {
          * @param name Display name for the gate.
          * @param gate 2x2 unitary matrix.
          * @param targetQubit Qubit index to transform.
+         * @param angleRadians Optional rotation angle retained for UI inspection.
          * @throws std::invalid_argument if gate is not a valid single-qubit unitary.
          * @throws std::out_of_range if targetQubit is outside the circuit.
          */
-        void insertSingleQubitGate(std::size_t instructionIndex, std::string name, math::ComplexMatrix gate,
-                                   std::size_t targetQubit);
+        void insertSingleQubitGate(
+            std::size_t instructionIndex,
+            std::string name,
+            math::ComplexMatrix gate,
+            std::size_t targetQubit,
+            std::optional<double> angleRadians = std::nullopt
+        );
 
         /**
          * Inserts a two-qubit full-register instruction before the requested index.
@@ -176,6 +189,7 @@ namespace quantum_sim::circuit {
             std::string name;
             math::ComplexMatrix gate;
             std::size_t targetQubit;
+            std::optional<double> angleRadians;
         };
 
         struct FullRegisterInstruction {

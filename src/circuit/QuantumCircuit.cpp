@@ -20,7 +20,12 @@ namespace quantum_sim::circuit {
         return qubitCount_;
     }
 
-    void QuantumCircuit::addSingleQubitGate(std::string name, math::ComplexMatrix gate, std::size_t targetQubit) {
+    void QuantumCircuit::addSingleQubitGate(
+        std::string name,
+        math::ComplexMatrix gate,
+        const std::size_t targetQubit,
+        const std::optional<double> angleRadians
+    ) {
         if (gate.rows() != 2 || gate.columns() != 2) {
             throw std::invalid_argument{"A single-qubit gate must be a 2 by 2 matrix."};
         }
@@ -32,7 +37,14 @@ namespace quantum_sim::circuit {
             throw std::out_of_range{"Target qubit index is outside the circuit."};
         }
 
-        instructions_.push_back(SingleQubitInstruction{std::move(name), std::move(gate), targetQubit});
+        instructions_.push_back(
+            SingleQubitInstruction{
+                std::move(name),
+                std::move(gate),
+                targetQubit,
+                angleRadians
+            }
+        );
     }
 
     void QuantumCircuit::addFullRegisterGate(std::string name, math::ComplexMatrix gate) {
@@ -123,6 +135,13 @@ namespace quantum_sim::circuit {
                     currentState = currentState.applySingleQubitGate(actualInstruction.gate,
                                                                      actualInstruction.targetQubit);
                     description = actualInstruction.name + " on qubit " + std::to_string(actualInstruction.targetQubit);
+
+                    if (actualInstruction.angleRadians.has_value()) {
+                        description +=
+                                " at " +
+                                std::to_string(actualInstruction.angleRadians.value()) +
+                                " radians";
+                    }
                 } else {
                     currentState = currentState.applyGate(actualInstruction.gate);
                     description = actualInstruction.name;
@@ -150,7 +169,8 @@ namespace quantum_sim::circuit {
                         CircuitInstructionKind::SingleQubit,
                         actualInstruction.targetQubit,
                         std::nullopt,
-                        std::nullopt
+                        std::nullopt,
+                        actualInstruction.angleRadians
                     });
                 } else {
                     result.push_back(CircuitInstructionInfo{
@@ -158,7 +178,8 @@ namespace quantum_sim::circuit {
                         CircuitInstructionKind::FullRegister,
                         std::nullopt,
                         actualInstruction.controlQubit,
-                        actualInstruction.targetQubit
+                        actualInstruction.targetQubit,
+                        std::nullopt
                     });
                 }
             }, instruction);
@@ -215,8 +236,13 @@ namespace quantum_sim::circuit {
         return true;
     }
 
-    void QuantumCircuit::insertSingleQubitGate(std::size_t instructionIndex, std::string name, math::ComplexMatrix gate,
-                                               std::size_t targetQubit) {
+    void QuantumCircuit::insertSingleQubitGate(
+        const std::size_t instructionIndex,
+        std::string name,
+        math::ComplexMatrix gate,
+        const std::size_t targetQubit,
+        const std::optional<double> angleRadians
+    ) {
         if (gate.rows() != 2 || gate.columns() != 2) {
             throw std::invalid_argument{"A single-qubit gate must be a 2 by 2 matrix."};
         }
@@ -242,7 +268,8 @@ namespace quantum_sim::circuit {
             SingleQubitInstruction{
                 std::move(name),
                 std::move(gate),
-                targetQubit
+                targetQubit,
+                angleRadians
             }
         );
     }
