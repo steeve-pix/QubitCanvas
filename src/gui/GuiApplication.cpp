@@ -31,15 +31,26 @@ namespace quantum_sim::gui {
         };
 
         /**
-         * One drawable square in the state-volume preview.
+         * Strongest amplitude bucket used by density-matrix render cells.
          */
-        struct StateVolumeVoxel {
+        struct DensityBinSample {
+            std::size_t firstState{};
+            std::size_t lastState{};
+            std::size_t strongestState{};
+            double probability{};
+            double phase{};
+        };
+
+        /**
+         * Draw payload for one matrix cell in the 3D layer stack.
+         */
+        struct DensityLayerCell {
             float depth{};
             ImVec2 center{};
             float size{};
-            float glowRadius{};
             ImU32 color{};
             ImU32 glowColor{};
+            float glowRadius{};
         };
 
         /**
@@ -49,6 +60,154 @@ namespace quantum_sim::gui {
             return static_cast<int>(
                 std::clamp(value, 0.0F, 255.0F)
             );
+        }
+
+        /**
+         * Picks a matrix resolution that preserves small states and buckets huge ones.
+         */
+        [[nodiscard]] std::size_t densityMatrixDimension(std::size_t stateCount, std::size_t maximumDimension) {
+            if (stateCount == 0U) {
+                return 1U;
+            }
+
+            return std::clamp<std::size_t>(
+                stateCount,
+                2U,
+                maximumDimension
+            );
+        }
+
+        /**
+         * Builds one row/column bucket for a density-matrix visualization.
+         */
+        [[nodiscard]] DensityBinSample densityBin(
+            const quantum::QuantumRegister &state,
+            const std::size_t binIndex,
+            const std::size_t binCount
+        ) {
+            const std::size_t stateCount =
+                    state.stateCount();
+
+            const std::size_t firstState =
+                    std::min(
+                        stateCount - 1U,
+                        binIndex * stateCount / binCount
+                    );
+
+            const std::size_t lastState =
+                    std::min(
+                        stateCount,
+                        std::max<std::size_t>(
+                            firstState + 1U,
+                            ((binIndex + 1U) * stateCount + binCount - 1U) /
+                            binCount
+                        )
+                    );
+
+            std::size_t strongestState =
+                    firstState;
+
+            double probability =
+                    0.0;
+
+            double phase =
+                    0.0;
+
+            for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
+                const double candidateProbability =
+                        state.probability(stateIndex);
+
+                if (candidateProbability >= probability) {
+                    strongestState =
+                            stateIndex;
+
+                    probability =
+                            candidateProbability;
+
+                    const auto &amplitude =
+                            state.amplitude(stateIndex);
+
+                    phase =
+                            std::atan2(
+                                amplitude.imaginary(),
+                                amplitude.real()
+                            );
+                }
+            }
+
+            return DensityBinSample{
+                firstState,
+                lastState,
+                strongestState,
+                probability,
+                phase
+            };
+        }
+
+        /**
+         * Precomputes density-matrix buckets for one quantum state.
+         */
+        [[nodiscard]] std::vector<DensityBinSample> densityBins(
+            const quantum::QuantumRegister &state,
+            const std::size_t binCount
+        ) {
+            std::vector<DensityBinSample> bins;
+            bins.reserve(binCount);
+
+            for (std::size_t bin = 0; bin < binCount; ++bin) {
+                bins.push_back(
+                    densityBin(state, bin, binCount)
+                );
+            }
+
+            return bins;
+        }
+
+        /**
+         * Converts one density-matrix cell into the purple/magenta/amber QAVE palette.
+         */
+        [[nodiscard]] ImU32 densityMatrixColor(
+            const double magnitude,
+            const double phase,
+            const float alphaScale = 1.0F
+        ) {
+            const float intensity =
+                    std::clamp(
+                        static_cast<float>(std::pow(magnitude, 0.45)),
+                        0.0F,
+                        1.0F
+                    );
+
+            const float phaseT =
+                    static_cast<float>(
+                        (phase + std::numbers::pi) /
+                        (2.0 * std::numbers::pi)
+                    );
+
+            const float amber =
+                    std::clamp(
+                        (intensity - 0.72F) / 0.28F,
+                        0.0F,
+                        1.0F
+                    );
+
+            const int red =
+                    colorChannel(30.0F + intensity * 176.0F + amber * 72.0F);
+
+            const int green =
+                    colorChannel(13.0F + intensity * 42.0F + amber * 168.0F);
+
+            const int blue =
+                    colorChannel(
+                        72.0F + (1.0F - intensity) * 84.0F +
+                        std::cos(phaseT * 6.28318F) * 28.0F -
+                        amber * 48.0F
+                    );
+
+            const int alpha =
+                    colorChannel((72.0F + intensity * 176.0F) * alphaScale);
+
+            return IM_COL32(red, green, blue, alpha);
         }
 
         /**
@@ -102,6 +261,7 @@ namespace quantum_sim::gui {
     GuiApplication::GuiApplication(circuit::QuantumCircuit &circuit,
                                    const quantum::QuantumRegister &initialState)
         : circuit_{circuit}, initialState_{initialState}, session_{circuit_, initialState_} {
+        settleDebuggerPreview();
     }
 
     void GuiApplication::run() {
@@ -185,7 +345,7 @@ namespace quantum_sim::gui {
             applyPlayback(session_, snapshot);
             snapshot = session_.snapshot();
 
-            drawBackdrop(snapshot);
+            drawBackdrop(session_, snapshot);
             drawTopBar(session_, snapshot);
 
             const ImGuiViewport *viewport =
@@ -576,7 +736,10 @@ namespace quantum_sim::gui {
         }
     }
 
-    void GuiApplication::drawBackdrop(const debug::DebuggerSnapshot &snapshot) {
+    void GuiApplication::drawBackdrop(
+        const debug::DebuggerSession &session,
+        const debug::DebuggerSnapshot &snapshot
+    ) {
         const ImGuiViewport *viewport =
                 ImGui::GetMainViewport();
 
@@ -636,7 +799,7 @@ namespace quantum_sim::gui {
 
         const ImVec2 renderMinimum{
             workPosition.x + leftPanelWidth + gap * 2.0F,
-            workPosition.y + topBarHeight + gap + usableHeight * 0.45F + gap
+            workPosition.y + topBarHeight + gap
         };
 
         const ImVec2 renderMaximum{
@@ -661,14 +824,33 @@ namespace quantum_sim::gui {
             workPosition.y + topBarHeight + usableHeight
         };
 
+        const ImVec2 stageMinimum{
+            visualMinimum.x,
+            visualMinimum.y
+        };
+
+        const ImVec2 stageMaximum{
+            visualMaximum.x,
+            visualMaximum.y
+        };
+
         drawList->AddRectFilledMultiColor(
-            visualMinimum,
-            visualMaximum,
-            IM_COL32(24, 7, 10, 38),
-            IM_COL32(10, 10, 20, 10),
-            IM_COL32(54, 20, 16, 48),
-            IM_COL32(8, 8, 14, 0)
+            stageMinimum,
+            stageMaximum,
+            IM_COL32(1, 2, 5, 246),
+            IM_COL32(2, 4, 8, 242),
+            IM_COL32(34, 6, 8, 232),
+            IM_COL32(8, 2, 7, 238)
         );
+
+        for (float y = stageMinimum.y; y < stageMaximum.y; y += 3.0F) {
+            drawList->AddLine(
+                ImVec2{stageMinimum.x, y},
+                ImVec2{stageMaximum.x, y},
+                IM_COL32(92, 58, 84, 14),
+                1.0F
+            );
+        }
 
         const quantum::QuantumRegister &state =
                 snapshot.afterState.get();
@@ -683,34 +865,25 @@ namespace quantum_sim::gui {
         const bool layerStack =
                 canvasMode_ == CanvasMode::LayerStack;
 
-        std::size_t layerCount =
-                layerStack ? 42U : 26U;
+        const std::size_t sourceLayerCount =
+                session.hasSteps()
+                    ? session.stepCount()
+                    : 1U;
 
-        if (stateCount >= 512U) {
-            layerCount =
-                    layerStack ? 44U : 30U;
-        } else if (stateCount <= 16U) {
-            layerCount =
-                    layerStack ? 36U : 22U;
-        }
-
-        const std::size_t rowCount =
-                std::clamp<std::size_t>(
-                    static_cast<std::size_t>(
-                        std::ceil(
-                            std::log2(
-                                static_cast<double>(stateCount)
-                            )
-                        )
-                    ) + 2U,
-                    7U,
-                    9U
-                );
-
-        const std::size_t depthCount =
+        const std::size_t layerCount =
                 layerStack
-                    ? 7U
-                    : rowCount;
+                    ? std::clamp<std::size_t>(
+                        std::max<std::size_t>(sourceLayerCount, 18U),
+                        8U,
+                        56U
+                    )
+                    : 1U;
+
+        const std::size_t matrixDimension =
+                std::max<std::size_t>(
+                    4U,
+                    densityMatrixDimension(stateCount, 16U)
+                );
 
         const float renderWidth =
                 std::max(
@@ -726,46 +899,40 @@ namespace quantum_sim::gui {
 
         const float scale =
                 std::clamp(
-                    std::min(renderWidth / 720.0F, renderHeight / 390.0F),
-                    0.58F,
-                    1.28F
+                    std::min(renderWidth / 620.0F, renderHeight / 290.0F),
+                    0.78F,
+                    1.48F
                 ) * renderZoom_;
 
         const ImVec2 origin{
-            visualMinimum.x + renderWidth * 0.52F + renderPan_.x,
-            visualMinimum.y + renderHeight * (layerStack ? 0.58F : 0.64F) + renderPan_.y
+            visualMinimum.x + renderWidth * 0.38F + renderPan_.x,
+            stageMinimum.y + (stageMaximum.y - stageMinimum.y) * 0.53F + renderPan_.y
         };
 
         const float pitch =
-                renderPitch_ + (layerStack ? 0.0F : 0.34F);
+                renderPitch_ + (layerStack ? 0.0F : 0.24F);
 
-        const float sliceSpacing =
-                layerStack ? 8.7F : 12.2F;
+        const float layerSpacing =
+                layerStack ? 4.6F : 8.8F;
 
-        const float rowSpacing =
-                layerStack ? 8.4F : 12.0F;
-
-        const float depthSpacing =
-                layerStack ? 9.6F : 12.0F;
+        const float matrixSpacing =
+                layerStack ? 5.2F : 7.6F;
 
         const float halfX =
-                (static_cast<float>(layerCount) - 1.0F) * sliceSpacing * 0.5F;
+                (static_cast<float>(layerCount) - 1.0F) * layerSpacing * 0.5F;
 
-        const float halfY =
-                (static_cast<float>(rowCount) - 1.0F) * rowSpacing * 0.5F;
-
-        const float halfZ =
-                (static_cast<float>(depthCount) - 1.0F) * depthSpacing * 0.5F;
+        const float halfMatrix =
+                (static_cast<float>(matrixDimension) - 1.0F) * matrixSpacing * 0.5F;
 
         const std::array<ProjectedVolumePoint, 8> corners{
-            projectVolumePoint(-halfX, -halfY, -halfZ, renderYaw_, pitch, scale, origin),
-            projectVolumePoint(halfX, -halfY, -halfZ, renderYaw_, pitch, scale, origin),
-            projectVolumePoint(halfX, halfY, -halfZ, renderYaw_, pitch, scale, origin),
-            projectVolumePoint(-halfX, halfY, -halfZ, renderYaw_, pitch, scale, origin),
-            projectVolumePoint(-halfX, -halfY, halfZ, renderYaw_, pitch, scale, origin),
-            projectVolumePoint(halfX, -halfY, halfZ, renderYaw_, pitch, scale, origin),
-            projectVolumePoint(halfX, halfY, halfZ, renderYaw_, pitch, scale, origin),
-            projectVolumePoint(-halfX, halfY, halfZ, renderYaw_, pitch, scale, origin)
+            projectVolumePoint(-halfX, -halfMatrix, -halfMatrix, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(halfX, -halfMatrix, -halfMatrix, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(halfX, halfMatrix, -halfMatrix, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(-halfX, halfMatrix, -halfMatrix, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(-halfX, -halfMatrix, halfMatrix, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(halfX, -halfMatrix, halfMatrix, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(halfX, halfMatrix, halfMatrix, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(-halfX, halfMatrix, halfMatrix, renderYaw_, pitch, scale, origin)
         };
 
         const std::array<std::pair<int, int>, 12> edges{
@@ -795,170 +962,128 @@ namespace quantum_sim::gui {
         const float time =
                 static_cast<float>(ImGui::GetTime());
 
-        for (std::size_t layer = 0; layer < layerCount; layer += 4U) {
-            const float x =
-                    static_cast<float>(layer) * sliceSpacing - halfX;
+        const std::size_t currentLayer =
+                std::min(
+                    layerCount - 1U,
+                    sourceLayerCount == 0U
+                        ? 0U
+                        : snapshot.currentStepIndex * layerCount / sourceLayerCount
+                );
 
-            const ProjectedVolumePoint bottom =
-                    projectVolumePoint(x, -halfY, -halfZ, renderYaw_, pitch, scale, origin);
+        const float currentLayerX =
+                static_cast<float>(currentLayer) * layerSpacing - halfX;
 
-            const ProjectedVolumePoint top =
-                    projectVolumePoint(x, halfY, -halfZ, renderYaw_, pitch, scale, origin);
+        const ProjectedVolumePoint highlightA =
+                projectVolumePoint(currentLayerX, -halfMatrix, -halfMatrix, renderYaw_, pitch, scale, origin);
 
-            // Slice rails make the stack read as many computation layers.
-            drawList->AddLine(
-                bottom.screen,
-                top.screen,
-                IM_COL32(128, 65, 154, 32),
-                1.0F
-            );
-        }
+        const ProjectedVolumePoint highlightB =
+                projectVolumePoint(currentLayerX, halfMatrix, -halfMatrix, renderYaw_, pitch, scale, origin);
 
-        std::vector<StateVolumeVoxel> voxels;
+        const ProjectedVolumePoint highlightC =
+                projectVolumePoint(currentLayerX, halfMatrix, halfMatrix, renderYaw_, pitch, scale, origin);
 
-        const std::size_t volumeCellCount =
-                layerCount * rowCount * depthCount;
+        const ProjectedVolumePoint highlightD =
+                projectVolumePoint(currentLayerX, -halfMatrix, halfMatrix, renderYaw_, pitch, scale, origin);
 
-        voxels.reserve(volumeCellCount);
+        drawList->AddQuadFilled(
+            highlightA.screen,
+            highlightB.screen,
+            highlightC.screen,
+            highlightD.screen,
+            IM_COL32(255, 177, 36, 38)
+        );
+
+        drawList->AddQuad(
+            highlightA.screen,
+            highlightB.screen,
+            highlightC.screen,
+            highlightD.screen,
+            IM_COL32(255, 194, 67, 118),
+            1.2F
+        );
+
+        std::vector<DensityLayerCell> cells;
+        cells.reserve(layerCount * matrixDimension * matrixDimension);
 
         const float depthNormalizer =
-                halfX + halfY + halfZ + 1.0F;
+                halfX + halfMatrix * 2.0F + 1.0F;
 
         for (std::size_t layer = 0; layer < layerCount; ++layer) {
-            for (std::size_t row = 0; row < rowCount; ++row) {
-                for (std::size_t depth = 0; depth < depthCount; ++depth) {
-                    const std::size_t volumeIndex =
-                            (layer * rowCount + row) * depthCount + depth;
+            const std::size_t traceIndex =
+                    session.hasSteps()
+                        ? std::min(
+                            sourceLayerCount - 1U,
+                            layer * sourceLayerCount / layerCount
+                        )
+                        : 0U;
 
-                    std::size_t firstState =
-                            std::min(
-                                stateCount - 1U,
-                                volumeIndex * stateCount / volumeCellCount
+            const quantum::QuantumRegister &layerState =
+                    session.hasSteps()
+                        ? session.stepAt(traceIndex).state
+                        : state;
+
+            const std::vector<DensityBinSample> bins =
+                    densityBins(layerState, matrixDimension);
+
+            const float layerX =
+                    static_cast<float>(layer) * layerSpacing - halfX;
+
+            const float layerDistance =
+                    std::abs(
+                        static_cast<float>(layer) -
+                        static_cast<float>(currentLayer)
+                    );
+
+            const float focusBoost =
+                    std::clamp(
+                        1.0F - layerDistance / 12.0F,
+                        0.18F,
+                        1.0F
+                    );
+
+            for (std::size_t row = 0; row < matrixDimension; ++row) {
+                for (std::size_t column = 0; column < matrixDimension; ++column) {
+                    const double rawMagnitude =
+                            std::sqrt(
+                                bins[row].probability *
+                                bins[column].probability
                             );
 
-                    std::size_t lastState =
-                            std::min(
-                                stateCount,
-                                std::max<std::size_t>(
-                                    firstState + 1U,
-                                    ((volumeIndex + 1U) * stateCount + volumeCellCount - 1U) /
-                                    volumeCellCount
-                                )
-                            );
-
-                    if (volumeCellCount > stateCount) {
-                        // Small registers repeat amplitudes through the volume;
-                        // hashing spreads those repeats so a basis state becomes
-                        // a readable field instead of one solid colored chunk.
-                        const std::size_t hashedState =
-                                (
-                                    volumeIndex * 1'140'071'481'932'319'845ULL +
-                                    layer * 97U +
-                                    row * 37U +
-                                    depth * 17U
-                                ) %
-                                stateCount;
-
-                        firstState =
-                                hashedState;
-
-                        lastState =
-                                hashedState + 1U;
-                    }
-
-                    double bucketProbability =
-                            0.0;
-
-                    double bucketPhase =
-                            0.0;
-
-                    // A volume cell may summarize several amplitudes in large registers.
-                    for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
-                        const double probability =
-                                state.probability(stateIndex);
-
-                        if (probability > bucketProbability) {
-                            bucketProbability =
-                                    probability;
-
-                            bucketPhase =
-                                    std::atan2(
-                                        state.amplitude(stateIndex).imaginary(),
-                                        state.amplitude(stateIndex).real()
-                                    );
-                        }
-                    }
-
-                    const float normalizedProbability =
-                            std::pow(
-                                std::clamp(
-                                    static_cast<float>(
-                                        bucketProbability * static_cast<double>(stateCount)
-                                    ),
-                                    0.0F,
-                                    1.0F
-                                ),
-                                heatAmount_
-                            );
-
-                    const float phase =
-                            static_cast<float>(bucketPhase);
-
-                    const float phaseT =
-                            static_cast<float>(
-                                (bucketPhase + std::numbers::pi) /
-                                (2.0 * std::numbers::pi)
-                            );
-
-                    const float ripple =
-                            0.5F + 0.5F * std::sin(
-                                time * 0.56F +
-                                static_cast<float>(layer) * 0.23F +
-                                static_cast<float>(row) * 0.71F +
-                                static_cast<float>(depth) * 0.39F +
-                                phase
-                            );
-
-                    const float energy =
+                    const double normalizedMagnitude =
                             std::clamp(
-                                0.10F + normalizedProbability * 0.54F + ripple * 0.12F,
-                                0.0F,
+                                rawMagnitude * std::sqrt(static_cast<double>(stateCount)),
+                                0.0,
+                                1.0
+                            );
+
+                    const double phase =
+                            bins[row].phase - bins[column].phase;
+
+                    const bool diagonal =
+                            row == column;
+
+                    const float shimmer =
+                            0.92F + 0.08F * std::sin(
+                                time * 0.9F +
+                                static_cast<float>(layer) * 0.19F +
+                                static_cast<float>(row + column) * 0.11F
+                            );
+
+                    const float alphaScale =
+                            std::clamp(
+                                (0.30F + focusBoost * 0.70F) * shimmer,
+                                0.18F,
                                 1.0F
                             );
-
-                    const float hot =
-                            std::clamp(
-                                (normalizedProbability - 0.72F) / 0.28F,
-                                0.0F,
-                                1.0F
-                            ) *
-                            std::clamp(
-                                (ripple - 0.84F) / 0.16F,
-                                0.0F,
-                                1.0F
-                            );
-
-                    const bool cyanPhaseAccent =
-                            std::sin(phaseT * 6.28318F) < -0.78F;
-
-                    const bool edgeCell =
-                            layer == 0U ||
-                            layer + 1U == layerCount ||
-                            depth == 0U ||
-                            depth + 1U == depthCount;
 
                     const float x =
-                            static_cast<float>(layer) * sliceSpacing - halfX;
+                            layerX;
 
                     const float y =
-                            (static_cast<float>(row) -
-                             (static_cast<float>(rowCount) - 1.0F) * 0.5F) *
-                            rowSpacing;
+                            halfMatrix - static_cast<float>(row) * matrixSpacing;
 
                     const float z =
-                            (static_cast<float>(depth) -
-                             (static_cast<float>(depthCount) - 1.0F) * 0.5F) *
-                            depthSpacing;
+                            static_cast<float>(column) * matrixSpacing - halfMatrix;
 
                     const ProjectedVolumePoint projected =
                             projectVolumePoint(
@@ -979,48 +1104,37 @@ namespace quantum_sim::gui {
                                 1.0F
                             );
 
-                    const float edgeBoost =
-                            edgeCell ? 0.08F : 0.0F;
-
-                    const int red =
-                            colorChannel(42.0F + energy * 176.0F + hot * 64.0F + edgeBoost * 68.0F);
-
-                    const int green =
-                            colorChannel(
-                                14.0F + energy * 42.0F + hot * 168.0F +
-                                (cyanPhaseAccent ? 42.0F : 0.0F)
+                    const float cellSize =
+                            std::max(
+                                1.2F,
+                                matrixSpacing * scale *
+                                (diagonal ? 0.92F : 0.82F)
                             );
 
-                    const int blue =
-                            colorChannel(
-                                118.0F + (1.0F - energy) * 70.0F - hot * 70.0F +
-                                (cyanPhaseAccent ? 82.0F : 0.0F)
+                    const float glowMagnitude =
+                            std::clamp(
+                                static_cast<float>(normalizedMagnitude - 0.76) / 0.24F,
+                                0.0F,
+                                1.0F
                             );
 
-                    const int alpha =
-                            colorChannel(
-                                (50.0F + energy * 128.0F + hot * 44.0F) *
-                                (0.58F + depthLight * 0.50F)
-                            );
+                    const ImU32 color =
+                            normalizedMagnitude <= 0.002
+                                ? IM_COL32(58, 22, 112, colorChannel(86.0F * alphaScale))
+                                : densityMatrixColor(
+                                    normalizedMagnitude,
+                                    phase,
+                                    alphaScale * (0.72F + depthLight * 0.42F)
+                                );
 
-                    const float voxelSize =
-                            (layerStack ? 4.8F : 7.0F) *
-                            scale *
-                            (0.84F + energy * 0.24F + depthLight * 0.12F);
-
-                    const float glowRadius =
-                            hot > 0.20F
-                                ? voxelSize * (0.9F + hot * 1.25F)
-                                : 0.0F;
-
-                    voxels.push_back(
-                        StateVolumeVoxel{
+                    cells.push_back(
+                        DensityLayerCell{
                             projected.depth,
                             projected.screen,
-                            voxelSize,
-                            glowRadius,
-                            IM_COL32(red, green, blue, alpha),
-                            IM_COL32(255, colorChannel(142.0F + hot * 92.0F), 78, colorChannel(hot * 48.0F))
+                            cellSize,
+                            color,
+                            IM_COL32(255, 197, 91, colorChannel(58.0F * glowMagnitude * alphaScale)),
+                            glowMagnitude > 0.0F ? cellSize * (1.5F + glowMagnitude) : 0.0F
                         }
                     );
                 }
@@ -1028,44 +1142,224 @@ namespace quantum_sim::gui {
         }
 
         std::sort(
-            voxels.begin(),
-            voxels.end(),
-            [](const StateVolumeVoxel &left, const StateVolumeVoxel &right) {
+            cells.begin(),
+            cells.end(),
+            [](const DensityLayerCell &left, const DensityLayerCell &right) {
                 return left.depth < right.depth;
             }
         );
 
-        for (const StateVolumeVoxel &voxel : voxels) {
-            if (voxel.glowRadius > 0.0F) {
+        for (const DensityLayerCell &cell : cells) {
+            if (cell.glowRadius > 0.0F) {
                 drawList->AddRectFilled(
                     ImVec2{
-                        voxel.center.x - voxel.glowRadius,
-                        voxel.center.y - voxel.glowRadius
+                        cell.center.x - cell.glowRadius,
+                        cell.center.y - cell.glowRadius
                     },
                     ImVec2{
-                        voxel.center.x + voxel.glowRadius,
-                        voxel.center.y + voxel.glowRadius
+                        cell.center.x + cell.glowRadius,
+                        cell.center.y + cell.glowRadius
                     },
-                    voxel.glowColor,
+                    cell.glowColor,
                     2.4F
                 );
             }
 
-            const ImVec2 voxelMinimum{
-                voxel.center.x - voxel.size * 0.5F,
-                voxel.center.y - voxel.size * 0.5F
+            const ImVec2 cellMinimum{
+                cell.center.x - cell.size * 0.5F,
+                cell.center.y - cell.size * 0.5F
             };
 
-            const ImVec2 voxelMaximum{
-                voxel.center.x + voxel.size * 0.5F,
-                voxel.center.y + voxel.size * 0.5F
+            const ImVec2 cellMaximum{
+                cell.center.x + cell.size * 0.5F,
+                cell.center.y + cell.size * 0.5F
             };
 
             drawList->AddRectFilled(
-                voxelMinimum,
-                voxelMaximum,
-                voxel.color,
-                1.2F
+                cellMinimum,
+                cellMaximum,
+                cell.color,
+                0.8F
+            );
+        }
+
+        const float overlayWidth =
+                std::clamp(
+                    renderWidth * 0.42F,
+                    240.0F,
+                    330.0F
+                );
+
+        const float overlayGrid =
+                overlayWidth - 24.0F;
+
+        const float overlayHeight =
+                overlayGrid + 54.0F;
+
+        const ImVec2 overlayMinimum{
+            visualMaximum.x - overlayWidth - 18.0F,
+            stageMaximum.y - overlayHeight - 52.0F
+        };
+
+        const ImVec2 overlayMaximum{
+            overlayMinimum.x + overlayWidth,
+            overlayMinimum.y + overlayHeight
+        };
+
+        drawList->AddRectFilled(
+            overlayMinimum,
+            overlayMaximum,
+            IM_COL32(7, 12, 22, 232),
+            7.0F
+        );
+
+        drawList->AddRect(
+            overlayMinimum,
+            overlayMaximum,
+            IM_COL32(54, 98, 143, 190),
+            7.0F,
+            0,
+            1.0F
+        );
+
+        const std::size_t overlayDimension =
+                densityMatrixDimension(stateCount, 32U);
+
+        const std::vector<DensityBinSample> overlayBins =
+                densityBins(state, overlayDimension);
+
+        const std::string overlayHeader =
+                "P - 2D - LAYER " +
+                std::to_string(snapshot.stepCount == 0 ? 0 : snapshot.currentStepIndex + 1U) +
+                " - " +
+                std::to_string(overlayDimension) +
+                "x" +
+                std::to_string(overlayDimension);
+
+        drawList->AddText(
+            ImVec2{overlayMinimum.x + 12.0F, overlayMinimum.y + 8.0F},
+            IM_COL32(139, 160, 193, 255),
+            overlayHeader.c_str()
+        );
+
+        const ImVec2 overlayGridMinimum{
+            overlayMinimum.x + 12.0F,
+            overlayMinimum.y + 32.0F
+        };
+
+        const float overlayCell =
+                overlayGrid / static_cast<float>(overlayDimension);
+
+        for (std::size_t row = 0; row < overlayDimension; ++row) {
+            for (std::size_t column = 0; column < overlayDimension; ++column) {
+                const double magnitude =
+                        std::clamp(
+                            std::sqrt(
+                                overlayBins[row].probability *
+                                overlayBins[column].probability
+                            ) * std::sqrt(static_cast<double>(stateCount)),
+                            0.0,
+                            1.0
+                        );
+
+                const double phase =
+                        overlayBins[row].phase - overlayBins[column].phase;
+
+                const ImVec2 cellMinimum{
+                    overlayGridMinimum.x + static_cast<float>(column) * overlayCell,
+                    overlayGridMinimum.y + static_cast<float>(row) * overlayCell
+                };
+
+                const ImVec2 cellMaximum{
+                    overlayGridMinimum.x + static_cast<float>(column + 1U) * overlayCell - 0.7F,
+                    overlayGridMinimum.y + static_cast<float>(row + 1U) * overlayCell - 0.7F
+                };
+
+                drawList->AddRectFilled(
+                    cellMinimum,
+                    cellMaximum,
+                    magnitude <= 0.002
+                        ? IM_COL32(30, 17, 69, 184)
+                        : densityMatrixColor(magnitude, phase, 0.96F),
+                    0.0F
+                );
+            }
+        }
+
+        for (std::size_t line = 0; line <= overlayDimension; ++line) {
+            const float offset =
+                    static_cast<float>(line) * overlayCell;
+
+            drawList->AddLine(
+                ImVec2{overlayGridMinimum.x + offset, overlayGridMinimum.y},
+                ImVec2{overlayGridMinimum.x + offset, overlayGridMinimum.y + overlayGrid},
+                IM_COL32(76, 96, 137, 42),
+                1.0F
+            );
+
+            drawList->AddLine(
+                ImVec2{overlayGridMinimum.x, overlayGridMinimum.y + offset},
+                ImVec2{overlayGridMinimum.x + overlayGrid, overlayGridMinimum.y + offset},
+                IM_COL32(76, 96, 137, 42),
+                1.0F
+            );
+        }
+
+        drawList->AddLine(
+            overlayGridMinimum,
+            ImVec2{
+                overlayGridMinimum.x + overlayGrid,
+                overlayGridMinimum.y + overlayGrid
+            },
+            IM_COL32(218, 148, 50, 100),
+            1.1F
+        );
+
+        drawList->AddText(
+            ImVec2{visualMinimum.x + 18.0F, stageMaximum.y - 36.0F},
+            IM_COL32(255, 197, 53, 235),
+            layerStack ? "layer stack:" : "floor field:"
+        );
+
+        drawList->AddText(
+            ImVec2{visualMinimum.x + 128.0F, stageMaximum.y - 36.0F},
+            IM_COL32(104, 121, 156, 210),
+            layerStack
+                ? "full history density slices - one rho matrix per circuit step"
+                : "single rho matrix floor view"
+        );
+
+        drawList->AddText(
+            ImVec2{visualMaximum.x - 168.0F, stageMaximum.y - 18.0F},
+            IM_COL32(104, 121, 156, 210),
+            "|P| low-high"
+        );
+
+        constexpr int legendSteps = 44;
+        const float legendWidth = 82.0F;
+        const ImVec2 legendMinimum{
+            visualMaximum.x - 260.0F,
+            stageMaximum.y - 16.0F
+        };
+
+        for (int step = 0; step < legendSteps; ++step) {
+            const float t =
+                    static_cast<float>(step) /
+                    static_cast<float>(legendSteps - 1);
+
+            drawList->AddRectFilled(
+                ImVec2{
+                    legendMinimum.x + legendWidth * t,
+                    legendMinimum.y
+                },
+                ImVec2{
+                    legendMinimum.x +
+                    legendWidth * static_cast<float>(step + 1) /
+                    static_cast<float>(legendSteps),
+                    legendMinimum.y + 8.0F
+                },
+                densityMatrixColor(t * t, 0.0, 1.0F),
+                0.0F
             );
         }
     }
@@ -1219,16 +1513,32 @@ namespace quantum_sim::gui {
 
     void GuiApplication::resetRenderCamera() {
         renderYaw_ =
-                -0.62F;
+                -0.46F;
 
         renderPitch_ =
-                0.18F;
+                0.24F;
 
         renderZoom_ =
-                1.0F;
+                1.30F;
 
         renderPan_ =
                 ImVec2{0.0F, 0.0F};
+    }
+
+    void GuiApplication::settleDebuggerPreview() {
+        if (
+            !session_.hasSteps() ||
+            session_.stepCount() < 4U
+        ) {
+            return;
+        }
+
+        session_.moveToStep(
+            std::min(
+                session_.stepCount() - 1U,
+                session_.stepCount() * 2U / 5U
+            )
+        );
     }
 
     void GuiApplication::drawTopBar(
@@ -1394,9 +1704,10 @@ namespace quantum_sim::gui {
         scriptButton("Bell", CircuitPreset::Bell, false);
         scriptButton("GHZ", CircuitPreset::Ghz, true);
         scriptButton("|+>^n", CircuitPreset::PlusRegister, false);
-        scriptButton("Phase", CircuitPreset::PhaseLadder, true);
-        scriptButton("Entangle", CircuitPreset::EntangleChain, false);
-        scriptButton("Scramble", CircuitPreset::Scramble, true);
+        scriptButton("QFT", CircuitPreset::Qft, true);
+        scriptButton("Phase", CircuitPreset::PhaseLadder, false);
+        scriptButton("Entangle", CircuitPreset::EntangleChain, true);
+        scriptButton("Scramble", CircuitPreset::Scramble, false);
 
         ImGui::Spacing();
         ImGui::SeparatorText("P Coloring");
@@ -1474,6 +1785,7 @@ namespace quantum_sim::gui {
         playbackPaused_ = true;
 
         rebuildDebuggerAfterCircuitEdit();
+        settleDebuggerPreview();
     }
 
     circuit::QuantumCircuit GuiApplication::createPresetCircuit(CircuitPreset preset) const {
@@ -1493,6 +1805,10 @@ namespace quantum_sim::gui {
 
         if (preset == CircuitPreset::PlusRegister) {
             return algorithms::equalSuperpositionCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Qft) {
+            return algorithms::qftCircuit(qubitCount);
         }
 
         circuit::QuantumCircuit presetCircuit{qubitCount};

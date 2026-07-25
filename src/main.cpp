@@ -62,7 +62,7 @@ int main() {
     // Start the GUI with a visually interesting circuit instead of prompting
     // through the console. Users can switch presets inside the app.
     QuantumCircuit circuit =
-            quantum_sim::algorithms::ghzStateCircuit();
+            quantum_sim::algorithms::qftCircuit(4);
 
     // Presets start from |000...> so the trace is deterministic and easy to inspect.
     const QuantumRegister initialState =

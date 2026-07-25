@@ -22,6 +22,7 @@ namespace quantum_sim::gui {
         Bell,
         Ghz,
         PlusRegister,
+        Qft,
         PhaseLadder,
         EntangleChain,
         Scramble
@@ -108,13 +109,13 @@ namespace quantum_sim::gui {
         std::vector<circuit::QuantumCircuit> redoHistory_;
         std::mt19937 randomEngine_{std::random_device{}()};
         CanvasMode canvasMode_{CanvasMode::LayerStack};
-        int presetQubitCount_{3};
+        int presetQubitCount_{4};
         bool playbackPaused_{true};
         double nextAutoStepAt_{0.0};
         float heatAmount_{0.78F};
-        float renderYaw_{-0.62F};
-        float renderPitch_{0.18F};
-        float renderZoom_{1.0F};
+        float renderYaw_{-0.46F};
+        float renderPitch_{0.24F};
+        float renderZoom_{1.30F};
         ImVec2 renderPan_{0.0F, 0.0F};
         std::string lastSampleLabel_{"none"};
 
@@ -146,9 +147,10 @@ namespace quantum_sim::gui {
         /**
          * Draws the animated quantum-state background visualization.
          *
+         * @param session Debugger trace used to render full-history layers.
          * @param snapshot Current debugger snapshot used as the source state.
          */
-        void drawBackdrop(const debug::DebuggerSnapshot &snapshot);
+        void drawBackdrop(const debug::DebuggerSession &session, const debug::DebuggerSnapshot &snapshot);
 
         /**
          * Applies mouse orbit, pan, zoom, and reset gestures to the state render.
@@ -162,6 +164,11 @@ namespace quantum_sim::gui {
          * Restores the state-volume camera to its reference composition.
          */
         void resetRenderCamera();
+
+        /**
+         * Opens rich demo traces at a settled mid-history frame.
+         */
+        void settleDebuggerPreview();
 
         /**
          * Draws playback, scrub, view-mode, and sampling controls.
