@@ -74,6 +74,10 @@ namespace quantum_sim::gui {
 
         void configureStyle() const;
 
+        void pushApplicationFont() const;
+
+        void popApplicationFont() const;
+
         void drawBackdrop(const debug::DebuggerSnapshot &snapshot) const;
 
         void drawTopBar(debug::DebuggerSession &session, const debug::DebuggerSnapshot &snapshot);
