@@ -3,19 +3,12 @@
 #include <vector>
 #include <functional>
 
+#include "DebuggerSnapshot.hpp"
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 
 
 namespace quantum_sim::debug {
-    struct DebuggerSnapshot {
-        std::size_t currentStepIndex, stepCount;
-        std::reference_wrapper<const circuit::CircuitInstructionInfo> instruction;
-        std::reference_wrapper<const quantum::QuantumRegister> beforeState;
-        std::reference_wrapper<const quantum::QuantumRegister> afterState;
-        bool canMoveNext, canMovePrevious;
-    };
-
     class DebuggerSession {
     public:
         /**
@@ -61,7 +54,7 @@ namespace quantum_sim::debug {
          *
          * @return A constant reference to the current `TraceStep` in the execution trace.
          */
-        [[nodiscard]] const circuit::TraceStep &currentStep() const noexcept;
+        [[nodiscard]] const circuit::TraceStep &currentStep() const;
 
         /**
          * Determines whether the debugger session can move to the next step
@@ -140,6 +133,14 @@ namespace quantum_sim::debug {
         [[nodiscard]] const circuit::CircuitInstructionInfo &currentInstruction() const;
 
         [[nodiscard]] DebuggerSnapshot snapshot() const;
+
+        [[nodiscard]] const circuit::TraceStep &stepAt(std::size_t index) const;
+
+        void moveToStep(std::size_t index);
+
+        void rebuild(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState);
+
+        [[nodiscard]] bool hasSteps() const noexcept;
 
         /**
          * Represents the initial state of the quantum register for the debugging session.

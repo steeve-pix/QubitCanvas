@@ -288,7 +288,7 @@ namespace quantum_sim::visualization {
     }
 
     void printBlochVector(const quantum::QuantumRegister &state, std::ostream &output) {
-        const quantum::BlockVector vector = state.blockVector();
+        const quantum::BlochVector vector = state.blockVector();
         const quantum::BlochAngles angles = state.blochAngles();
 
         output
@@ -321,7 +321,7 @@ namespace quantum_sim::visualization {
     }
 
     void printAsciiBlochSphere(const quantum::QuantumRegister &state, std::ostream &output) {
-        const quantum::BlockVector vector =
+        const quantum::BlochVector vector =
                 state.blockVector();
 
         constexpr double centerRow = 5.0;

@@ -16,7 +16,7 @@ namespace quantum_sim::quantum {
         double probability;
     };
 
-    struct BlockVector {
+    struct BlochVector {
         double x, y, z;
     };
 
@@ -210,7 +210,7 @@ namespace quantum_sim::quantum {
          * @return The Bloch vector as a BlockVector object, containing x, y, and z components
          *         corresponding to the state of the qubit.
          */
-        [[nodiscard]] BlockVector blockVector() const;
+        [[nodiscard]] BlochVector blockVector() const;
 
         [[nodiscard]] BlochAngles blochAngles() const;
 
