@@ -1100,7 +1100,13 @@ namespace quantum_sim::gui {
         );
 
         ImGui::SetCursorScreenPos(minimum);
-        ImGui::InvisibleButton("##StateVolumeCamera", size);
+        ImGui::InvisibleButton(
+            "##StateVolumeCamera",
+            size,
+            ImGuiButtonFlags_MouseButtonLeft |
+            ImGuiButtonFlags_MouseButtonMiddle |
+            ImGuiButtonFlags_MouseButtonRight
+        );
 
         const bool hovered =
                 ImGui::IsItemHovered();
@@ -1112,7 +1118,42 @@ namespace quantum_sim::gui {
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
         }
 
-        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0F)) {
+        const bool middleMouseDragging =
+                ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0F);
+
+        const bool altLeftMouseDragging =
+                io.KeyAlt &&
+                ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0F);
+
+        const bool blenderOrbitDrag =
+                ImGui::IsItemActive() &&
+                !io.KeyShift &&
+                !io.KeyCtrl &&
+                (
+                    middleMouseDragging ||
+                    altLeftMouseDragging
+                );
+
+        const bool blenderPanDrag =
+                ImGui::IsItemActive() &&
+                io.KeyShift &&
+                !io.KeyCtrl &&
+                (
+                    middleMouseDragging ||
+                    altLeftMouseDragging
+                );
+
+        const bool blenderDollyDrag =
+                ImGui::IsItemActive() &&
+                io.KeyCtrl &&
+                !io.KeyShift &&
+                (
+                    middleMouseDragging ||
+                    altLeftMouseDragging
+                );
+
+        if (blenderOrbitDrag) {
+            // Blender-style orbit: MMB drag rotates around the state volume.
             renderYaw_ +=
                     io.MouseDelta.x * 0.008F;
 
@@ -1124,13 +1165,8 @@ namespace quantum_sim::gui {
                     );
         }
 
-        if (
-            hovered &&
-            (
-                ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0F) ||
-                ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0F)
-            )
-        ) {
+        if (blenderPanDrag) {
+            // Blender-style pan: Shift+MMB moves the view in screen space.
             renderPan_.x +=
                     io.MouseDelta.x;
 
@@ -1138,7 +1174,17 @@ namespace quantum_sim::gui {
                     io.MouseDelta.y;
         }
 
+        if (blenderDollyDrag) {
+            renderZoom_ =
+                    std::clamp(
+                        renderZoom_ * std::pow(1.012F, -io.MouseDelta.y),
+                        0.48F,
+                        2.35F
+                    );
+        }
+
         if (hovered && io.MouseWheel != 0.0F) {
+            // Wheel zoom mirrors Blender's viewport dolly without needing a drag.
             renderZoom_ =
                     std::clamp(
                         renderZoom_ * std::pow(1.12F, io.MouseWheel),
@@ -1147,13 +1193,23 @@ namespace quantum_sim::gui {
                     );
         }
 
-        if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        if (
+            hovered &&
+            (
+                ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Middle) ||
+                (
+                    io.KeyAlt &&
+                    ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)
+                )
+            )
+        ) {
             resetRenderCamera();
         }
 
         if (hovered) {
             ImGui::BeginTooltip();
-            ImGui::TextUnformatted("Drag orbit  |  wheel zoom  |  right drag pan");
+            ImGui::TextUnformatted("MMB orbit  |  Shift+MMB pan  |  Ctrl+MMB zoom");
+            ImGui::TextUnformatted("Alt+LMB mirrors MMB");
             ImGui::EndTooltip();
         }
 
