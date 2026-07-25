@@ -125,20 +125,101 @@ namespace {
                 );
 
         const int red =
-                static_cast<int>(88.0F + intensity * 180.0F);
+                static_cast<int>(42.0F + intensity * 220.0F);
 
         const int green =
-                static_cast<int>(52.0F + std::sin(phaseT * 6.28318F) * 40.0F + intensity * 130.0F);
+                static_cast<int>(18.0F + std::sin(phaseT * 6.28318F) * 36.0F + intensity * 182.0F);
 
         const int blue =
-                static_cast<int>(135.0F + std::cos(phaseT * 6.28318F) * 70.0F + intensity * 75.0F);
+                static_cast<int>(112.0F + (1.0F - intensity) * 86.0F + std::cos(phaseT * 6.28318F) * 42.0F);
 
         return IM_COL32(
             std::clamp(red, 0, 255),
             std::clamp(green, 0, 255),
             std::clamp(blue, 0, 255),
-            static_cast<int>(55.0F + intensity * 200.0F)
+            static_cast<int>(92.0F + intensity * 163.0F)
         );
+    }
+
+    [[nodiscard]] std::size_t nextPowerOfTwo(std::size_t value) {
+        if (value <= 1U) {
+            return 1U;
+        }
+
+        std::size_t power =
+                1U;
+
+        while (power < value) {
+            power <<= 1U;
+        }
+
+        return power;
+    }
+
+    [[nodiscard]] std::size_t heatmapDimension(std::size_t stateCount) {
+        const std::size_t squareRoot =
+                std::max<std::size_t>(
+                    1U,
+                    static_cast<std::size_t>(
+                        std::ceil(
+                            std::sqrt(
+                                static_cast<double>(
+                                    std::max<std::size_t>(1U, stateCount)
+                                )
+                            )
+                        )
+                    )
+                );
+
+        // A 16x16 minimum gives tiny registers enough pixels to inspect.
+        return std::clamp<std::size_t>(
+            nextPowerOfTwo(
+                std::max<std::size_t>(16U, squareRoot)
+            ),
+            16U,
+            64U
+        );
+    }
+
+    [[nodiscard]] std::pair<std::size_t, std::size_t> heatmapStateRange(
+        const std::size_t cellIndex,
+        const std::size_t cellCount,
+        const std::size_t stateCount
+    ) {
+        if (stateCount == 0U) {
+            return {0U, 0U};
+        }
+
+        if (cellCount >= stateCount) {
+            const std::size_t repeatedIndex =
+                    cellIndex % stateCount;
+
+            return {
+                repeatedIndex,
+                repeatedIndex + 1U
+            };
+        }
+
+        const std::size_t firstState =
+                std::min(
+                    stateCount - 1U,
+                    cellIndex * stateCount / cellCount
+                );
+
+        const std::size_t lastState =
+                std::min(
+                    stateCount,
+                    std::max<std::size_t>(
+                        firstState + 1U,
+                        ((cellIndex + 1U) * stateCount + cellCount - 1U) /
+                        cellCount
+                    )
+                );
+
+        return {
+            firstState,
+            lastState
+        };
     }
 }
 
@@ -472,8 +553,8 @@ namespace quantum_sim::gui {
         ImGui::Spacing();
         ImGui::SeparatorText("Quantum State");
 
-        drawProbabilities(state);
         drawStateHeatmap(state);
+        drawProbabilities(state);
         drawAmplitudes(state);
         drawBlochInformation(state);
     }
@@ -537,40 +618,45 @@ namespace quantum_sim::gui {
         ImGui::TextDisabled("Amplitude field");
 
         const float availableWidth =
-                std::max(120.0F, ImGui::GetContentRegionAvail().x);
+                std::max(220.0F, ImGui::GetContentRegionAvail().x);
 
         const std::size_t stateCount =
                 state.stateCount();
 
-        const int columns =
-                std::max(
-                    1,
-                    static_cast<int>(
-                        std::ceil(
-                            std::sqrt(
-                                static_cast<double>(stateCount)
-                            )
-                        )
-                    )
-                );
+        const std::size_t gridDimension =
+                heatmapDimension(stateCount);
 
-        // Square-ish grid keeps the amplitude field compact in narrow panels.
-        const float cellSize =
+        const std::size_t heatmapCellCount =
+                gridDimension * gridDimension;
+
+        const float panelWidth =
                 std::clamp(
-                    availableWidth / static_cast<float>(columns),
-                    4.0F,
-                    10.0F
+                    availableWidth,
+                    220.0F,
+                    340.0F
                 );
 
-        const int rows =
-                static_cast<int>(
-                    (stateCount + static_cast<std::size_t>(columns) - 1) /
-                    static_cast<std::size_t>(columns)
+        constexpr float padding = 10.0F;
+        constexpr float headerHeight = 26.0F;
+        constexpr float legendHeight = 24.0F;
+
+        const float gridSide =
+                std::max(
+                    180.0F,
+                    panelWidth - padding * 2.0F
                 );
+
+        const float cellSize =
+                gridSide / static_cast<float>(gridDimension);
+
+        const float cellInset =
+                gridDimension <= 32U
+                    ? 1.0F
+                    : 0.45F;
 
         const ImVec2 canvasSize{
-            availableWidth,
-            static_cast<float>(rows) * cellSize
+            panelWidth,
+            padding + headerHeight + gridSide + padding + legendHeight
         };
 
         const ImVec2 origin =
@@ -587,79 +673,290 @@ namespace quantum_sim::gui {
         drawList->AddRectFilled(
             origin,
             ImVec2{origin.x + canvasSize.x, origin.y + canvasSize.y},
-            IM_COL32(8, 13, 22, 190),
-            4.0F
+            IM_COL32(7, 11, 20, 232),
+            7.0F
         );
 
-        for (std::size_t stateIndex = 0; stateIndex < stateCount; ++stateIndex) {
-            const int column =
-                    static_cast<int>(stateIndex % static_cast<std::size_t>(columns));
+        drawList->AddRect(
+            origin,
+            ImVec2{origin.x + canvasSize.x, origin.y + canvasSize.y},
+            IM_COL32(55, 99, 142, 210),
+            7.0F,
+            0,
+            1.0F
+        );
 
-            const int row =
-                    static_cast<int>(stateIndex / static_cast<std::size_t>(columns));
+        const std::string headerPrefix =
+                "P - 2D - ";
 
-            const auto &amplitude =
-                    state.amplitude(stateIndex);
+        const std::string headerSize =
+                std::to_string(gridDimension) + "x" + std::to_string(gridDimension);
 
-            const double probability =
-                    state.probability(stateIndex);
+        const ImVec2 headerPosition{
+            origin.x + padding,
+            origin.y + 7.0F
+        };
 
-            const double phase =
-                    std::atan2(
-                        amplitude.imaginary(),
-                        amplitude.real()
+        drawList->AddText(
+            headerPosition,
+            IM_COL32(139, 160, 193, 255),
+            headerPrefix.c_str()
+        );
+
+        const ImVec2 headerPrefixSize =
+                ImGui::CalcTextSize(headerPrefix.c_str());
+
+        drawList->AddText(
+            ImVec2{
+                headerPosition.x + headerPrefixSize.x,
+                headerPosition.y
+            },
+            IM_COL32(255, 197, 53, 255),
+            headerSize.c_str()
+        );
+
+        const ImVec2 gridOrigin{
+            origin.x + padding,
+            origin.y + padding + headerHeight
+        };
+
+        const ImVec2 gridMaximum{
+            gridOrigin.x + gridSide,
+            gridOrigin.y + gridSide
+        };
+
+        drawList->AddRectFilled(
+            gridOrigin,
+            gridMaximum,
+            IM_COL32(13, 8, 34, 245),
+            3.0F
+        );
+
+        for (std::size_t cellIndex = 0; cellIndex < heatmapCellCount; ++cellIndex) {
+            const std::size_t column =
+                    cellIndex % gridDimension;
+
+            const std::size_t row =
+                    cellIndex / gridDimension;
+
+            const auto [firstState, lastState] =
+                    heatmapStateRange(
+                        cellIndex,
+                        heatmapCellCount,
+                        stateCount
                     );
 
-            // Each cell encodes probability by intensity and phase by hue.
+            std::size_t strongestState =
+                    firstState;
+
+            double strongestProbability =
+                    0.0;
+
+            double strongestPhase =
+                    0.0;
+
+            for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
+                const double probability =
+                        state.probability(stateIndex);
+
+                if (probability >= strongestProbability) {
+                    strongestState =
+                            stateIndex;
+
+                    strongestProbability =
+                            probability;
+
+                    const auto &amplitude =
+                            state.amplitude(stateIndex);
+
+                    strongestPhase =
+                            std::atan2(
+                                amplitude.imaginary(),
+                                amplitude.real()
+                            );
+                }
+            }
+
+            // The visible grid is deliberately larger than the raw state count:
+            // repeated small-register cells keep the pattern readable.
             const ImVec2 minimum{
-                origin.x + static_cast<float>(column) * cellSize,
-                origin.y + static_cast<float>(row) * cellSize
+                gridOrigin.x + static_cast<float>(column) * cellSize + cellInset * 0.5F,
+                gridOrigin.y + static_cast<float>(row) * cellSize + cellInset * 0.5F
             };
 
             const ImVec2 maximum{
-                minimum.x + cellSize - 1.0F,
-                minimum.y + cellSize - 1.0F
+                gridOrigin.x + static_cast<float>(column + 1U) * cellSize - cellInset * 0.5F,
+                gridOrigin.y + static_cast<float>(row + 1U) * cellSize - cellInset * 0.5F
             };
 
             drawList->AddRectFilled(
                 minimum,
                 maximum,
-                probabilityColor(probability, phase),
+                probabilityColor(strongestProbability, strongestPhase),
+                gridDimension <= 32U ? 1.5F : 0.7F
+            );
+
+            (void) strongestState;
+        }
+
+        const std::size_t gridLineStride =
+                gridDimension <= 32U
+                    ? 1U
+                    : 4U;
+
+        for (std::size_t line = 0; line <= gridDimension; line += gridLineStride) {
+            const float offset =
+                    static_cast<float>(line) * cellSize;
+
+            drawList->AddLine(
+                ImVec2{gridOrigin.x + offset, gridOrigin.y},
+                ImVec2{gridOrigin.x + offset, gridMaximum.y},
+                IM_COL32(89, 112, 154, 34),
+                1.0F
+            );
+
+            drawList->AddLine(
+                ImVec2{gridOrigin.x, gridOrigin.y + offset},
+                ImVec2{gridMaximum.x, gridOrigin.y + offset},
+                IM_COL32(89, 112, 154, 34),
                 1.0F
             );
         }
+
+        drawList->AddLine(
+            gridOrigin,
+            gridMaximum,
+            IM_COL32(219, 147, 48, 96),
+            1.25F
+        );
+
+        drawList->AddRect(
+            gridOrigin,
+            gridMaximum,
+            IM_COL32(93, 139, 192, 155),
+            3.0F,
+            0,
+            1.0F
+        );
+
+        constexpr int legendSteps = 42;
+        const float legendWidth = 88.0F;
+        const float legendHeightPixels = 8.0F;
+        const ImVec2 legendMinimum{
+            origin.x + canvasSize.x - padding - legendWidth,
+            gridMaximum.y + padding + 5.0F
+        };
+
+        for (int step = 0; step < legendSteps; ++step) {
+            const float t =
+                    static_cast<float>(step) /
+                    static_cast<float>(legendSteps - 1);
+
+            const ImVec2 minimum{
+                legendMinimum.x + legendWidth * t,
+                legendMinimum.y
+            };
+
+            const ImVec2 maximum{
+                legendMinimum.x + legendWidth * (static_cast<float>(step + 1) / static_cast<float>(legendSteps)),
+                legendMinimum.y + legendHeightPixels
+            };
+
+            drawList->AddRectFilled(
+                minimum,
+                maximum,
+                probabilityColor(t * t, 0.0),
+                0.0F
+            );
+        }
+
+        const char *legendLabel =
+                "|P| low-high";
+
+        const ImVec2 legendLabelSize =
+                ImGui::CalcTextSize(legendLabel);
+
+        drawList->AddText(
+            ImVec2{
+                legendMinimum.x - legendLabelSize.x - 7.0F,
+                legendMinimum.y - 3.0F
+            },
+            IM_COL32(95, 117, 151, 255),
+            legendLabel
+        );
 
         if (ImGui::IsItemHovered()) {
             const ImVec2 mouse =
                     ImGui::GetMousePos();
 
-            // Convert mouse position back into a state index for the tooltip.
-            const int column =
-                    static_cast<int>(
-                        (mouse.x - origin.x) / cellSize
-                    );
-
-            const int row =
-                    static_cast<int>(
-                        (mouse.y - origin.y) / cellSize
-                    );
-
             if (
-                column >= 0 &&
-                row >= 0
+                mouse.x >= gridOrigin.x &&
+                mouse.x <= gridMaximum.x &&
+                mouse.y >= gridOrigin.y &&
+                mouse.y <= gridMaximum.y
             ) {
-                const std::size_t stateIndex =
-                        static_cast<std::size_t>(row) *
-                        static_cast<std::size_t>(columns) +
-                        static_cast<std::size_t>(column);
+                const std::size_t column =
+                        std::min<std::size_t>(
+                            gridDimension - 1U,
+                            static_cast<std::size_t>(
+                                (mouse.x - gridOrigin.x) / cellSize
+                            )
+                        );
 
-                if (stateIndex < stateCount) {
+                const std::size_t row =
+                        std::min<std::size_t>(
+                            gridDimension - 1U,
+                            static_cast<std::size_t>(
+                                (mouse.y - gridOrigin.y) / cellSize
+                            )
+                        );
+
+                const std::size_t cellIndex =
+                        row * gridDimension + column;
+
+                const auto [firstState, lastState] =
+                        heatmapStateRange(
+                            cellIndex,
+                            heatmapCellCount,
+                            stateCount
+                        );
+
+                if (firstState < lastState) {
+                    std::size_t strongestState =
+                            firstState;
+
+                    double strongestProbability =
+                            0.0;
+
+                    for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
+                        const double probability =
+                                state.probability(stateIndex);
+
+                        if (probability >= strongestProbability) {
+                            strongestState =
+                                    stateIndex;
+
+                            strongestProbability =
+                                    probability;
+                        }
+                    }
+
                     const quantum::StateInfo info =
-                            state.stateInfo(stateIndex);
+                            state.stateInfo(strongestState);
 
                     ImGui::BeginTooltip();
+                    ImGui::Text("cell %zux%zu", column, row);
                     ImGui::Text("%s", info.label.c_str());
-                    ImGui::Text("index %zu", stateIndex);
+                    ImGui::Text("index %zu", strongestState);
+
+                    if (lastState - firstState > 1U) {
+                        ImGui::Text(
+                            "bucket %zu-%zu",
+                            firstState,
+                            lastState - 1U
+                        );
+                    }
+
                     ImGui::Text("p %.6f", info.probability);
                     ImGui::Text(
                         "amp %.4f%+.4fi",
