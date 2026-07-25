@@ -18,6 +18,15 @@ namespace quantum_sim::algorithms {
     [[nodiscard]] circuit::QuantumCircuit equalSuperpositionCircuit(std::size_t qubitCount);
 
     /**
+     * Builds a QFT-style phase-history showcase circuit for the GUI.
+     *
+     * @param qubitCount Number of qubits to use in the scripted circuit.
+     * @return Circuit with Hadamards, decomposed phase interactions, swaps, and a final phase pass.
+     * @throws std::invalid_argument if qubitCount is zero.
+     */
+    [[nodiscard]] circuit::QuantumCircuit qftCircuit(std::size_t qubitCount);
+
+    /**
      * @return Three-qubit GHZ circuit: H(q0), CX(q0 -> q1), CX(q1 -> q2).
      */
     [[nodiscard]] circuit::QuantumCircuit ghzStateCircuit();

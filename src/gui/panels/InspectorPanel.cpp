@@ -18,6 +18,14 @@ namespace {
         quantum_sim::quantum::StateInfo state;
     };
 
+    struct DensityBinSample {
+        std::size_t firstState{};
+        std::size_t lastState{};
+        std::size_t strongestState{};
+        double probability{};
+        double phase{};
+    };
+
     [[nodiscard]] std::string toLower(std::string value) {
         for (char &character: value) {
             character =
@@ -141,69 +149,27 @@ namespace {
         );
     }
 
-    [[nodiscard]] std::size_t nextPowerOfTwo(std::size_t value) {
-        if (value <= 1U) {
-            return 1U;
-        }
-
-        std::size_t power =
-                1U;
-
-        while (power < value) {
-            power <<= 1U;
-        }
-
-        return power;
-    }
-
     [[nodiscard]] std::size_t heatmapDimension(std::size_t stateCount) {
-        const std::size_t squareRoot =
-                std::max<std::size_t>(
-                    1U,
-                    static_cast<std::size_t>(
-                        std::ceil(
-                            std::sqrt(
-                                static_cast<double>(
-                                    std::max<std::size_t>(1U, stateCount)
-                                )
-                            )
-                        )
-                    )
-                );
-
-        // A 16x16 minimum gives tiny registers enough pixels to inspect.
+        // Small registers keep their true density-matrix size; huge registers are bucketed.
         return std::clamp<std::size_t>(
-            nextPowerOfTwo(
-                std::max<std::size_t>(16U, squareRoot)
-            ),
-            16U,
+            stateCount,
+            2U,
             64U
         );
     }
 
-    [[nodiscard]] std::pair<std::size_t, std::size_t> heatmapStateRange(
-        const std::size_t cellIndex,
-        const std::size_t cellCount,
-        const std::size_t stateCount
+    [[nodiscard]] DensityBinSample densityBin(
+        const quantum_sim::quantum::QuantumRegister &state,
+        const std::size_t binIndex,
+        const std::size_t binCount
     ) {
-        if (stateCount == 0U) {
-            return {0U, 0U};
-        }
-
-        if (cellCount >= stateCount) {
-            const std::size_t repeatedIndex =
-                    cellIndex % stateCount;
-
-            return {
-                repeatedIndex,
-                repeatedIndex + 1U
-            };
-        }
+        const std::size_t stateCount =
+                state.stateCount();
 
         const std::size_t firstState =
                 std::min(
                     stateCount - 1U,
-                    cellIndex * stateCount / cellCount
+                    binIndex * stateCount / binCount
                 );
 
         const std::size_t lastState =
@@ -211,15 +177,65 @@ namespace {
                     stateCount,
                     std::max<std::size_t>(
                         firstState + 1U,
-                        ((cellIndex + 1U) * stateCount + cellCount - 1U) /
-                        cellCount
+                        ((binIndex + 1U) * stateCount + binCount - 1U) /
+                        binCount
                     )
                 );
 
-        return {
+        std::size_t strongestState =
+                firstState;
+
+        double probability =
+                0.0;
+
+        double phase =
+                0.0;
+
+        for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
+            const double candidateProbability =
+                    state.probability(stateIndex);
+
+            if (candidateProbability >= probability) {
+                strongestState =
+                        stateIndex;
+
+                probability =
+                        candidateProbability;
+
+                const auto &amplitude =
+                        state.amplitude(stateIndex);
+
+                phase =
+                        std::atan2(
+                            amplitude.imaginary(),
+                            amplitude.real()
+                        );
+            }
+        }
+
+        return DensityBinSample{
             firstState,
-            lastState
+            lastState,
+            strongestState,
+            probability,
+            phase
         };
+    }
+
+    [[nodiscard]] std::vector<DensityBinSample> densityBins(
+        const quantum_sim::quantum::QuantumRegister &state,
+        const std::size_t binCount
+    ) {
+        std::vector<DensityBinSample> bins;
+        bins.reserve(binCount);
+
+        for (std::size_t bin = 0; bin < binCount; ++bin) {
+            bins.push_back(
+                densityBin(state, bin, binCount)
+            );
+        }
+
+        return bins;
     }
 }
 
@@ -626,14 +642,14 @@ namespace quantum_sim::gui {
         const std::size_t gridDimension =
                 heatmapDimension(stateCount);
 
-        const std::size_t heatmapCellCount =
-                gridDimension * gridDimension;
+        const std::vector<DensityBinSample> bins =
+                densityBins(state, gridDimension);
 
         const float panelWidth =
                 std::clamp(
                     availableWidth,
-                    220.0F,
-                    340.0F
+                    260.0F,
+                    560.0F
                 );
 
         constexpr float padding = 10.0F;
@@ -642,7 +658,7 @@ namespace quantum_sim::gui {
 
         const float gridSide =
                 std::max(
-                    180.0F,
+                    240.0F,
                     panelWidth - padding * 2.0F
                 );
 
@@ -687,7 +703,7 @@ namespace quantum_sim::gui {
         );
 
         const std::string headerPrefix =
-                "P - 2D - ";
+                "P - rho - ";
 
         const std::string headerSize =
                 std::to_string(gridDimension) + "x" + std::to_string(gridDimension);
@@ -732,71 +748,57 @@ namespace quantum_sim::gui {
             3.0F
         );
 
-        for (std::size_t cellIndex = 0; cellIndex < heatmapCellCount; ++cellIndex) {
-            const std::size_t column =
-                    cellIndex % gridDimension;
+        for (std::size_t row = 0; row < gridDimension; ++row) {
+            for (std::size_t column = 0; column < gridDimension; ++column) {
+                const double magnitude =
+                        std::clamp(
+                            std::sqrt(
+                                bins[row].probability *
+                                bins[column].probability
+                            ) * std::sqrt(static_cast<double>(stateCount)),
+                            0.0,
+                            1.0
+                        );
 
-            const std::size_t row =
-                    cellIndex / gridDimension;
+                const double phase =
+                        bins[row].phase - bins[column].phase;
 
-            const auto [firstState, lastState] =
-                    heatmapStateRange(
-                        cellIndex,
-                        heatmapCellCount,
-                        stateCount
-                    );
+                // Each cell encodes one bucket of rho = |psi><psi| coherence.
+                const ImVec2 minimum{
+                    gridOrigin.x + static_cast<float>(column) * cellSize + cellInset * 0.5F,
+                    gridOrigin.y + static_cast<float>(row) * cellSize + cellInset * 0.5F
+                };
 
-            std::size_t strongestState =
-                    firstState;
+                const ImVec2 maximum{
+                    gridOrigin.x + static_cast<float>(column + 1U) * cellSize - cellInset * 0.5F,
+                    gridOrigin.y + static_cast<float>(row + 1U) * cellSize - cellInset * 0.5F
+                };
 
-            double strongestProbability =
-                    0.0;
-
-            double strongestPhase =
-                    0.0;
-
-            for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
-                const double probability =
-                        state.probability(stateIndex);
-
-                if (probability >= strongestProbability) {
-                    strongestState =
-                            stateIndex;
-
-                    strongestProbability =
-                            probability;
-
-                    const auto &amplitude =
-                            state.amplitude(stateIndex);
-
-                    strongestPhase =
-                            std::atan2(
-                                amplitude.imaginary(),
-                                amplitude.real()
-                            );
-                }
+                drawList->AddRectFilled(
+                    minimum,
+                    maximum,
+                    magnitude <= 0.002
+                        ? IM_COL32(30, 17, 69, 198)
+                        : probabilityColor(magnitude, phase),
+                    gridDimension <= 32U ? 1.5F : 0.7F
+                );
             }
+        }
 
-            // The visible grid is deliberately larger than the raw state count:
-            // repeated small-register cells keep the pattern readable.
-            const ImVec2 minimum{
-                gridOrigin.x + static_cast<float>(column) * cellSize + cellInset * 0.5F,
-                gridOrigin.y + static_cast<float>(row) * cellSize + cellInset * 0.5F
-            };
+        if (gridDimension < stateCount) {
+            const std::string bucketLabel =
+                    "bucketed from " +
+                    std::to_string(stateCount) +
+                    " states";
 
-            const ImVec2 maximum{
-                gridOrigin.x + static_cast<float>(column + 1U) * cellSize - cellInset * 0.5F,
-                gridOrigin.y + static_cast<float>(row + 1U) * cellSize - cellInset * 0.5F
-            };
-
-            drawList->AddRectFilled(
-                minimum,
-                maximum,
-                probabilityColor(strongestProbability, strongestPhase),
-                gridDimension <= 32U ? 1.5F : 0.7F
+            drawList->AddText(
+                ImVec2{
+                    headerPosition.x,
+                    headerPosition.y + 17.0F
+                },
+                IM_COL32(95, 117, 151, 255),
+                bucketLabel.c_str()
             );
-
-            (void) strongestState;
         }
 
         const std::size_t gridLineStride =
@@ -911,58 +913,54 @@ namespace quantum_sim::gui {
                             )
                         );
 
-                const std::size_t cellIndex =
-                        row * gridDimension + column;
+                const DensityBinSample &rowBin =
+                        bins[row];
 
-                const auto [firstState, lastState] =
-                        heatmapStateRange(
-                            cellIndex,
-                            heatmapCellCount,
-                            stateCount
-                        );
+                const DensityBinSample &columnBin =
+                        bins[column];
 
-                if (firstState < lastState) {
-                    std::size_t strongestState =
-                            firstState;
+                if (
+                    rowBin.firstState < rowBin.lastState &&
+                    columnBin.firstState < columnBin.lastState
+                ) {
+                    const quantum::StateInfo rowInfo =
+                            state.stateInfo(rowBin.strongestState);
 
-                    double strongestProbability =
-                            0.0;
+                    const quantum::StateInfo columnInfo =
+                            state.stateInfo(columnBin.strongestState);
 
-                    for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
-                        const double probability =
-                                state.probability(stateIndex);
-
-                        if (probability >= strongestProbability) {
-                            strongestState =
-                                    stateIndex;
-
-                            strongestProbability =
-                                    probability;
-                        }
-                    }
-
-                    const quantum::StateInfo info =
-                            state.stateInfo(strongestState);
+                    const double magnitude =
+                            std::sqrt(
+                                rowBin.probability *
+                                columnBin.probability
+                            );
 
                     ImGui::BeginTooltip();
-                    ImGui::Text("cell %zux%zu", column, row);
-                    ImGui::Text("%s", info.label.c_str());
-                    ImGui::Text("index %zu", strongestState);
+                    ImGui::Text("rho cell %zux%zu", column, row);
+                    ImGui::Text("row %s", rowInfo.label.c_str());
+                    ImGui::Text("col %s", columnInfo.label.c_str());
 
-                    if (lastState - firstState > 1U) {
+                    if (rowBin.lastState - rowBin.firstState > 1U) {
                         ImGui::Text(
-                            "bucket %zu-%zu",
-                            firstState,
-                            lastState - 1U
+                            "row bucket %zu-%zu",
+                            rowBin.firstState,
+                            rowBin.lastState - 1U
                         );
                     }
 
-                    ImGui::Text("p %.6f", info.probability);
+                    if (columnBin.lastState - columnBin.firstState > 1U) {
+                        ImGui::Text(
+                            "col bucket %zu-%zu",
+                            columnBin.firstState,
+                            columnBin.lastState - 1U
+                        );
+                    }
+
                     ImGui::Text(
-                        "amp %.4f%+.4fi",
-                        info.amplitude.real(),
-                        info.amplitude.imaginary()
+                        "|rho| %.6f",
+                        magnitude
                     );
+
                     ImGui::EndTooltip();
                 }
             }
