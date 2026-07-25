@@ -6,6 +6,7 @@
 #include <vector>
 #include <utility>
 #include <algorithm>
+#include <limits>
 
 namespace quantum_sim::quantum {
     QuantumRegister::QuantumRegister(std::size_t qubitCount, math::ComplexVector amplitudes)
@@ -19,6 +20,7 @@ namespace quantum_sim::quantum {
                 "Qubit count is too large to represent its state count."
             };
 
+        // A register with n qubits has exactly 2^n basis amplitudes.
         const std::size_t expectedStateCount =
                 std::size_t{1} << qubitCount_;
 
@@ -62,6 +64,8 @@ namespace quantum_sim::quantum {
         math::ComplexMatrix combinedGate =
                 math::ComplexMatrix::identity(1);
 
+        // Build I tensor I tensor gate tensor I ... so the 2x2 gate acts on
+        // the requested qubit while all other qubits pass through unchanged.
         for (std::size_t qubit{}; qubit < qubitCount_; ++qubit) {
             math::ComplexMatrix operationForThisQubit =
                     math::ComplexMatrix::identity(2);
@@ -112,6 +116,7 @@ namespace quantum_sim::quantum {
         double cumulativeProbability = 0.0;
         std::size_t measuredState = stateCount() - 1;
 
+        // Walk the cumulative distribution and choose the first state past the sample.
         for (std::size_t state{}; state < stateCount(); ++state) {
             cumulativeProbability += probability(state);
 
@@ -120,6 +125,8 @@ namespace quantum_sim::quantum {
                 break;
             }
         }
+
+        // Collapse the register so only the measured basis state remains.
         std::vector collapsedValues(
             stateCount(), math::Complex{});
 
@@ -130,6 +137,7 @@ namespace quantum_sim::quantum {
     }
 
     bool QuantumRegister::stateHasQubitOne(std::size_t stateIndex, std::size_t qubitIndex) const noexcept {
+        // q0 maps to the most-significant bit of the state index.
         const std::size_t bitPosition = qubitCount_ - 1 - qubitIndex;
         const std::size_t mask =
                 std::size_t{1} << bitPosition;
@@ -143,6 +151,8 @@ namespace quantum_sim::quantum {
         }
 
         double totalProbability = 0.0;
+
+        // Marginal probability is the sum of every basis state where this bit is 1.
         for (std::size_t state{}; state < stateCount(); ++state) {
             if (stateHasQubitOne(state, qubitIndex)) {
                 totalProbability += probability(state);
@@ -182,6 +192,7 @@ namespace quantum_sim::quantum {
         std::vector<math::Complex> collapsedValues;
         collapsedValues.reserve(stateCount());
 
+        // Keep amplitudes consistent with the sampled qubit result and zero the rest.
         for (std::size_t state{}; state < stateCount(); ++state) {
             const bool stateQubitIsOne =
                     stateHasQubitOne(state, qubitIndex);
@@ -226,6 +237,8 @@ namespace quantum_sim::quantum {
         }
 
         std::string label{"|"};
+
+        // Convert the numeric state index back into a q0..qn bit string.
         for (std::size_t qubit = 0; qubit < qubitCount_; ++qubit) {
             const bool isOne = stateHasQubitOne(stateIndex, qubit);
 
@@ -263,6 +276,7 @@ namespace quantum_sim::quantum {
         const math::Complex alpha = amplitude(0);
         const math::Complex beta = amplitude(1);
 
+        // Standard Bloch coordinates for alpha|0> + beta|1>.
         const double x = 2.0 * (alpha.real() * beta.real() + alpha.imaginary() * beta.imaginary());
         const double y = 2.0 * (alpha.real() * beta.imaginary() - alpha.imaginary() * beta.real());
         const double z = alpha.magnitudeSquared() - beta.magnitudeSquared();

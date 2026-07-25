@@ -40,6 +40,7 @@ namespace {
     }
 } //
 int main() {
+    // Regression coverage for debugger snapshots on a non-trivial entangling circuit.
     const QuantumCircuit circuit =
             quantum_sim::algorithms::ghzStateCircuit();
 
@@ -53,6 +54,7 @@ int main() {
 
     session.restart();
 
+    // After restart, the "before" state of the first step should be the original |000>.
     const quantum_sim::debug::DebuggerSnapshot snapshot =
             session.snapshot();
 

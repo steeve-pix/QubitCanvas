@@ -66,6 +66,7 @@ namespace {
         const std::size_t mask =
                 std::size_t{1} << bitPosition;
 
+        // Reduced Bloch vector comes from tracing out every qubit except the selected one.
         for (std::size_t stateIndex = 0; stateIndex < state.stateCount(); ++stateIndex) {
             const bool bitIsOne =
                     (stateIndex & mask) != 0;
@@ -78,6 +79,7 @@ namespace {
                      : probability;
 
             if (bitIsOne) {
+                // Each zero-side basis state pairs with the same state where this qubit is one.
                 continue;
             }
 
@@ -115,6 +117,7 @@ namespace {
                     1.0F
                 );
 
+        // Phase rotates color; probability controls alpha and brightness.
         const float phaseT =
                 static_cast<float>(
                     (phase + std::numbers::pi) /
@@ -150,8 +153,9 @@ namespace quantum_sim::gui {
         drawHeader(snapshot, selectedInstructionIndex, headingFont);
 
         const bool jumpedToInstruction =
-                drawInstructionSummary(session, snapshot, circuit, selectedInstructionIndex);
+        drawInstructionSummary(session, snapshot, circuit, selectedInstructionIndex);
 
+        // A selected gate inspects its post-step state; otherwise use live debugger state.
         const quantum::QuantumRegister &currentState =
                 resolveInspectedState(session, snapshot, selectedInstructionIndex);
 
@@ -168,6 +172,7 @@ namespace quantum_sim::gui {
         navigationConfirmationMessage_ =
                 std::move(message);
 
+        // Confirmation messages self-expire so the panel does not need extra state cleanup.
         navigationConfirmationUntil_ =
                 ImGui::GetTime() + 1.5;
     }
@@ -251,6 +256,7 @@ namespace quantum_sim::gui {
                 ImGuiFocusedFlags_RootAndChildWindows
             )
         ) {
+            // Keyboard navigation only runs when the inspector has focus.
             if (
                 ImGui::IsKeyPressed(ImGuiKey_LeftArrow) &&
                 snapshot.canMovePrevious
@@ -349,6 +355,7 @@ namespace quantum_sim::gui {
                     snapshot.currentStepIndex
                 );
 
+        // Selection mode lets the renderer and inspector inspect different steps.
         ImGui::TextDisabled(
             selectedInstructionIndex.has_value()
                 ? "Selection"
@@ -382,9 +389,11 @@ namespace quantum_sim::gui {
         }
 
         if (inspectedInstructionIndex < instructions.size()) {
+            // Prefer circuit metadata for selected gates.
             inspectedInstruction =
                     &instructions[inspectedInstructionIndex];
         } else {
+            // Fall back to the debugger snapshot when execution is the source.
             inspectedInstruction =
                     &snapshot.instruction->get();
         }
@@ -486,6 +495,7 @@ namespace quantum_sim::gui {
             ImGui::TableHeadersRow();
 
             for (std::size_t qubit = 0; qubit < state.qubitCount(); ++qubit) {
+                // Marginal probabilities stay compact even for large registers.
                 const float oneProbability =
                         static_cast<float>(
                             state.probabilityOfQubitOne(qubit)
@@ -544,6 +554,7 @@ namespace quantum_sim::gui {
                     )
                 );
 
+        // Square-ish grid keeps the amplitude field compact in narrow panels.
         const float cellSize =
                 std::clamp(
                     availableWidth / static_cast<float>(columns),
@@ -599,6 +610,7 @@ namespace quantum_sim::gui {
                         amplitude.real()
                     );
 
+            // Each cell encodes probability by intensity and phase by hue.
             const ImVec2 minimum{
                 origin.x + static_cast<float>(column) * cellSize,
                 origin.y + static_cast<float>(row) * cellSize
@@ -621,6 +633,7 @@ namespace quantum_sim::gui {
             const ImVec2 mouse =
                     ImGui::GetMousePos();
 
+            // Convert mouse position back into a state index for the tooltip.
             const int column =
                     static_cast<int>(
                         (mouse.x - origin.x) / cellSize
@@ -695,6 +708,7 @@ namespace quantum_sim::gui {
                 state.stateInfo(stateIndex)
             };
 
+            // The default table omits zero amplitudes so large registers stay readable.
             if (
                 showOnlyLiveAmplitudes_ &&
                 entry.state.probability <= liveThreshold
@@ -710,6 +724,7 @@ namespace quantum_sim::gui {
         }
 
         if (sortAmplitudesByProbability_) {
+            // Put the physically important states first.
             std::sort(
                 entries.begin(),
                 entries.end(),
@@ -841,6 +856,7 @@ namespace quantum_sim::gui {
                         static_cast<std::size_t>(inspectedBlochQubit_)
                     );
 
+        // Vector length below 1.0 indicates a mixed/reduced single-qubit view.
         const double purity =
                 std::sqrt(
                     bloch.x * bloch.x +
@@ -932,6 +948,7 @@ namespace quantum_sim::gui {
             selectedInstructionIndex.has_value() &&
             selectedInstructionIndex.value() < session.stepCount()
         ) {
+            // Renderer selection is expressed as the state after that instruction.
             return session
                     .stepAt(selectedInstructionIndex.value())
                     .state;

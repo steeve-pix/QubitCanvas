@@ -15,6 +15,7 @@ namespace {
         constexpr double epsilon = 1e-10;
         constexpr double pi = std::numbers::pi;
 
+        // Prefer familiar exact labels for common quantum phases.
         struct KnownPhase {
             double value;
             const char *text;
@@ -37,6 +38,8 @@ namespace {
                 return knownPhase.text;
             }
         }
+
+        // Fall back to a decimal value for arbitrary rotations.
         std::ostringstream output;
         output << std::fixed << std::setprecision(2) << phase;
         return output.str();
@@ -46,6 +49,7 @@ namespace {
 namespace quantum_sim::visualization {
     void printProbabilityBars(const quantum::QuantumRegister &state, std::ostream &output, std::size_t barWidth) {
         for (const quantum::StateInfo &info: state.states()) {
+            // Clamp protects the text renderer from tiny floating-point drift.
             const double clampedProbability =
                     std::clamp(info.probability, 0.0, 1.0);
 
@@ -80,6 +84,8 @@ namespace quantum_sim::visualization {
         for (const std::size_t count: counts) {
             totalShots += count;
         }
+
+        // Convert raw counts to frequencies before scaling the bar width.
         for (std::size_t stateIndex = 0;
              stateIndex < state.stateCount();
              ++stateIndex) {
@@ -132,6 +138,7 @@ namespace quantum_sim::visualization {
         const std::vector<circuit::CircuitInstructionInfo> instructions =
                 circuit.instructionInfo();
 
+        // Each qubit gets one row; each instruction writes one fixed-width cell.
         for (std::size_t qubit = 0; qubit < circuit.qubitCount(); ++qubit) {
             output
                     << "q"
@@ -146,6 +153,7 @@ namespace quantum_sim::visualization {
                         currentInstruction == instructionIndex;
 
                 if (instruction.kind == circuit::CircuitInstructionKind::SingleQubit) {
+                    // Single-qubit gates draw only on their target row.
                     if (instruction.targetQubit.value() == qubit) {
                         output << (isCurrentInstruction ? "-[" : "--") << instruction.name << (
                             isCurrentInstruction ? "]-" : "--");
@@ -153,6 +161,7 @@ namespace quantum_sim::visualization {
                         output << "-----";
                     }
                 } else {
+                    // Controlled gates draw C and X markers plus a note below.
                     if (instruction.controlQubit.has_value() && instruction.secondaryTargetQubit.has_value()) {
                         if (qubit == instruction.controlQubit.value()) {
                             output << (isCurrentInstruction ? "-[C]-" : "--C--");
@@ -207,6 +216,7 @@ namespace quantum_sim::visualization {
         const auto beforeStates = beforeState.states();
         const auto afterStates = afterState.states();
 
+        // Compare matching basis states so probability and phase changes line up.
         for (std::size_t stateIndex = 0; stateIndex < beforeStates.size(); ++stateIndex) {
             const double beforeProbability =
                     beforeStates[stateIndex].probability;
@@ -253,6 +263,8 @@ namespace quantum_sim::visualization {
             }
             output << '\n';
             if (amplitudeChanged) {
+                // Show amplitude and phase only when probability does not tell
+                // the whole story, especially for phase-only gates.
                 const auto printAmplitude = [&output]<typename T0>(const T0 &amplitude) {
                     output
                             << amplitude.real()
@@ -311,6 +323,7 @@ namespace quantum_sim::visualization {
         const bool isAtPole =
                 std::abs(vector.x) < epsilon && std::abs(vector.y) < epsilon;
 
+        // Phi is undefined at the poles because the vector has no X/Y direction.
         if (isAtPole) {
             output << "NaN) rad\n";
         } else {
@@ -336,6 +349,7 @@ namespace quantum_sim::visualization {
         const double clampedZ =
                 std::clamp(vector.z, -1.0, 1.0);
 
+        // Project X/Z coordinates onto a fixed ASCII ellipse.
         const std::size_t markerRow =
                 static_cast<std::size_t>(std::lround(centerRow - clampedZ * verticalRadius));
 

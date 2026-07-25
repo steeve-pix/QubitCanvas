@@ -1,111 +1,90 @@
 #pragma once
 
+#include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 
 #include <cstddef>
 #include <iosfwd>
+#include <optional>
 #include <vector>
-#include <ostream>
-
-#include "quantum_sim/circuit/QuantumCircuit.hpp"
 
 namespace quantum_sim::visualization {
     /**
-     * @brief Generates a visual representation of quantum state probabilities
-     *        as bar charts and writes it to the output stream.
+     * Prints one probability bar per basis state.
      *
-     * @param state The quantum register containing the states and probabilities to visualize.
-     * @param output The output stream where the probability bar chart will be written.
-     * @param barWidth The maximum width of the bar chart for each state, in characters.
+     * @param state Register whose probabilities are printed.
+     * @param output Destination stream.
+     * @param barWidth Maximum bar width in characters.
      */
     void printProbabilityBars(const quantum::QuantumRegister &state, std::ostream &output, std::size_t barWidth = 50);
 
     /**
-     * @brief Prints a visualization of the measurement results as a bar chart to the provided output stream.
+     * Prints measurement shot counts as scaled bars.
      *
-     * The method creates a textual representation of the measurement frequencies for each quantum state
-     * in a quantum register. Each bar represents the frequency of a specific state based on the counts
-     * provided in the input. The length of the bar represents the relative frequency, scaled by the given bar width.
-     *
-     * @param state The quantum register containing the quantum states to be displayed.
-     * @param counts A vector containing the measurement counts for each quantum state in the register.
-     *               The size of the vector must match the number of states in the register.
-     * @param output The output stream where the textual bar chart will be printed.
-     * @param barWidth The total width (in characters) of each bar in the visual representation.
-     *                 Higher values result in more detailed representations.
-     *
-     * @throws std::invalid_argument if the size of `counts` does not match the number of states in the `state`.
+     * @param state Register used for state labels.
+     * @param counts Measurement counts indexed by basis state.
+     * @param output Destination stream.
+     * @param barWidth Maximum bar width in characters.
+     * @throws std::invalid_argument if counts size does not match state.stateCount().
      */
     void printShotBars(const quantum::QuantumRegister &state, const std::vector<std::size_t> &counts,
                        std::ostream &output, std::size_t barWidth = 50);
 
     /**
-     * Prints the execution trace of a quantum computation, including the initial state and the subsequent states
-     * after each step in the trace. The visualization is rendered as probability bars to the specified output stream.
+     * Prints the initial state followed by each traced step.
      *
-     * @param initialState The initial state of the quantum register before any trace steps are applied.
-     * @param trace A vector of trace steps representing the sequence of operations and the respective states
-     *              of the quantum register after each step.
-     * @param output The output stream to which the execution trace and probability bars should be written.
-     * @param barWidth The width of the probability bars used for visualizing the quantum state.
+     * @param initialState State before the first instruction.
+     * @param trace Execution trace returned by QuantumCircuit::executeWithTrace().
+     * @param output Destination stream.
+     * @param barWidth Maximum probability bar width in characters.
      */
     void printExecutionTrace(const quantum::QuantumRegister &initialState, const std::vector<circuit::TraceStep> &trace,
                              std::ostream &output, std::size_t barWidth = 50);
 
     /**
-     * Prints a textual representation of a quantum circuit diagram to the specified output stream.
+     * Prints an ASCII circuit diagram.
      *
-     * The method iterates through the qubits in the circuit and visualizes the quantum operations applied to them.
-     * For each instruction, it determines its type (single-qubit gate, controlled gate, etc.) and generates
-     * an appropriate visualization for the circuit. Additionally, connections between control and target qubits
-     * for controlled gates are displayed below the diagram.
-     *
-     * @param circuit Reference to the QuantumCircuit object containing the circuit's qubits and instructions.
-     * @param output Reference to the std::ostream object where the circuit diagram will be printed.
+     * @param circuit Circuit to draw.
+     * @param output Destination stream.
+     * @param currentInstruction Optional instruction to highlight.
      */
     void printCircuitDiagram(const circuit::QuantumCircuit &circuit, std::ostream &output,
                              std::optional<std::size_t> currentInstruction = std::nullopt);
 
     /**
-     * @brief Outputs the amplitudes of all quantum states in the given quantum register.
+     * Prints all amplitudes in basis-state order.
      *
-     * @param state The quantum register containing the states and their amplitudes to be displayed.
-     * @param output The output stream where the state labels and their amplitudes will be written.
+     * @param state Register whose amplitudes are printed.
+     * @param output Destination stream.
      */
     void printAmplitudes(const quantum::QuantumRegister &state, std::ostream &output);
 
     /**
-     * @brief Compares two quantum states before and after a specific transformation or operation
-     *        and outputs the differences in probabilities, amplitudes, and phases for each state.
+     * Prints per-state amplitude/probability differences.
      *
-     * @param beforeState The initial quantum register containing the states and probabilities before the operation.
-     * @param afterState The quantum register containing the states and probabilities after the operation.
-     * @param output The output stream where the comparison results are written.
-     *
-     * @throws std::invalid_argument If the quantum registers being compared do not have the same number of states.
+     * @param beforeState State before a transformation.
+     * @param afterState State after a transformation.
+     * @param output Destination stream.
+     * @throws std::invalid_argument if the registers have different state counts.
      */
     void printStateComparison(const quantum::QuantumRegister &beforeState, const quantum::QuantumRegister &afterState,
                               std::ostream &output);
 
     /**
-     * @brief Outputs the Bloch vector and corresponding spherical coordinates of
-     *        the quantum state to the specified output stream.
+     * Prints Bloch-vector coordinates and angles for a single-qubit state.
      *
-     * @param state The quantum register representing the quantum state for which
-     *              the Bloch vector and angles are to be calculated.
-     * @param output The output stream where the Bloch vector and angles
-     *               (theta, phi) will be written.
+     * @param state Single-qubit register.
+     * @param output Destination stream.
+     * @throws std::invalid_argument if state does not contain exactly one qubit.
      */
     void printBlochVector(const quantum::QuantumRegister &state, std::ostream &output);
 
     /**
-     * @brief Renders a textual representation of a Bloch sphere annotated with
-     *        the quantum state vector's position and outputs it to the specified stream.
+     * Prints a compact ASCII Bloch-sphere projection.
      *
-     * @param state The quantum register containing the state vector whose
-     *              Bloch sphere representation will be visualized.
-     * @param output The output stream where the ASCII Bloch sphere visualization
-     *               and directional information will be written.
+     * @param state Single-qubit register.
+     * @param output Destination stream.
+     * @throws std::invalid_argument if state does not contain exactly one qubit.
      */
     void printAsciiBlochSphere(const quantum::QuantumRegister &state, std::ostream &output);
 }

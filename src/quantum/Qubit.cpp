@@ -9,6 +9,7 @@ namespace quantum_sim::quantum {
         : alpha_(alpha), beta_(beta) {
         constexpr double epsilon = 1e-9;
 
+        // A qubit is valid only when measurement probabilities add to one.
         const double totalProbability =
                 alpha_.magnitudeSquared() + beta_.magnitudeSquared();
 
@@ -40,6 +41,7 @@ namespace quantum_sim::quantum {
             std::vector{alpha_, beta_}
         };
 
+        // Matrix-vector multiplication gives the transformed alpha and beta.
         const math::ComplexVector transformed = gate * state;
 
         return Qubit{
@@ -60,6 +62,7 @@ namespace quantum_sim::quantum {
         std::uniform_real_distribution distribution{0.0, 1.0};
         const double sample = distribution(randomEngine);
 
+        // Collapse to the sampled basis state so later reads see classical output.
         if (sample < probabilityOfZero()) {
             alpha_ = math::Complex{1.0, 0.0};
             beta_ = math::Complex{};

@@ -65,6 +65,8 @@ namespace quantum_sim::circuit {
 
         quantum::QuantumRegister currentState = initialState;
 
+        // Instructions store either a single-qubit gate or a full-register gate;
+        // visit selects the correct execution path without exposing the variant.
         for (const Instruction &instruction: instructions_) {
             std::visit([&currentState]<typename T0>(const T0 &actualInstruction) {
                            using InstructionType =
@@ -88,6 +90,8 @@ namespace quantum_sim::circuit {
                                                       std::size_t shotCount, std::mt19937 &randomEngine) const {
         std::vector<std::size_t> counts(initialState.stateCount(), 0);
 
+        // Each shot starts from the same initial state, executes the circuit,
+        // then measures and increments the observed basis-state bucket.
         for (std::size_t shot = 0; shot < shotCount; ++shot) {
             quantum::QuantumRegister result = execute(initialState);
             const std::size_t measuredState = result.measure(randomEngine);
@@ -106,6 +110,9 @@ namespace quantum_sim::circuit {
         quantum::QuantumRegister currentState = initialState;
         std::vector<TraceStep> trace;
         trace.reserve(instructions_.size());
+
+        // The trace records the state after each instruction so the debugger can
+        // show both before/after state without re-executing the circuit per frame.
         for (const Instruction &instruction: instructions_) {
             std::visit([&currentState,&trace]<typename T0>(const T0 &actualInstruction) {
                 using InstructionType = std::decay_t<T0>;
@@ -131,6 +138,8 @@ namespace quantum_sim::circuit {
         std::vector<CircuitInstructionInfo> result;
         result.reserve(instructions_.size());
 
+        // Convert private executable instructions into lightweight metadata for
+        // renderers, debugger panels, and console diagrams.
         for (const Instruction &instruction: instructions_) {
             std::visit([&result]<typename T0>(const T0 &actualInstruction) {
                 using InstructionType = std::decay_t<decltype(actualInstruction)>;
@@ -225,6 +234,8 @@ namespace quantum_sim::circuit {
                     instructions_.size()
                 );
 
+        // Insertion positions beyond the end behave like append, which keeps
+        // drag/placement code forgiving.
         instructions_.insert(
             instructions_.begin()
             + static_cast<ptrdiff_t>(clampedIndex),
@@ -259,6 +270,8 @@ namespace quantum_sim::circuit {
         const std::size_t clampedIndex =
                 std::min(instructionIndex, instructions_.size());
 
+        // Controlled and swap-style gates are stored as full-register matrices
+        // plus qubit metadata for renderers.
         instructions_.insert(
             instructions_.begin()
             + static_cast<ptrdiff_t>(clampedIndex),

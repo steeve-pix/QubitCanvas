@@ -17,6 +17,7 @@ namespace quantum_sim::gui {
         const float availableWidth =
                 std::max(0.0F, ImGui::GetContentRegionAvail().x);
 
+        // The sphere is drawn in a square canvas centered inside the inspector.
         const float canvasSize =
                 calculateCanvasSize();
 
@@ -39,6 +40,7 @@ namespace quantum_sim::gui {
         const bool canvasHovered =
                 handleCanvasInteraction(canvasSize, bloch);
 
+        // From here on, all drawing uses absolute screen coordinates.
         ImDrawList *drawList =
                 ImGui::GetWindowDrawList();
 
@@ -81,6 +83,7 @@ namespace quantum_sim::gui {
                     const float rotation, const ImU32 color, const float thickness) {
             constexpr int segmentCount = 96;
 
+            // Dear ImGui has circle helpers, but custom ellipses need a path.
             const float cosine =
                     std::cos(rotation);
 
@@ -121,6 +124,7 @@ namespace quantum_sim::gui {
                     const ImU32 color) {
             constexpr int segmentCount = 64;
 
+            // Filled ellipse is used for the soft ground shadow.
             drawList->PathClear();
 
             for (int segment = 0; segment < segmentCount; ++segment) {
@@ -150,6 +154,7 @@ namespace quantum_sim::gui {
             style_.shadowColor
         );
 
+        // Layer filled circles to fake a softly lit sphere.
         drawList->AddCircleFilled(
             center,
             radius,
@@ -176,6 +181,7 @@ namespace quantum_sim::gui {
             1.2F
         );
 
+        // Meridians make the 2D projection read as a 3D object.
         drawEllipse(
             center,
             radius * style_.meridianSquash,
@@ -262,6 +268,7 @@ namespace quantum_sim::gui {
                     1.0F
                 );
 
+        // Y is represented as a screen-space depth offset.
         const ImVec2 vectorEnd{
             center.x +
             static_cast<float>(bloch.x) * radius +
@@ -294,6 +301,7 @@ namespace quantum_sim::gui {
                 + depth
                 * style_.depthMarkerScale;
 
+        // The endpoint marker gets bigger when the vector points toward the viewer.
         const float depthMarkerRadius =
                 std::clamp(
                     rawDepthMarkerRadius,
@@ -340,6 +348,7 @@ namespace quantum_sim::gui {
     bool BlochSphereRenderer::handleCanvasInteraction(float canvasSize, const quantum::BlochVector &bloch) {
         ImGui::PushID(this);
 
+        // InvisibleButton reserves the canvas area and gives us hover/click state.
         ImGui::InvisibleButton(
             style_.canvasId.data(),
             ImVec2{

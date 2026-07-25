@@ -6,6 +6,7 @@ namespace quantum_sim::algorithms {
     circuit::QuantumCircuit bellStateCircuit() {
         circuit::QuantumCircuit circuit{2};
 
+        // H creates superposition; CX entangles q1 with q0.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addControlledGate("CX", gates::cxGate(), 0, 1);
 
@@ -15,6 +16,7 @@ namespace quantum_sim::algorithms {
     circuit::QuantumCircuit equalSuperpositionCircuit(std::size_t qubitCount) {
         circuit::QuantumCircuit circuit{qubitCount};
 
+        // Applying H to every qubit creates a uniform distribution over 2^n states.
         for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
             circuit.addSingleQubitGate("H", gates::hadamardGate(), qubit);
         }
@@ -25,6 +27,7 @@ namespace quantum_sim::algorithms {
     circuit::QuantumCircuit ghzStateCircuit() {
         circuit::QuantumCircuit circuit{3};
 
+        // GHZ chains two CX gates from a superposed first qubit.
         circuit.addSingleQubitGate(
             "H",
             gates::hadamardGate(),

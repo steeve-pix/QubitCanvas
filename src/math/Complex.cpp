@@ -36,6 +36,7 @@ namespace quantum_sim::math {
     }
 
     Complex Complex::operator*(const Complex &other) const noexcept {
+        // (a + bi)(c + di) = (ac - bd) + (ad + bc)i.
         return Complex{
             (real_ * other.real_) - (imaginary_ * other.imaginary_),
             (real_ * other.imaginary_) + (imaginary_ * other.real_)
@@ -43,6 +44,7 @@ namespace quantum_sim::math {
     }
 
     Complex Complex::operator/(double scalar) const {
+        // Division by a real scalar scales both components equally.
         if (scalar == 0) throw std::invalid_argument{"Cannot divide a complex number by zero"};
         return Complex{
             real_ / scalar,
