@@ -66,6 +66,38 @@ int main() {
         "Debugger snapshot exposes the state before the current instruction"
     );
 
+    // The GUI default relies on this script to provide a rich density-history stack.
+    const QuantumCircuit qftCircuit =
+            quantum_sim::algorithms::qftCircuit(4);
+
+    check(
+        qftCircuit.qubitCount() == 4,
+        "QFT showcase uses the requested qubit count"
+    );
+
+    check(
+        qftCircuit.instructionCount() == 44,
+        "QFT showcase keeps a 44-step render history"
+    );
+
+    const QuantumRegister qftFinalState =
+            qftCircuit.execute(
+                QuantumRegister::basisState(4, 0)
+            );
+
+    double totalProbability =
+            0.0;
+
+    for (std::size_t stateIndex = 0; stateIndex < qftFinalState.stateCount(); ++stateIndex) {
+        totalProbability +=
+                qftFinalState.probability(stateIndex);
+    }
+
+    check(
+        approximatelyEqual(totalProbability, 1.0),
+        "QFT showcase preserves total probability"
+    );
+
     if (failures == 0) {
         std::cout << "All tests passed.\n";
     }
