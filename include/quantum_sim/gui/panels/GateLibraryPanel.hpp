@@ -71,14 +71,20 @@ namespace quantum_sim::gui {
         float rotationAngleRadians_{1.57079632679F};
 
         /**
-         * Draws one square gate button.
+         * Draws one square gate button and its matrix preview tooltip.
          *
-         * @param label Button text and gate name.
-         * @param tooltip Hover explanation.
+         * @param gate Gate name and explanatory text.
          * @param selected Whether this gate is currently selected.
          * @return True when the button was clicked.
          */
-        [[nodiscard]] bool drawGateButton(const char *label, const char *tooltip, bool selected);
+        [[nodiscard]] bool drawGateButton(const GateDescriptor &gate, bool selected);
+
+        /**
+         * Draws a compact, formatted matrix for one hovered gate.
+         *
+         * @param gate Hovered gate descriptor.
+         */
+        void drawGateMatrixTooltip(const GateDescriptor &gate) const;
 
         /**
          * @param gateName Gate name to test.
