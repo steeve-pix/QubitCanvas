@@ -99,6 +99,159 @@ int main() {
         "QFT showcase preserves total probability"
     );
 
+    const QuantumRegister qftSourceState =
+            QuantumRegister::basisState(4, 9);
+
+    const QuantumRegister qftTransformedState =
+            qftCircuit.execute(qftSourceState);
+
+    const QuantumCircuit inverseQftCircuit =
+            quantum_sim::algorithms::inverseQftCircuit(4);
+
+    const QuantumRegister qftRestoredState =
+            inverseQftCircuit.execute(qftTransformedState);
+
+    check(
+        inverseQftCircuit.instructionCount() ==
+        qftCircuit.instructionCount(),
+        "Inverse QFT mirrors every showcase instruction"
+    );
+
+    check(
+        approximatelyEqual(qftRestoredState.probability(9), 1.0),
+        "Inverse QFT restores a state transformed by the QFT showcase"
+    );
+
+    const QuantumRegister groverResult =
+            quantum_sim::algorithms::groverSearchCircuit().execute(
+                QuantumRegister::basisState(2, 0)
+            );
+
+    check(
+        approximatelyEqual(groverResult.probability(3), 1.0),
+        "Grover search amplifies the marked state |11>"
+    );
+
+    const QuantumRegister deutschJozsaResult =
+            quantum_sim::algorithms::deutschJozsaCircuit().execute(
+                QuantumRegister::basisState(3, 0)
+            );
+
+    check(
+        approximatelyEqual(
+            deutschJozsaResult.probabilityOfQubitOne(0),
+            1.0
+        ) &&
+        approximatelyEqual(
+            deutschJozsaResult.probabilityOfQubitOne(1),
+            1.0
+        ),
+        "Deutsch-Jozsa identifies the balanced XOR oracle"
+    );
+
+    const QuantumRegister bernsteinVaziraniResult =
+            quantum_sim::algorithms::bernsteinVaziraniCircuit(
+                3,
+                0b101
+            ).execute(
+                QuantumRegister::basisState(4, 0)
+            );
+
+    check(
+        approximatelyEqual(
+            bernsteinVaziraniResult.probabilityOfQubitOne(0),
+            1.0
+        ) &&
+        approximatelyEqual(
+            bernsteinVaziraniResult.probabilityOfQubitZero(1),
+            1.0
+        ) &&
+        approximatelyEqual(
+            bernsteinVaziraniResult.probabilityOfQubitOne(2),
+            1.0
+        ),
+        "Bernstein-Vazirani recovers the hidden string 101"
+    );
+
+    const QuantumRegister toffoliResult =
+            quantum_sim::algorithms::toffoliDemoCircuit().execute(
+                QuantumRegister::basisState(3, 0)
+            );
+
+    check(
+        approximatelyEqual(toffoliResult.probability(7), 1.0),
+        "Decomposed Toffoli flips the target when both controls are one"
+    );
+
+    const QuantumRegister kickbackResult =
+            quantum_sim::algorithms::phaseKickbackCircuit().execute(
+                QuantumRegister::basisState(2, 0)
+            );
+
+    check(
+        approximatelyEqual(kickbackResult.probability(3), 1.0),
+        "Phase kickback is exposed as the final basis state |11>"
+    );
+
+    const QuantumRegister teleportationResult =
+            quantum_sim::algorithms::teleportationCircuit().execute(
+                QuantumRegister::basisState(3, 0)
+            );
+
+    check(
+        approximatelyEqual(
+            teleportationResult.probabilityOfQubitOne(2),
+            0.25
+        ),
+        "Coherent teleportation transfers the prepared state's magnitude to q2"
+    );
+
+    const double teleportedTheta =
+            std::numbers::pi / 3.0;
+
+    const double teleportedPhi =
+            std::numbers::pi / 5.0;
+
+    const double expectedTeleportedZeroReal =
+            0.5 *
+            std::cos(teleportedTheta * 0.5) *
+            std::cos(teleportedPhi * 0.5);
+
+    const double expectedTeleportedZeroImaginary =
+            -0.5 *
+            std::cos(teleportedTheta * 0.5) *
+            std::sin(teleportedPhi * 0.5);
+
+    const double expectedTeleportedOneReal =
+            0.5 *
+            std::sin(teleportedTheta * 0.5) *
+            std::cos(teleportedPhi * 0.5);
+
+    const double expectedTeleportedOneImaginary =
+            0.5 *
+            std::sin(teleportedTheta * 0.5) *
+            std::sin(teleportedPhi * 0.5);
+
+    check(
+        approximatelyEqual(
+            teleportationResult.amplitude(0).real(),
+            expectedTeleportedZeroReal
+        ) &&
+        approximatelyEqual(
+            teleportationResult.amplitude(0).imaginary(),
+            expectedTeleportedZeroImaginary
+        ) &&
+        approximatelyEqual(
+            teleportationResult.amplitude(1).real(),
+            expectedTeleportedOneReal
+        ) &&
+        approximatelyEqual(
+            teleportationResult.amplitude(1).imaginary(),
+            expectedTeleportedOneImaginary
+        ),
+        "Coherent teleportation preserves the prepared state's relative phase"
+    );
+
     const double halfTurn =
             std::numbers::pi;
 
