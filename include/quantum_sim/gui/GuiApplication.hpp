@@ -8,6 +8,7 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "rendering/BlochSphereRenderer.hpp"
 #include "rendering/CircuitRenderer.hpp"
+#include "rendering/QaveCubeRenderer.hpp"
 
 #include <optional>
 #include <random>
@@ -109,6 +110,7 @@ namespace quantum_sim::gui {
         debug::DebuggerSession session_;
         InspectorPanel inspectorPanel_;
         CircuitRenderer circuitRenderer_;
+        QaveCubeRenderer qaveCubeRenderer_;
         GateLibraryPanel gateLibraryPanel_;
         std::optional<std::string> pendingGate_;
         std::optional<double> pendingRotationAngleRadians_;
@@ -124,10 +126,6 @@ namespace quantum_sim::gui {
         bool playbackPaused_{true};
         double nextAutoStepAt_{0.0};
         float heatAmount_{0.78F};
-        float renderYaw_{-0.46F};
-        float renderPitch_{0.24F};
-        float renderZoom_{1.30F};
-        ImVec2 renderPan_{0.0F, 0.0F};
         std::string lastSampleLabel_{"none"};
 
         /**
@@ -156,25 +154,17 @@ namespace quantum_sim::gui {
         void popApplicationFont() const;
 
         /**
-         * Draws the animated quantum-state background visualization.
-         *
-         * @param session Debugger trace used to render full-history layers.
-         * @param snapshot Current debugger snapshot used as the source state.
+         * Draws the application background behind the docked panels.
          */
-        void drawBackdrop(const debug::DebuggerSession &session, const debug::DebuggerSnapshot &snapshot);
+        void drawBackdrop() const;
 
         /**
-         * Applies mouse orbit, pan, zoom, and reset gestures to the state render.
+         * Displays the OpenGL framebuffer texture in the center QAVE panel.
          *
-         * @param minimum Screen-space top-left corner of the interactive render area.
-         * @param maximum Screen-space bottom-right corner of the interactive render area.
+         * @param position Screen-space top-left corner of the panel.
+         * @param size Screen-space width and height of the panel.
          */
-        void handleRenderCameraInput(const ImVec2 &minimum, const ImVec2 &maximum);
-
-        /**
-         * Restores the state-volume camera to its reference composition.
-         */
-        void resetRenderCamera();
+        void drawQaveViewport(const ImVec2 &position, const ImVec2 &size);
 
         /**
          * Opens rich demo traces at a settled mid-history frame.

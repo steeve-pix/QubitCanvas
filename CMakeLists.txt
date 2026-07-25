@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(QubitCanvas VERSION 0.1.0 LANGUAGES CXX)
+project(QubitCanvas VERSION 0.1.0 LANGUAGES C CXX)
 
 include(CTest)
 
@@ -20,6 +20,17 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/glfw)
 
 find_package(OpenGL REQUIRED)
+
+# GLAD is the single application-level OpenGL function loader.
+add_library(glad STATIC
+        third_party/glad/src/gl.c
+)
+
+target_include_directories(
+        glad
+        PUBLIC
+        third_party/glad/include
+)
 
 # Dear ImGui
 add_library(imgui STATIC
@@ -80,6 +91,7 @@ add_library(qubit_canvas_gui STATIC
         src/gui/panels/InspectorPanel.cpp
         src/gui/rendering/CircuitRenderer.cpp
         src/gui/rendering/BlochSphereRenderer.cpp
+        src/gui/rendering/QaveCubeRenderer.cpp
         src/gui/panels/GateLibraryPanel.cpp
 )
 
@@ -89,8 +101,10 @@ target_compile_features(qubit_canvas_gui PUBLIC cxx_std_20)
 
 target_link_libraries(
         qubit_canvas_gui
-        PUBLIC qubit_canvas_core
-        PUBLIC imgui
+        PUBLIC
+        qubit_canvas_core
+        imgui
+        glad
 )
 
 enable_project_warnings(qubit_canvas_gui)
