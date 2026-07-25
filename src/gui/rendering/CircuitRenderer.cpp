@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <optional>
 #include <string>
 #include <utility>
@@ -604,11 +605,20 @@ namespace quantum_sim::gui {
                     ImGuiMouseCursor_Hand
                 );
 
-                ImGui::SetTooltip(
-                    "Execution step %zu\nGate: %s",
-                    instructionIndex + 1,
-                    instruction.name.c_str()
-                );
+                if (instruction.angleRadians.has_value()) {
+                    ImGui::SetTooltip(
+                        "Execution step %zu\nGate: %s\nAngle: %.6f rad",
+                        instructionIndex + 1,
+                        instruction.name.c_str(),
+                        instruction.angleRadians.value()
+                    );
+                } else {
+                    ImGui::SetTooltip(
+                        "Execution step %zu\nGate: %s",
+                        instructionIndex + 1,
+                        instruction.name.c_str()
+                    );
+                }
             }
 
             // Short execution stem. It stops before the first wire.
@@ -1083,6 +1093,14 @@ namespace quantum_sim::gui {
                 ImGui::SetMouseCursor(
                     ImGuiMouseCursor_Hand
                 );
+
+                if (instruction.angleRadians.has_value()) {
+                    ImGui::SetTooltip(
+                        "%s\nAngle: %.6f rad",
+                        instruction.name.c_str(),
+                        instruction.angleRadians.value()
+                    );
+                }
             }
 
             const bool clicked =
@@ -1107,6 +1125,28 @@ namespace quantum_sim::gui {
                     selectedInstructionIndex_.value() == instructionIndex;
 
             drawGate(drawList, ImVec2{x, y}, instruction.name, highlighted, hovered, selected, false);
+
+            if (instruction.angleRadians.has_value()) {
+                char angleLabel[32]{};
+                std::snprintf(
+                    angleLabel,
+                    sizeof(angleLabel),
+                    "%.3f rad",
+                    instruction.angleRadians.value()
+                );
+
+                const ImVec2 angleLabelSize =
+                        ImGui::CalcTextSize(angleLabel);
+
+                drawList->AddText(
+                    ImVec2{
+                        x - angleLabelSize.x * 0.5F,
+                        y - style_.gateHalfHeight - angleLabelSize.y - 3.0F
+                    },
+                    instructionColor,
+                    angleLabel
+                );
+            }
         }
 
         const float circuitContentWidth =

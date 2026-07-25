@@ -10,6 +10,7 @@
 
 #include <sstream>
 #include <iostream>
+#include <cmath>
 #include <numbers>
 
 #include "quantum_sim/debug/DebuggerSession.hpp"
@@ -96,6 +97,75 @@ int main() {
     check(
         approximatelyEqual(totalProbability, 1.0),
         "QFT showcase preserves total probability"
+    );
+
+    const double halfTurn =
+            std::numbers::pi;
+
+    const ComplexMatrix rx =
+            quantum_sim::gates::rxGate(halfTurn);
+
+    const ComplexMatrix ry =
+            quantum_sim::gates::ryGate(halfTurn);
+
+    const ComplexMatrix rz =
+            quantum_sim::gates::rzGate(halfTurn);
+
+    check(
+        approximatelyEqual(rx.at(0, 0).real(), 0.0) &&
+        approximatelyEqual(rx.at(0, 1).imaginary(), -1.0) &&
+        approximatelyEqual(rx.at(1, 0).imaginary(), -1.0),
+        "Rx(pi) uses the expected half-angle matrix"
+    );
+
+    check(
+        approximatelyEqual(ry.at(0, 1).real(), -1.0) &&
+        approximatelyEqual(ry.at(1, 0).real(), 1.0) &&
+        approximatelyEqual(ry.at(1, 1).real(), 0.0),
+        "Ry(pi) uses the expected half-angle matrix"
+    );
+
+    check(
+        approximatelyEqual(rz.at(0, 0).imaginary(), -1.0) &&
+        approximatelyEqual(rz.at(1, 1).imaginary(), 1.0) &&
+        approximatelyEqual(rz.at(0, 1).magnitude(), 0.0),
+        "Rz(pi) applies opposite diagonal phases"
+    );
+
+    const QuantumRegister rxResult =
+            quantum_sim::algorithms::rxRotationCircuit(halfTurn).execute(
+                QuantumRegister::basisState(1, 0)
+            );
+
+    const QuantumRegister ryResult =
+            quantum_sim::algorithms::ryRotationCircuit(halfTurn).execute(
+                QuantumRegister::basisState(1, 0)
+            );
+
+    check(
+        approximatelyEqual(rxResult.probability(1), 1.0),
+        "Rx(pi) rotates |0> to |1> up to phase"
+    );
+
+    check(
+        approximatelyEqual(ryResult.probability(1), 1.0),
+        "Ry(pi) rotates |0> to |1>"
+    );
+
+    const double metadataAngle =
+            std::numbers::pi / 3.0;
+
+    const auto rotationInstructions =
+            quantum_sim::algorithms::rzRotationCircuit(metadataAngle).instructionInfo();
+
+    check(
+        rotationInstructions.size() == 1U &&
+        rotationInstructions.front().angleRadians.has_value() &&
+        approximatelyEqual(
+            rotationInstructions.front().angleRadians.value(),
+            metadataAngle
+        ),
+        "Rotation circuits retain their angle in instruction metadata"
     );
 
     if (failures == 0) {

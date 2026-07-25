@@ -503,6 +503,14 @@ namespace quantum_sim::gui {
             inspectedInstruction->name.c_str()
         );
 
+        if (inspectedInstruction->angleRadians.has_value()) {
+            ImGui::TextColored(
+                ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
+                "angle %.6f rad",
+                inspectedInstruction->angleRadians.value()
+            );
+        }
+
         if (
             selectedInstructionIndex.has_value() &&
             selectedInstructionIndex.value() != snapshot.currentStepIndex

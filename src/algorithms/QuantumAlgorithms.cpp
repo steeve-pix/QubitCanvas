@@ -47,11 +47,15 @@ namespace quantum_sim::algorithms {
                         std::numbers::pi /
                         static_cast<double>(std::size_t{1} << (control - target));
 
+                const double halfAngleRadians =
+                        angleRadians * 0.5;
+
                 // Keep the controlled phase decomposed so the debugger exposes every layer.
                 circuit.addSingleQubitGate(
                     "Rz",
-                    gates::rzGate(angleRadians * 0.5),
-                    control
+                    gates::rzGate(halfAngleRadians),
+                    control,
+                    halfAngleRadians
                 );
 
                 circuit.addControlledGate(
@@ -63,8 +67,9 @@ namespace quantum_sim::algorithms {
 
                 circuit.addSingleQubitGate(
                     "Rz",
-                    gates::rzGate(-angleRadians * 0.5),
-                    target
+                    gates::rzGate(-halfAngleRadians),
+                    target,
+                    -halfAngleRadians
                 );
 
                 circuit.addControlledGate(
@@ -76,8 +81,9 @@ namespace quantum_sim::algorithms {
 
                 circuit.addSingleQubitGate(
                     "Rz",
-                    gates::rzGate(angleRadians * 0.5),
-                    target
+                    gates::rzGate(halfAngleRadians),
+                    target,
+                    halfAngleRadians
                 );
             }
         }
@@ -92,6 +98,11 @@ namespace quantum_sim::algorithms {
         }
 
         for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
+            const double angleRadians =
+                    std::numbers::pi *
+                    static_cast<double>(qubit + 1U) /
+                    16.0;
+
             circuit.addSingleQubitGate(
                 qubit % 2U == 0U ? "S" : "T",
                 qubit % 2U == 0U ? gates::sGate() : gates::tGate(),
@@ -100,12 +111,9 @@ namespace quantum_sim::algorithms {
 
             circuit.addSingleQubitGate(
                 "Rz",
-                gates::rzGate(
-                    std::numbers::pi *
-                    static_cast<double>(qubit + 1U) /
-                    16.0
-                ),
-                qubit
+                gates::rzGate(angleRadians),
+                qubit,
+                angleRadians
             );
         }
 
@@ -142,7 +150,12 @@ namespace quantum_sim::algorithms {
     circuit::QuantumCircuit rxRotationCircuit(double angleRadians) {
         circuit::QuantumCircuit circuit{1};
 
-        circuit.addSingleQubitGate("Rx", gates::rxGate(angleRadians), 0);
+        circuit.addSingleQubitGate(
+            "Rx",
+            gates::rxGate(angleRadians),
+            0,
+            angleRadians
+        );
 
         return circuit;
     }
@@ -150,7 +163,12 @@ namespace quantum_sim::algorithms {
     circuit::QuantumCircuit ryRotationCircuit(double angleRadians) {
         circuit::QuantumCircuit circuit{1};
 
-        circuit.addSingleQubitGate("Ry", gates::ryGate(angleRadians), 0);
+        circuit.addSingleQubitGate(
+            "Ry",
+            gates::ryGate(angleRadians),
+            0,
+            angleRadians
+        );
 
         return circuit;
     }
@@ -158,7 +176,12 @@ namespace quantum_sim::algorithms {
     circuit::QuantumCircuit rzRotationCircuit(double angleRadians) {
         circuit::QuantumCircuit circuit{1};
 
-        circuit.addSingleQubitGate("Rz", gates::rzGate(angleRadians), 0);
+        circuit.addSingleQubitGate(
+            "Rz",
+            gates::rzGate(angleRadians),
+            0,
+            angleRadians
+        );
 
         return circuit;
     }
