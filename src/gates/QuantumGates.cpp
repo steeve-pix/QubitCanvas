@@ -7,6 +7,7 @@
 
 namespace quantum_sim::gates {
     math::ComplexMatrix xGate() {
+        // X swaps the |0> and |1> amplitudes.
         return math::ComplexMatrix{
             2, 2,
             std::vector{
@@ -19,6 +20,7 @@ namespace quantum_sim::gates {
     }
 
     math::ComplexMatrix rxGate(const double angleRadians) {
+        // Quantum rotations use half-angles in the matrix representation.
         const double cosine =
                 std::cos(angleRadians / 2.0);
 
@@ -37,6 +39,7 @@ namespace quantum_sim::gates {
     }
 
     math::ComplexMatrix yGate() {
+        // Y is an X-like flip with +/-i phase on the swapped amplitudes.
         return math::ComplexMatrix{
             2, 2,
             std::vector{
@@ -49,6 +52,7 @@ namespace quantum_sim::gates {
     }
 
     math::ComplexMatrix ryGate(const double angleRadians) {
+        // Ry is the real-valued rotation around the Bloch Y axis.
         const double cosine =
                 std::cos(angleRadians / 2.0);
 
@@ -79,6 +83,7 @@ namespace quantum_sim::gates {
     }
 
     math::ComplexMatrix rzGate(const double angleRadians) {
+        // Rz is diagonal, so it changes phase without moving probability.
         const double cosine =
                 std::cos(angleRadians / 2.0);
 
@@ -110,6 +115,7 @@ namespace quantum_sim::gates {
     };
 
     math::ComplexMatrix tGate() {
+        // T is the fourth root of Z: phase angle pi/4 on |1>.
         double pi_value = std::numbers::pi;
 
         return math::ComplexMatrix{
@@ -124,6 +130,7 @@ namespace quantum_sim::gates {
     };
 
     math::ComplexMatrix hadamardGate() {
+        // 1/sqrt(2) keeps the Hadamard columns normalized.
         double invSqrt2 = 1.0 / std::sqrt(2.0);
         return math::ComplexMatrix{
             2, 2,
@@ -265,6 +272,7 @@ namespace quantum_sim::gates {
         const std::size_t stateCount =
                 std::size_t{1} << qubitCount;
 
+        // Full-register gates are represented as permutation matrices.
         std::vector values(
             stateCount * stateCount,
             math::Complex{}
@@ -278,6 +286,8 @@ namespace quantum_sim::gates {
                 std::size_t{1}
                 << (qubitCount - 1 - secondQubit);
 
+        // For each input basis state, compute the output basis state after
+        // exchanging the two selected bits.
         for (std::size_t inputState{}; inputState < stateCount; ++inputState) {
             const bool firstBit =
                     (inputState & firstMask) != 0;
@@ -332,6 +342,7 @@ namespace quantum_sim::gates {
         const std::size_t targetMask =
                 std::size_t{1} << (qubitCount - 1 - targetQubit);
 
+        // Controlled-X is a permutation: flip the target bit only when control is 1.
         for (std::size_t inputState = 0; inputState < stateCount; ++inputState) {
             std::size_t outputState = inputState;
 
@@ -381,6 +392,8 @@ namespace quantum_sim::gates {
                 std::size_t{1}
                 << (qubitCount - 1 - targetQubit);
 
+        // Controlled-Y flips the target like CX and adds a phase based on the
+        // target's original value.
         for (std::size_t inputState = 0; inputState < stateCount; ++inputState) {
             const bool controlIsOne =
                     (inputState & controlMask) != 0;
@@ -460,6 +473,7 @@ namespace quantum_sim::gates {
                 std::size_t{1}
                 << (qubitCount - 1 - targetQubit);
 
+        // Controlled-Z is diagonal: only |control=1,target=1> gets a -1 phase.
         for (
             std::size_t state = 0;
             state < stateCount;
@@ -560,6 +574,7 @@ namespace quantum_sim::gates {
                 std::size_t{1}
                 << (qubitCount - 1 - secondQubit);
 
+        // iSWAP exchanges the selected bits and adds i to the exchanged states.
         for (
             std::size_t inputState = 0;
             inputState < stateCount;

@@ -12,6 +12,7 @@
 
 namespace {
     char readDebuggerCommand() {
+        // Keep command parsing tiny: one lower-cased character drives the loop.
         std::cout
                 << "\n[n] Next, [p] Previous, [r] Restart, "
                 << "[a] Auto-play, [i] Inspect amplitudes, "
@@ -44,6 +45,8 @@ namespace {
 
 namespace quantum_sim::debug {
     std::string gateExplanation(const std::string &gateName) {
+        // The GUI and console debugger share these short explanations so gate
+        // selection and step inspection speak with the same vocabulary.
         if (gateName == "H") {
             return
                     "Create a superposition by mixing the |0> "
@@ -106,6 +109,7 @@ namespace quantum_sim::debug {
     void runInteractiveDebugger(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState) {
         DebuggerSession session{circuit, initialState};
 
+        // Always show the starting probabilities before stepping through gates.
         std::cout << "Initial state:\n";
         visualization::printProbabilityBars(initialState, std::cout);
 
@@ -115,6 +119,7 @@ namespace quantum_sim::debug {
         }
         bool autoPlay = false;
         while (true) {
+            // Snapshot captures all state needed to draw this console frame.
             const DebuggerSnapshot snapshot =
                     session.snapshot();
 
@@ -124,8 +129,8 @@ namespace quantum_sim::debug {
             const std::size_t currentStep =
                     snapshot.currentStepIndex;
 
-                const circuit::CircuitInstructionInfo &instruction =
-                       snapshot.instruction->get();
+            const circuit::CircuitInstructionInfo &instruction =
+                    snapshot.instruction->get();
 
 
             std::cout << "\nCircuit:\n";
@@ -140,6 +145,7 @@ namespace quantum_sim::debug {
 
             visualization::printProbabilityBars(currentState, std::cout);
             if (autoPlay) {
+                // Auto-play advances at a fixed delay until the final step.
                 waitForAutoPlay();
                 if (!session.moveNext()) {
                     break;
@@ -151,6 +157,7 @@ namespace quantum_sim::debug {
             const char command =
                     readDebuggerCommand();
 
+            // Manual commands mutate session navigation or print extra state details.
             if (command == 'q') {
                 std::cout << "\nDebugger closed.\n";
                 return;

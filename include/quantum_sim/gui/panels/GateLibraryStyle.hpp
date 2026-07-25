@@ -2,6 +2,9 @@
 #include "imgui.h"
 
 namespace quantum_sim::gui {
+    /**
+     * Visual constants for the gate palette.
+     */
     struct GateLibraryStyle {
         float gateButtonSize{48.0F};
 
@@ -16,6 +19,5 @@ namespace quantum_sim::gui {
         ImU32 selectedButtonActiveColor{
             IM_COL32(65, 150, 190, 255)
         };
-
     };
 }

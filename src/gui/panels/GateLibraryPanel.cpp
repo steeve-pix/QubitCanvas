@@ -67,6 +67,7 @@ namespace quantum_sim::gui {
     }
 
     void GateLibraryPanel::draw() {
+        // Categories keep one-click gate selection compact as the palette grows.
         drawGateCategory("Single-qubit gates", singleQubitGates, std::size(singleQubitGates));
 
         ImGui::Spacing();
@@ -78,6 +79,7 @@ namespace quantum_sim::gui {
 
     bool GateLibraryPanel::drawGateButton(const char *label, const char *tooltip, bool selected) {
         if (selected) {
+            // Push only the temporary selected colors, then pop after the button.
             ImGui::PushStyleColor(
                 ImGuiCol_Button,
                 style_.selectedButtonColor
@@ -126,6 +128,7 @@ namespace quantum_sim::gui {
     }
 
     bool GateLibraryPanel::canPlaceNextGateButton() const {
+        // Predict the next button's right edge before calling SameLine().
         const float nextButtonRightEdge =
                 ImGui::GetItemRectMax().x
                 + ImGui::GetStyle().ItemSpacing.x
@@ -145,6 +148,7 @@ namespace quantum_sim::gui {
             const GateDescriptor &gate =
                     gates[index];
 
+            // Clicking a gate arms placement; the app consumes it after draw().
             if (drawGateButton(gate.name, gate.tooltip, isGateSelected(gate.name))) {
                 selectedGate_ =
                         gate.name;
@@ -192,6 +196,7 @@ namespace quantum_sim::gui {
         std::optional<std::string> result =
                 std::move(selectedGate_);
 
+        // Make consumeSelectedGate a one-shot event.
         selectedGate_.reset();
 
         return result;

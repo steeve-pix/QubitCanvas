@@ -8,12 +8,16 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "rendering/BlochSphereRenderer.hpp"
 #include "rendering/CircuitRenderer.hpp"
-#include <random>
+
 #include <optional>
+#include <random>
 #include <string>
 #include <vector>
 
 namespace quantum_sim::gui {
+    /**
+     * Built-in circuit scripts available from the left-side algorithm panel.
+     */
     enum class CircuitPreset {
         Bell,
         Ghz,
@@ -23,25 +27,67 @@ namespace quantum_sim::gui {
         Scramble
     };
 
+    /**
+     * Main quantum-state background visualization mode.
+     */
     enum class CanvasMode {
         FloorField,
         LayerStack
     };
 
+    /**
+     * Dear ImGui/GLFW application shell for the interactive QubitCanvas GUI.
+     */
     class GuiApplication {
     public:
+        /**
+         * Creates a GUI session around an editable circuit and initial register.
+         *
+         * @param circuit Circuit edited and executed by the UI.
+         * @param initialState Starting state used by the debugger trace.
+         */
         GuiApplication(circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState);
 
+        /**
+         * Opens the window and runs the GUI event/render loop until closed.
+         *
+         * @throws std::runtime_error if GLFW, the window, or fonts fail to initialize.
+         */
         void run();
 
+        /**
+         * Creates a supported single-qubit gate by display name.
+         *
+         * @param gateName Gate name such as H, X, Y, Z, S, or T.
+         * @return 2x2 unitary gate matrix.
+         * @throws std::invalid_argument if gateName is not supported.
+         */
         [[nodiscard]] math::ComplexMatrix createSingleQubitGateMatrix(const std::string &gateName) const;
 
+        /**
+         * Applies any queued insertion/deletion produced by the UI.
+         */
         void applyQueuedCircuitEdits();
 
+        /**
+         * Restores the previous circuit-edit snapshot when available.
+         */
         void undoLastCircuitEdit();
 
+        /**
+         * Reapplies the most recently undone circuit edit when available.
+         */
         void redoLastCircuitEdit();
 
+        /**
+         * Creates a supported two-qubit/full-register gate by display name.
+         *
+         * @param gateName Gate name such as CX, CY, CZ, SWAP, or iSWAP.
+         * @param controlQubit Control or first qubit.
+         * @param targetQubit Target or second qubit.
+         * @return Full-register unitary matrix sized for circuit_.
+         * @throws std::invalid_argument if gateName is not supported.
+         */
         [[nodiscard]] math::ComplexMatrix createControlledGateMatrix(const std::string &gateName,
                                                                      std::size_t controlQubit, std::size_t targetQubit) const;
 
@@ -68,30 +114,86 @@ namespace quantum_sim::gui {
         float heatAmount_{0.78F};
         std::string lastSampleLabel_{"none"};
 
+        /**
+         * Rebuilds debugger state after the editable circuit changes.
+         */
         void rebuildDebuggerAfterCircuitEdit();
 
+        /**
+         * Stores the current circuit for undo and clears stale redo history.
+         */
         void recordCircuitForUndo();
 
+        /**
+         * Applies QubitCanvas colors, spacing, and rounding to the ImGui style.
+         */
         void configureStyle() const;
 
+        /**
+         * Pushes the regular JetBrains Mono font for the whole GUI frame.
+         */
         void pushApplicationFont() const;
 
+        /**
+         * Pops the regular JetBrains Mono font pushed for the GUI frame.
+         */
         void popApplicationFont() const;
 
+        /**
+         * Draws the animated quantum-state background visualization.
+         *
+         * @param snapshot Current debugger snapshot used as the source state.
+         */
         void drawBackdrop(const debug::DebuggerSnapshot &snapshot) const;
 
+        /**
+         * Draws playback, scrub, view-mode, and sampling controls.
+         *
+         * @param session Debugger session controlled by the top bar.
+         * @param snapshot Current debugger state.
+         */
         void drawTopBar(debug::DebuggerSession &session, const debug::DebuggerSnapshot &snapshot);
 
+        /**
+         * Draws built-in algorithm script buttons and visualization controls.
+         */
         void drawAlgorithmScripts();
 
+        /**
+         * Draws the compact bottom status strip.
+         *
+         * @param snapshot Current debugger state.
+         */
         void drawBottomStatus(const debug::DebuggerSnapshot &snapshot) const;
 
+        /**
+         * Advances the debugger while playback is active.
+         *
+         * @param session Debugger session to advance.
+         * @param snapshot Snapshot used to decide whether movement is possible.
+         */
         void applyPlayback(debug::DebuggerSession &session, const debug::DebuggerSnapshot &snapshot);
 
+        /**
+         * Replaces the editable circuit with one of the built-in presets.
+         *
+         * @param preset Preset to load.
+         */
         void loadPreset(CircuitPreset preset);
 
+        /**
+         * Builds a circuit for one built-in preset.
+         *
+         * @param preset Preset to build.
+         * @return Newly constructed circuit.
+         */
         [[nodiscard]] circuit::QuantumCircuit createPresetCircuit(CircuitPreset preset) const;
 
+        /**
+         * Samples the current state and stores a display label for the status bar.
+         *
+         * @param state Register state to measure.
+         */
         void sampleCurrentState(const quantum::QuantumRegister &state);
 
         bool showHistoryDebugInfo_{false};

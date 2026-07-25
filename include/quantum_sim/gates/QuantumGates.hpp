@@ -1,126 +1,149 @@
 #pragma once
-#include "../math/ComplexMatrix.hpp"
+#include "quantum_sim/math/ComplexMatrix.hpp"
+
+#include <cstddef>
 
 namespace quantum_sim::gates {
     /**
-     * Constructs the X (Pauli-X) gate for a single qubit in the form of a 2x2 complex matrix.
-     * The X gate flips the state of a qubit. It maps |0⟩ to |1⟩ and |1⟩ to |0⟩.
-     *
-     * @return A 2x2 ComplexMatrix representing the Pauli-X gate.
+     * @return Pauli-X single-qubit gate.
      */
     [[nodiscard]] math::ComplexMatrix xGate();
 
     /**
-     * Constructs the RX rotation gate for a single qubit as a 2x2 complex matrix.
-     * The RX gate performs a counterclockwise rotation around the X-axis of the Bloch sphere
-     * by an angle specified in radians.
+     * Creates an Rx rotation gate.
      *
-     * @param angleRadians The rotation angle in radians.
-     * @return A 2x2 ComplexMatrix representing the RX rotation gate.
+     * @param angleRadians Rotation angle in radians.
+     * @return 2x2 unitary rotation around the X axis.
      */
     [[nodiscard]] math::ComplexMatrix rxGate(double angleRadians);
 
     /**
-     * Constructs the Y gate (Pauli-Y gate) matrix for single-qubit quantum operations.
-     * The Y gate is represented as a 2x2 complex matrix.
-     *
-     * @return A ComplexMatrix representing the Y gate, with the following structure:
-     *         [[0, i],
-     *          [-i, 0]]
+     * @return Pauli-Y single-qubit gate.
      */
     [[nodiscard]] math::ComplexMatrix yGate();
 
     /**
-     * Constructs the RY (rotation around the Y axis) gate for a single qubit
-     * as a 2x2 complex matrix. The RY gate applies a rotation by the specified angle
-     * about the Y axis in the Bloch sphere representation of a qubit's state.
+     * Creates an Ry rotation gate.
      *
-     * @param angleRadians The rotation angle in radians.
-     * @return A 2x2 ComplexMatrix representing the RY gate.
+     * @param angleRadians Rotation angle in radians.
+     * @return 2x2 unitary rotation around the Y axis.
      */
     [[nodiscard]] math::ComplexMatrix ryGate(double angleRadians);
 
     /**
-     * Constructs the Z (Pauli-Z) gate for a single qubit in the form of a 2x2 complex matrix.
-     * The Z gate applies a phase flip to the state of a qubit. It maps |0⟩ to |0⟩ and |1⟩ to -|1⟩.
-     *
-     * @return A 2x2 ComplexMatrix representing the Pauli-Z gate.
+     * @return Pauli-Z single-qubit gate.
      */
     [[nodiscard]] math::ComplexMatrix zGate();
 
     /**
-     * Constructs the Rz (rotation around the Z-axis) gate for a single qubit in the form of a 2x2 complex matrix.
-     * The Rz gate applies a phase shift dependent on the given angle in radians.
+     * Creates an Rz rotation gate.
      *
-     * @param angleRadians The rotation angle in radians. The phase shift is calculated as a function of this angle.
-     * @return A 2x2 ComplexMatrix representing the Rz gate.
+     * @param angleRadians Rotation angle in radians.
+     * @return 2x2 unitary rotation around the Z axis.
      */
     [[nodiscard]] math::ComplexMatrix rzGate(double angleRadians);
 
     /**
-     * Constructs the S gate matrix, which is a single-qubit quantum gate used in quantum computing.
-     * The S gate applies a phase shift and is represented by a 2x2 matrix:
-     *
-     * [[1, 0],
-     *  [0, i]],
-     * where i is the imaginary unit.
-     *
-     * @return A ComplexMatrix representing the S gate matrix.
+     * @return S phase gate, diag(1, i).
      */
     [[nodiscard]] math::ComplexMatrix sGate();
 
     /**
-     * Constructs the T gate matrix used in quantum computing.
-     * The T gate is a single-qubit quantum gate that corresponds
-     * to a diagonal matrix with elements {1, exp(i * π / 4)}.
-     *
-     * @return A 2x2 complex matrix representing the T gate.
+     * @return T phase gate, diag(1, exp(i*pi/4)).
      */
     [[nodiscard]] math::ComplexMatrix tGate();
 
     /**
-     * Constructs the Hadamard gate for a single qubit, representing
-     * a quantum operation that puts the qubit into a superposition state.
-     *
-     * @return A representation of the Hadamard gate for a single qubit.
+     * @return Hadamard gate, which maps basis states into equal superposition.
      */
     [[nodiscard]] math::ComplexMatrix hadamardGate();
 
     /**
-     * Constructs the CX (Controlled-NOT) gate as a 4x4 complex matrix.
-     * The CX gate is a two-qubit quantum gate that flips the state of the target qubit
-     * if and only if the control qubit is in the |1⟩ state.
-     *
-     * @return A 4x4 ComplexMatrix representing the CX gate.
+     * @return Two-qubit controlled-X matrix for adjacent two-qubit states.
      */
     [[nodiscard]] math::ComplexMatrix cxGate();
 
+    /**
+     * @return Two-qubit controlled-Y matrix for adjacent two-qubit states.
+     */
     [[nodiscard]] math::ComplexMatrix cyGate();
 
+    /**
+     * @return Two-qubit controlled-Z matrix for adjacent two-qubit states.
+     */
     [[nodiscard]] math::ComplexMatrix czGate();
 
     /**
-     * Constructs the SWAP gate for two qubits in the form of a 4x4 complex matrix.
-     * The SWAP gate exchanges the states of two qubits. It maps the basis states
-     * |01⟩ to |10⟩ and |10⟩ to |01⟩, leaving |00⟩ and |11⟩ unchanged.
-     *
-     * @return A 4x4 ComplexMatrix representing the SWAP gate.
+     * @return Two-qubit SWAP matrix for adjacent two-qubit states.
      */
     [[nodiscard]] math::ComplexMatrix swapGate();
 
+    /**
+     * Creates a full-register SWAP matrix for any two qubits.
+     *
+     * @param qubitCount Register size.
+     * @param firstQubit First qubit to exchange.
+     * @param secondQubit Second qubit to exchange.
+     * @return stateCount by stateCount unitary matrix.
+     * @throws std::invalid_argument if the qubit count is invalid or both qubits are the same.
+     * @throws std::out_of_range if either qubit index is outside the register.
+     */
     [[nodiscard]] math::ComplexMatrix swapGate(std::size_t qubitCount, std::size_t firstQubit, std::size_t secondQubit);
 
+    /**
+     * Creates a full-register controlled-X matrix.
+     *
+     * @param qubitCount Register size.
+     * @param controlQubit Control qubit index.
+     * @param targetQubit Target qubit index.
+     * @return stateCount by stateCount unitary matrix.
+     * @throws std::invalid_argument if the qubit count is invalid or control equals target.
+     * @throws std::out_of_range if either qubit index is outside the register.
+     */
     [[nodiscard]] math::ComplexMatrix cxGate(std::size_t qubitCount, std::size_t controlQubit,
                                              std::size_t targetQubit);
 
+    /**
+     * Creates a full-register controlled-Y matrix.
+     *
+     * @param qubitCount Register size.
+     * @param controlQubit Control qubit index.
+     * @param targetQubit Target qubit index.
+     * @return stateCount by stateCount unitary matrix.
+     * @throws std::invalid_argument if the qubit count is invalid or control equals target.
+     * @throws std::out_of_range if either qubit index is outside the register.
+     */
     [[nodiscard]] math::ComplexMatrix cyGate(std::size_t qubitCount, std::size_t controlQubit,
                                              std::size_t targetQubit);
 
+    /**
+     * Creates a full-register controlled-Z matrix.
+     *
+     * @param qubitCount Register size.
+     * @param controlQubit Control qubit index.
+     * @param targetQubit Target qubit index.
+     * @return stateCount by stateCount unitary matrix.
+     * @throws std::invalid_argument if the qubit count is invalid or control equals target.
+     * @throws std::out_of_range if either qubit index is outside the register.
+     */
     [[nodiscard]] math::ComplexMatrix czGate(std::size_t qubitCount, std::size_t controlQubit,
                                              std::size_t targetQubit);
 
+    /**
+     * @return Two-qubit iSWAP matrix for adjacent two-qubit states.
+     */
     [[nodiscard]] math::ComplexMatrix iSwapGate();
 
+    /**
+     * Creates a full-register iSWAP matrix for any two qubits.
+     *
+     * @param qubitCount Register size.
+     * @param controlQubit First qubit to exchange.
+     * @param targetQubit Second qubit to exchange.
+     * @return stateCount by stateCount unitary matrix.
+     * @throws std::invalid_argument if the qubit count is invalid or both qubits are the same.
+     * @throws std::out_of_range if either qubit index is outside the register.
+     */
     [[nodiscard]] math::ComplexMatrix iSwapGate(std::size_t qubitCount, std::size_t controlQubit,
-                                                        std::size_t targetQubit);
+                                                std::size_t targetQubit);
 }

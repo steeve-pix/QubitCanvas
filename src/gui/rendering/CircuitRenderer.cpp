@@ -96,6 +96,7 @@ namespace quantum_sim::gui {
                 pendingGate.has_value();
 
         if (placementModeActive) {
+            // Default new placements to append until the mouse picks another slot.
             if (!pendingInsertionIndex_.has_value()) {
                 pendingInsertionIndex_ =
                         instructions.size();
@@ -115,6 +116,7 @@ namespace quantum_sim::gui {
                 );
 
         if (controlledPlacement) {
+            // Remember the family so a completed two-click placement can be emitted.
             pendingControlledGateName_ =
                     pendingGate.value();
         } else {
@@ -181,6 +183,7 @@ namespace quantum_sim::gui {
             placementModeActive &&
             ImGui::IsWindowHovered()
         ) {
+            // Convert mouse X position into the nearest instruction insertion slot.
             const ImVec2 insertionMousePosition =
                     ImGui::GetMousePos();
 
@@ -395,6 +398,7 @@ namespace quantum_sim::gui {
                 }
 
                 if (clicked) {
+                    // The application consumes this placement next frame and edits the circuit.
                     completedSingleQubitPlacement_ =
                             SingleQubitPlacement{
                                 pendingGate.value(), qubit, pendingInsertionIndex_.value_or(instructions.size())
@@ -477,12 +481,15 @@ namespace quantum_sim::gui {
 
                 if (clicked) {
                     if (!pendingControlQubit_.has_value()) {
+                        // First click chooses the control/first qubit.
                         pendingControlQubit_ =
                                 qubit;
                     } else if (isSelectedControl) {
+                        // Clicking the first qubit again cancels that half of placement.
                         pendingControlQubit_.reset();
                         pendingTargetQubit_.reset();
                     } else {
+                        // Second click chooses the target/second qubit.
                         pendingTargetQubit_ =
                                 qubit;
                     }
@@ -588,6 +595,7 @@ namespace quantum_sim::gui {
                     ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
             if (stepBadgeClicked) {
+                // Step badges select gates without requiring a precise gate click.
                 selectedInstructionIndex_ = instructionIndex;
             }
 
@@ -739,6 +747,7 @@ namespace quantum_sim::gui {
                     const float crossRadius =
                             style_.targetRadius * 0.9F;
 
+                    // SWAP-style gates use two crosses instead of a control dot and box.
                     const auto drawSwapCross =
                             [&](const ImVec2 &center, const ImU32 color, const float thickness) {
                         drawList->AddLine(
@@ -1167,6 +1176,7 @@ namespace quantum_sim::gui {
             return std::nullopt;
         }
 
+        // Reset only the two-click state; pending gate is owned by GuiApplication.
         pendingControlQubit_.reset();
         pendingTargetQubit_.reset();
 
@@ -1181,6 +1191,7 @@ namespace quantum_sim::gui {
         std::optional<SingleQubitPlacement> placement =
                 std::move(completedSingleQubitPlacement_);
 
+        // Consuming transfers ownership to GuiApplication.
         completedSingleQubitPlacement_.reset();
 
         return placement;
