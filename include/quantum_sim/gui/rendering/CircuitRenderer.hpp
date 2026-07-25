@@ -11,13 +11,16 @@ struct ImVec2;
 
 namespace quantum_sim::gui {
     struct ControlledPlacement {
+        std::string gateName;
         std::size_t controlQubit;
         std::size_t targetQubit;
+        std::size_t instructionIndex;
     };
 
     struct SingleQubitPlacement {
         std::string gateName;
         std::size_t targetQubit;
+        std::size_t instructionIndex;
     };
 
     class CircuitRenderer {
@@ -46,6 +49,7 @@ namespace quantum_sim::gui {
 
         void cancelPlacement() noexcept;
 
+        [[nodiscard]] std::optional<std::size_t> pendingInsertionIndex() const noexcept;
 
     private:
         void drawGate(ImDrawList *drawList, const ImVec2 &center, const std::string &label, bool highlighted,
@@ -57,5 +61,7 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> pendingControlQubit_;
         std::optional<std::size_t> pendingTargetQubit_;
         std::optional<SingleQubitPlacement> completedSingleQubitPlacement_;
+        std::optional<std::size_t> pendingInsertionIndex_;
+        std::optional<std::string> pendingControlledGateName_;
     };
 }

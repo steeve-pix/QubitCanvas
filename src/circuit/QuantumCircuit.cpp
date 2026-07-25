@@ -6,6 +6,8 @@
 #include <variant>
 #include <string>
 #include <optional>
+#include <algorithm>
+#include <cstddef>
 
 namespace quantum_sim::circuit {
     QuantumCircuit::QuantumCircuit(std::size_t qubitCount) : qubitCount_(qubitCount) {
@@ -202,5 +204,69 @@ namespace quantum_sim::circuit {
         instructions_.erase(instructions_.begin() + static_cast<ptrdiff_t>(index));
 
         return true;
+    }
+
+    void QuantumCircuit::insertSingleQubitGate(std::size_t instructionIndex, std::string name, math::ComplexMatrix gate,
+                                               std::size_t targetQubit) {
+        if (gate.rows() != 2 || gate.columns() != 2) {
+            throw std::invalid_argument{"A single-qubit gate must be a 2 by 2 matrix."};
+        }
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{"A quantum gate must be unitary."};
+        }
+
+        if (targetQubit >= qubitCount_) {
+            throw std::out_of_range{"Target qubit index is outside the circuit."};
+        }
+
+        const std::size_t clampedIndex =
+                std::min(
+                    instructionIndex,
+                    instructions_.size()
+                );
+
+        instructions_.insert(
+            instructions_.begin()
+            + static_cast<ptrdiff_t>(clampedIndex),
+            SingleQubitInstruction{
+                std::move(name),
+                std::move(gate),
+                targetQubit
+            }
+        );
+    }
+
+    void QuantumCircuit::insertControlledGate(std::size_t instructionIndex, std::string name, math::ComplexMatrix gate,
+                                              std::size_t controlQubit, std::size_t targetQubit) {
+        if (controlQubit >= qubitCount_ || targetQubit >= qubitCount_) {
+            throw std::out_of_range{"Controlled-gate qubit index is outside the circuit."};
+        }
+        if (controlQubit == targetQubit) {
+            throw std::invalid_argument{"Control and target qubits must be different."};
+        }
+
+        const std::size_t expectedSize =
+                std::size_t{1} << qubitCount_;
+
+        if (gate.rows() != expectedSize || gate.columns() != expectedSize) {
+            throw std::invalid_argument{"Controlled-gate dimensions must match the circuit state count."};
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{"A quantum gate must be unitary."};
+        }
+
+        const std::size_t clampedIndex =
+                std::min(instructionIndex, instructions_.size());
+
+        instructions_.insert(
+            instructions_.begin()
+            + static_cast<ptrdiff_t>(clampedIndex),
+            FullRegisterInstruction{
+                std::move(name),
+                std::move(gate),
+                controlQubit,
+                targetQubit
+            });
     }
 }

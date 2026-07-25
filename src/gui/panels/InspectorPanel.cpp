@@ -3,9 +3,141 @@
 
 #include "imgui.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdio>
+#include <numbers>
 #include <string>
 #include <utility>
+#include <vector>
+
+namespace {
+    struct IndexedStateInfo {
+        std::size_t index{};
+        quantum_sim::quantum::StateInfo state;
+    };
+
+    [[nodiscard]] std::string toLower(std::string value) {
+        for (char &character: value) {
+            character =
+                    static_cast<char>(
+                        std::tolower(
+                            static_cast<unsigned char>(character)
+                        )
+                    );
+        }
+
+        return value;
+    }
+
+    [[nodiscard]] bool stateMatchesFilter(
+        const IndexedStateInfo &entry,
+        const std::string &filter
+    ) {
+        if (filter.empty()) {
+            return true;
+        }
+
+        const std::string label =
+                toLower(entry.state.label);
+
+        const std::string index =
+                std::to_string(entry.index);
+
+        return label.find(filter) != std::string::npos ||
+               index.find(filter) != std::string::npos;
+    }
+
+    [[nodiscard]] quantum_sim::quantum::BlochVector reducedBlochVector(
+        const quantum_sim::quantum::QuantumRegister &state,
+        const std::size_t qubitIndex
+    ) {
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+
+        const std::size_t qubitCount =
+                state.qubitCount();
+
+        const std::size_t bitPosition =
+                qubitCount - 1 - qubitIndex;
+
+        const std::size_t mask =
+                std::size_t{1} << bitPosition;
+
+        for (std::size_t stateIndex = 0; stateIndex < state.stateCount(); ++stateIndex) {
+            const bool bitIsOne =
+                    (stateIndex & mask) != 0;
+
+            const double probability =
+                    state.probability(stateIndex);
+
+            z += bitIsOne
+                     ? -probability
+                     : probability;
+
+            if (bitIsOne) {
+                continue;
+            }
+
+            const std::size_t pairedIndex =
+                    stateIndex | mask;
+
+            const auto &zeroAmplitude =
+                    state.amplitude(stateIndex);
+
+            const auto &oneAmplitude =
+                    state.amplitude(pairedIndex);
+
+            x += 2.0 * (
+                zeroAmplitude.real() * oneAmplitude.real() +
+                zeroAmplitude.imaginary() * oneAmplitude.imaginary()
+            );
+
+            y += 2.0 * (
+                zeroAmplitude.real() * oneAmplitude.imaginary() -
+                zeroAmplitude.imaginary() * oneAmplitude.real()
+            );
+        }
+
+        return quantum_sim::quantum::BlochVector{x, y, z};
+    }
+
+    [[nodiscard]] ImU32 probabilityColor(
+        const double probability,
+        const double phase
+    ) {
+        const float intensity =
+                std::clamp(
+                    static_cast<float>(std::sqrt(probability)),
+                    0.0F,
+                    1.0F
+                );
+
+        const float phaseT =
+                static_cast<float>(
+                    (phase + std::numbers::pi) /
+                    (2.0 * std::numbers::pi)
+                );
+
+        const int red =
+                static_cast<int>(88.0F + intensity * 180.0F);
+
+        const int green =
+                static_cast<int>(52.0F + std::sin(phaseT * 6.28318F) * 40.0F + intensity * 130.0F);
+
+        const int blue =
+                static_cast<int>(135.0F + std::cos(phaseT * 6.28318F) * 70.0F + intensity * 75.0F);
+
+        return IM_COL32(
+            std::clamp(red, 0, 255),
+            std::clamp(green, 0, 255),
+            std::clamp(blue, 0, 255),
+            static_cast<int>(55.0F + intensity * 200.0F)
+        );
+    }
+}
 
 namespace quantum_sim::gui {
     bool InspectorPanel::draw(
@@ -332,49 +464,321 @@ namespace quantum_sim::gui {
         ImGui::SeparatorText("Quantum State");
 
         drawProbabilities(state);
+        drawStateHeatmap(state);
         drawAmplitudes(state);
         drawBlochInformation(state);
     }
 
     void InspectorPanel::drawProbabilities(const quantum::QuantumRegister &state) {
-        ImGui::TextDisabled("Probabilities");
+        ImGui::TextDisabled("Qubit probabilities");
 
-        for (const quantum::StateInfo &stateInfo: state.states()) {
-            const float probability =
-                    static_cast<float>(stateInfo.probability);
+        if (
+            ImGui::BeginTable(
+                "QubitProbabilityTable",
+                3,
+                ImGuiTableFlags_BordersInnerV |
+                ImGuiTableFlags_RowBg
+            )
+        ) {
+            ImGui::TableSetupColumn("Qubit", ImGuiTableColumnFlags_WidthFixed, 52.0F);
+            ImGui::TableSetupColumn("P(1)");
+            ImGui::TableSetupColumn("P(0)", ImGuiTableColumnFlags_WidthFixed, 74.0F);
+            ImGui::TableHeadersRow();
 
-            ImGui::Text("%s", stateInfo.label.c_str());
-            ImGui::SameLine();
+            for (std::size_t qubit = 0; qubit < state.qubitCount(); ++qubit) {
+                const float oneProbability =
+                        static_cast<float>(
+                            state.probabilityOfQubitOne(qubit)
+                        );
 
-            ImGui::ProgressBar(
-                probability,
-                ImVec2{-1.0F, 0.0F}
+                const float zeroProbability =
+                        1.0F - oneProbability;
+
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("q%zu", qubit);
+
+                ImGui::TableSetColumnIndex(1);
+
+                char overlay[32]{};
+                std::snprintf(
+                    overlay,
+                    sizeof(overlay),
+                    "%.1f%%",
+                    oneProbability * 100.0F
+                );
+
+                ImGui::ProgressBar(
+                    oneProbability,
+                    ImVec2{-1.0F, 0.0F},
+                    overlay
+                );
+
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%.1f%%", zeroProbability * 100.0F);
+            }
+
+            ImGui::EndTable();
+        }
+    }
+
+    void InspectorPanel::drawStateHeatmap(const quantum::QuantumRegister &state) {
+        ImGui::Spacing();
+        ImGui::TextDisabled("Amplitude field");
+
+        const float availableWidth =
+                std::max(120.0F, ImGui::GetContentRegionAvail().x);
+
+        const std::size_t stateCount =
+                state.stateCount();
+
+        const int columns =
+                std::max(
+                    1,
+                    static_cast<int>(
+                        std::ceil(
+                            std::sqrt(
+                                static_cast<double>(stateCount)
+                            )
+                        )
+                    )
+                );
+
+        const float cellSize =
+                std::clamp(
+                    availableWidth / static_cast<float>(columns),
+                    4.0F,
+                    10.0F
+                );
+
+        const int rows =
+                static_cast<int>(
+                    (stateCount + static_cast<std::size_t>(columns) - 1) /
+                    static_cast<std::size_t>(columns)
+                );
+
+        const ImVec2 canvasSize{
+            availableWidth,
+            static_cast<float>(rows) * cellSize
+        };
+
+        const ImVec2 origin =
+                ImGui::GetCursorScreenPos();
+
+        ImGui::InvisibleButton(
+            "StateHeatmapCanvas",
+            canvasSize
+        );
+
+        ImDrawList *drawList =
+                ImGui::GetWindowDrawList();
+
+        drawList->AddRectFilled(
+            origin,
+            ImVec2{origin.x + canvasSize.x, origin.y + canvasSize.y},
+            IM_COL32(8, 13, 22, 190),
+            4.0F
+        );
+
+        for (std::size_t stateIndex = 0; stateIndex < stateCount; ++stateIndex) {
+            const int column =
+                    static_cast<int>(stateIndex % static_cast<std::size_t>(columns));
+
+            const int row =
+                    static_cast<int>(stateIndex / static_cast<std::size_t>(columns));
+
+            const auto &amplitude =
+                    state.amplitude(stateIndex);
+
+            const double probability =
+                    state.probability(stateIndex);
+
+            const double phase =
+                    std::atan2(
+                        amplitude.imaginary(),
+                        amplitude.real()
+                    );
+
+            const ImVec2 minimum{
+                origin.x + static_cast<float>(column) * cellSize,
+                origin.y + static_cast<float>(row) * cellSize
+            };
+
+            const ImVec2 maximum{
+                minimum.x + cellSize - 1.0F,
+                minimum.y + cellSize - 1.0F
+            };
+
+            drawList->AddRectFilled(
+                minimum,
+                maximum,
+                probabilityColor(probability, phase),
+                1.0F
             );
+        }
+
+        if (ImGui::IsItemHovered()) {
+            const ImVec2 mouse =
+                    ImGui::GetMousePos();
+
+            const int column =
+                    static_cast<int>(
+                        (mouse.x - origin.x) / cellSize
+                    );
+
+            const int row =
+                    static_cast<int>(
+                        (mouse.y - origin.y) / cellSize
+                    );
+
+            if (
+                column >= 0 &&
+                row >= 0
+            ) {
+                const std::size_t stateIndex =
+                        static_cast<std::size_t>(row) *
+                        static_cast<std::size_t>(columns) +
+                        static_cast<std::size_t>(column);
+
+                if (stateIndex < stateCount) {
+                    const quantum::StateInfo info =
+                            state.stateInfo(stateIndex);
+
+                    ImGui::BeginTooltip();
+                    ImGui::Text("%s", info.label.c_str());
+                    ImGui::Text("index %zu", stateIndex);
+                    ImGui::Text("p %.6f", info.probability);
+                    ImGui::Text(
+                        "amp %.4f%+.4fi",
+                        info.amplitude.real(),
+                        info.amplitude.imaginary()
+                    );
+                    ImGui::EndTooltip();
+                }
+            }
         }
     }
 
     void InspectorPanel::drawAmplitudes(const quantum::QuantumRegister &state) {
         ImGui::TextDisabled("Amplitudes");
 
-        if (ImGui::BeginTable("AmplitudeTable", 3)) {
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::InputText(
+            "Filter",
+            amplitudeFilter_.data(),
+            amplitudeFilter_.size()
+        );
+
+        ImGui::Checkbox("Live only", &showOnlyLiveAmplitudes_);
+        ImGui::SameLine();
+        ImGui::Checkbox("Sort by p", &sortAmplitudesByProbability_);
+
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::SliderInt(
+            "Shown",
+            &maximumVisibleAmplitudes_,
+            16,
+            256
+        );
+
+        const std::string filter =
+                toLower(amplitudeFilter_.data());
+
+        std::vector<IndexedStateInfo> entries;
+        entries.reserve(state.stateCount());
+
+        constexpr double liveThreshold = 1e-10;
+
+        for (std::size_t stateIndex = 0; stateIndex < state.stateCount(); ++stateIndex) {
+            IndexedStateInfo entry{
+                stateIndex,
+                state.stateInfo(stateIndex)
+            };
+
+            if (
+                showOnlyLiveAmplitudes_ &&
+                entry.state.probability <= liveThreshold
+            ) {
+                continue;
+            }
+
+            if (!stateMatchesFilter(entry, filter)) {
+                continue;
+            }
+
+            entries.push_back(std::move(entry));
+        }
+
+        if (sortAmplitudesByProbability_) {
+            std::sort(
+                entries.begin(),
+                entries.end(),
+                [](const IndexedStateInfo &left, const IndexedStateInfo &right) {
+                    return left.state.probability > right.state.probability;
+                }
+            );
+        }
+
+        const std::size_t visibleCount =
+                std::min(
+                    entries.size(),
+                    static_cast<std::size_t>(
+                        std::max(1, maximumVisibleAmplitudes_)
+                    )
+                );
+
+        ImGui::TextDisabled(
+            "Showing %zu of %zu states",
+            visibleCount,
+            entries.size()
+        );
+
+        const float tableHeight =
+                std::min(
+                    280.0F,
+                    60.0F + static_cast<float>(visibleCount) * 24.0F
+                );
+
+        ImGui::BeginChild(
+            "AmplitudeTableScroller",
+            ImVec2{0.0F, tableHeight},
+            true
+        );
+
+        if (
+            ImGui::BeginTable(
+                "AmplitudeTable",
+                4,
+                ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_BordersInnerV |
+                ImGuiTableFlags_ScrollY
+            )
+        ) {
             ImGui::TableSetupColumn("State");
+            ImGui::TableSetupColumn("p");
             ImGui::TableSetupColumn("Real");
             ImGui::TableSetupColumn("Imaginary");
             ImGui::TableHeadersRow();
 
-            for (const quantum::StateInfo &stateInfo: state.states()) {
+            for (std::size_t index = 0; index < visibleCount; ++index) {
+                const quantum::StateInfo &stateInfo =
+                        entries[index].state;
+
                 ImGui::TableNextRow();
 
                 ImGui::TableSetColumnIndex(0);
                 ImGui::TextUnformatted(stateInfo.label.c_str());
 
                 ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%.5f", stateInfo.probability);
+
+                ImGui::TableSetColumnIndex(2);
                 ImGui::Text(
                     "%.4f",
                     stateInfo.amplitude.real()
                 );
 
-                ImGui::TableSetColumnIndex(2);
+                ImGui::TableSetColumnIndex(3);
                 ImGui::Text(
                     "%.4f",
                     stateInfo.amplitude.imaginary()
@@ -383,60 +787,103 @@ namespace quantum_sim::gui {
 
             ImGui::EndTable();
         }
+
+        ImGui::EndChild();
     }
 
     void InspectorPanel::drawBlochInformation(const quantum::QuantumRegister &state) {
-        if (state.qubitCount() == 1) {
-            const quantum::BlochVector bloch =
-                    state.blockVector();
+        if (state.qubitCount() == 0) {
+            return;
+        }
 
-            const quantum::BlochAngles angles =
-                    state.blochAngles();
-
-            ImGui::Spacing();
-            ImGui::SeparatorText("Bloch Sphere");
-
-            ImGui::TextDisabled("Vector and angles");
-
-            ImGui::Text(
-                "(%.4f, %.4f, %.4f)",
-                bloch.x,
-                bloch.y,
-                bloch.z
-            );
-
-            ImGui::Spacing();
-
-            ImGui::Text(
-                "theta = %.4f rad",
-                angles.theta
-            );
-
-            constexpr double epsilon = 1e-10;
-
-            const bool isAtPole =
-                    std::abs(bloch.x) < epsilon &&
-                    std::abs(bloch.y) < epsilon;
-
-            if (isAtPole) {
-                ImGui::TextUnformatted(
-                    "phi = undefined at the pole"
+        inspectedBlochQubit_ =
+                std::clamp(
+                    inspectedBlochQubit_,
+                    0,
+                    static_cast<int>(state.qubitCount() - 1)
                 );
-            } else {
-                ImGui::Text(
-                    "phi = %.4f rad",
-                    angles.phi
-                );
+
+        ImGui::Spacing();
+        ImGui::SeparatorText("Bloch Sphere");
+
+        if (state.qubitCount() > 1) {
+            const std::string preview =
+                    "q" + std::to_string(inspectedBlochQubit_);
+
+            if (ImGui::BeginCombo("Qubit", preview.c_str())) {
+                for (std::size_t qubit = 0; qubit < state.qubitCount(); ++qubit) {
+                    const bool selected =
+                            inspectedBlochQubit_ ==
+                            static_cast<int>(qubit);
+
+                    const std::string label =
+                            "q" + std::to_string(qubit);
+
+                    if (ImGui::Selectable(label.c_str(), selected)) {
+                        inspectedBlochQubit_ =
+                                static_cast<int>(qubit);
+                    }
+
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+
+                ImGui::EndCombo();
             }
+        }
 
-            ImGui::Spacing();
-            ImGui::TextDisabled("Visualization");
+        const quantum::BlochVector bloch =
+                state.qubitCount() == 1
+                    ? state.blockVector()
+                    : reducedBlochVector(
+                        state,
+                        static_cast<std::size_t>(inspectedBlochQubit_)
+                    );
 
-            blochSphereRenderer_.draw(bloch);
+        const double purity =
+                std::sqrt(
+                    bloch.x * bloch.x +
+                    bloch.y * bloch.y +
+                    bloch.z * bloch.z
+                );
 
-            ImGui::Text(
-                "Depth: y = %.4f",
-                bloch.y
+        const double safePurity =
+                std::max(purity, 1e-10);
+
+        const double theta =
+                std::acos(
+                    std::clamp(
+                        bloch.z / safePurity,
+                        -1.0,
+                        1.0
+                    )
+                );
+
+        const double phi =
+                std::atan2(bloch.y, bloch.x);
+
+        ImGui::Text(
+            "vector (%.4f, %.4f, %.4f)",
+            bloch.x,
+            bloch.y,
+            bloch.z
+        );
+
+        ImGui::Text(
+            "theta %.4f   phi %.4f   purity %.3f",
+            theta,
+            phi,
+            std::clamp(purity, 0.0, 1.0)
+        );
+
+        ImGui::Spacing();
+        blochSphereRenderer_.draw(bloch);
+
+        if (state.qubitCount() > 1) {
+            ImGui::TextDisabled(
+                "Reduced view of q%d",
+                inspectedBlochQubit_
             );
         }
     }
@@ -453,11 +900,15 @@ namespace quantum_sim::gui {
             ImGui::PopFont();
         }
 
-        ImGui::Text(
-            "Step %d / %d",
-            static_cast<int>(snapshot.currentStepIndex + 1),
-            static_cast<int>(snapshot.stepCount)
-        );
+        if (snapshot.stepCount == 0) {
+            ImGui::TextUnformatted("Step 0 / 0");
+        } else {
+            ImGui::Text(
+                "Step %d / %d",
+                static_cast<int>(snapshot.currentStepIndex + 1),
+                static_cast<int>(snapshot.stepCount)
+            );
+        }
 
         if (selectedInstructionIndex.has_value()) {
             ImGui::TextDisabled(

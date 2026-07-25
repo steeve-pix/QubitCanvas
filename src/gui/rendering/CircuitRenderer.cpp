@@ -4,9 +4,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <string>
 #include <utility>
-#include <optional>
 
 namespace {
     [[nodiscard]] float animationPulse(const float speed) {
@@ -53,7 +53,8 @@ namespace {
 namespace quantum_sim::gui {
     void CircuitRenderer::draw(
         const circuit::QuantumCircuit &circuit,
-        const debug::DebuggerSnapshot &snapshot, const std::optional<std::string> &pendingGate
+        const debug::DebuggerSnapshot &snapshot,
+        const std::optional<std::string> &pendingGate
     ) {
         ImGui::BeginChild(
             "CircuitCanvas",
@@ -94,11 +95,30 @@ namespace quantum_sim::gui {
         const bool placementModeActive =
                 pendingGate.has_value();
 
+        if (placementModeActive) {
+            if (!pendingInsertionIndex_.has_value()) {
+                pendingInsertionIndex_ =
+                        instructions.size();
+            }
+        } else {
+            pendingInsertionIndex_.reset();
+        }
+
         const bool controlledPlacement =
                 placementModeActive &&
-                pendingGate.value() == "CX";
+                (
+                    pendingGate.value() == "CX" ||
+                    pendingGate.value() == "CY" ||
+                    pendingGate.value() == "CZ" ||
+                    pendingGate.value() == "SWAP" ||
+                    pendingGate.value() == "iSWAP"
+                );
 
-        if (!controlledPlacement) {
+        if (controlledPlacement) {
+            pendingControlledGateName_ =
+                    pendingGate.value();
+        } else {
+            pendingControlledGateName_.reset();
             pendingControlQubit_.reset();
             pendingTargetQubit_.reset();
         }
@@ -149,17 +169,6 @@ namespace quantum_sim::gui {
                 gateSpacing *
                 static_cast<float>(instructionCount - 1);
 
-        const float wireEndX =
-                lastGateX + style_.rightPadding;
-
-        const float placementX =
-                wireEndX + style_.gateSpacing;
-
-        const float displayedWireEndX =
-                placementModeActive
-                    ? placementX
-                    : wireEndX;
-
         const float firstWireY =
                 origin.y + style_.topMargin;
 
@@ -168,16 +177,100 @@ namespace quantum_sim::gui {
                 style_.wireSpacing *
                 static_cast<float>(qubitCount - 1);
 
+        if (
+            placementModeActive &&
+            ImGui::IsWindowHovered()
+        ) {
+            const ImVec2 insertionMousePosition =
+                    ImGui::GetMousePos();
+
+            const float relativeMouseX =
+                    insertionMousePosition.x - firstGateX;
+
+            const float rawInsertionIndex =
+                    relativeMouseX / gateSpacing;
+
+            const long long roundedInsertionIndex =
+                    std::llround(rawInsertionIndex);
+
+            const long long maximumInsertionIndex =
+                    static_cast<long long>(
+                        instructions.size()
+                    );
+
+            const long long clampedInsertionIndex =
+                    std::clamp(
+                        roundedInsertionIndex,
+                        0LL,
+                        maximumInsertionIndex
+                    );
+
+            pendingInsertionIndex_ =
+                    static_cast<std::size_t>(
+                        clampedInsertionIndex
+                    );
+        }
+
+        if (placementModeActive) {
+            const std::size_t insertionSlotCount =
+                    instructions.size() + 1;
+
+            const float slotMarkerY =
+                    origin.y +
+                    style_.timelineLabelOffsetY +
+                    22.0F;
+
+            for (
+                std::size_t candidateIndex = 0;
+                candidateIndex < insertionSlotCount;
+                ++candidateIndex
+            ) {
+                const float insertionX =
+                        firstGateX +
+                        gateSpacing *
+                        static_cast<float>(candidateIndex);
+
+                const bool selectedSlot =
+                        pendingInsertionIndex_.has_value() &&
+                        pendingInsertionIndex_.value() == candidateIndex;
+
+                drawList->AddCircleFilled(
+                    ImVec2{
+                        insertionX,
+                        slotMarkerY
+                    },
+                    selectedSlot ? 4.0F : 2.5F,
+                    selectedSlot
+                        ? style_.placementGuideColor
+                        : style_.inactiveColumnGuideColor
+                );
+            }
+        }
+
+        const std::size_t insertionIndex =
+                pendingInsertionIndex_.value_or(instructions.size());
+
+        const float placementX =
+                firstGateX + gateSpacing * static_cast<float>(insertionIndex);
+
+        const float shiftedLastGateX =
+                placementModeActive
+                    ? lastGateX + gateSpacing
+                    : lastGateX;
+
+        const float displayedWireEndX =
+                shiftedLastGateX + style_.rightPadding;
+
         if (placementModeActive) {
             const float guideStartY =
                     firstWireY - style_.columnGuideVerticalPadding;
 
             const float guideEndY =
-                    lastWireY - style_.columnGuideVerticalPadding;
+                    lastWireY + style_.columnGuideVerticalPadding;
 
             const float dashStep =
                     style_.placementGuideDashLength +
-                    style_.placementGuideDashLength;
+                    style_.placementGuideGapLength;
 
             for (float y = guideStartY; y < guideEndY; y += dashStep) {
                 const float dashEndY =
@@ -203,10 +296,18 @@ namespace quantum_sim::gui {
         // Layer 1: subtle instruction-column guides
         // ---------------------------------------------------------
 
-        for (std::size_t instructionIndex = 0;
-             instructionIndex < instructions.size();
-             ++instructionIndex) {
-            const float x = firstGateX + gateSpacing * static_cast<float>(instructionIndex);
+        for (std::size_t instructionIndex = 0; instructionIndex < instructions.size(); ++instructionIndex) {
+            std::size_t displayedInstructionIndex =
+                    instructionIndex;
+
+            if (placementModeActive &&
+                pendingInsertionIndex_.has_value() &&
+                instructionIndex >= pendingInsertionIndex_.value()) {
+                ++displayedInstructionIndex;
+            }
+
+            const float x =
+                    firstGateX + gateSpacing * static_cast<float>(displayedInstructionIndex);
 
             const bool highlighted =
                     instructionIndex ==
@@ -295,7 +396,9 @@ namespace quantum_sim::gui {
 
                 if (clicked) {
                     completedSingleQubitPlacement_ =
-                            SingleQubitPlacement{pendingGate.value(), qubit};
+                            SingleQubitPlacement{
+                                pendingGate.value(), qubit, pendingInsertionIndex_.value_or(instructions.size())
+                            };
                 }
 
                 drawGate(
@@ -346,11 +449,24 @@ namespace quantum_sim::gui {
                         pendingControlQubit_.has_value() &&
                         pendingControlQubit_.value() == qubit;
 
+                const bool choosingTarget =
+                        pendingControlQubit_.has_value();
+
+                const char *targetPreviewLabel = "T";
+
+                if (pendingGate.value() == "CX") {
+                    targetPreviewLabel = "X";
+                } else if (pendingGate.value() == "CY") {
+                    targetPreviewLabel = "Y";
+                } else if (pendingGate.value() == "CZ") {
+                    targetPreviewLabel = "Z";
+                }
+
                 const char *previewLabel =
-                        pendingControlQubit_.has_value()
+                        choosingTarget
                             ? isSelectedControl
                                   ? "C"
-                                  : "T"
+                                  : targetPreviewLabel
                             : "C";
 
                 if (hovered) {
@@ -366,7 +482,6 @@ namespace quantum_sim::gui {
                     } else if (isSelectedControl) {
                         pendingControlQubit_.reset();
                         pendingTargetQubit_.reset();
-                        pendingControlQubit_.reset();
                     } else {
                         pendingTargetQubit_ =
                                 qubit;
@@ -394,7 +509,19 @@ namespace quantum_sim::gui {
             const circuit::CircuitInstructionInfo &instruction =
                     instructions[instructionIndex];
 
-            const float x = firstGateX + gateSpacing * static_cast<float>(instructionIndex);
+            std::size_t displayedInstructionIndex =
+                    instructionIndex;
+
+            if (
+                placementModeActive &&
+                pendingInsertionIndex_.has_value() &&
+                instructionIndex >= pendingInsertionIndex_.value()
+            ) {
+                ++displayedInstructionIndex;
+            }
+
+            const float x =
+                    firstGateX + gateSpacing * static_cast<float>(displayedInstructionIndex);
 
             const bool highlighted =
                     instructionIndex ==
@@ -405,22 +532,76 @@ namespace quantum_sim::gui {
                         ? activeOrange(style_, pulse)
                         : style_.inactiveTimelineColor;
 
+
             const std::string instructionLabel =
-                    std::to_string(instructionIndex);
+                    "Step " + std::to_string(instructionIndex + 1);
 
             const ImVec2 labelSize =
                     ImGui::CalcTextSize(
                         instructionLabel.c_str()
                     );
 
+            const ImVec2 labelPosition{
+                x - labelSize.x / 2.0F,
+                origin.y + style_.timelineLabelOffsetY
+            };
+
+            const ImVec2 badgeMin{
+                labelPosition.x - style_.stepBadgePaddingX,
+                labelPosition.y - style_.stepBadgePaddingY
+            };
+
+            const ImVec2 badgeMax{
+                labelPosition.x
+                + labelSize.x
+                + style_.stepBadgePaddingX,
+                labelPosition.y
+                + labelSize.y
+                + style_.stepBadgePaddingY
+            };
+
+            drawList->AddRectFilled(
+                badgeMin,
+                badgeMax,
+                highlighted
+                    ? style_.activeStepBadgeFillColor
+                    : style_.stepBadgeFillColor,
+                style_.stepBadgeCornerRadius);
+
             drawList->AddText(
-                ImVec2{
-                    x - labelSize.x / 2.0F,
-                    origin.y + style_.timelineLabelOffsetY
-                },
+                labelPosition,
                 instructionColor,
                 instructionLabel.c_str()
             );
+
+            const bool stepBadgeHovered =
+                    ImGui::IsWindowHovered() &&
+                    isPointInsideRect(
+                        mousePosition,
+                        badgeMin,
+                        badgeMax
+                    );
+
+            const bool stepBadgeClicked =
+                    stepBadgeHovered &&
+                    !placementModeActive &&
+                    ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+
+            if (stepBadgeClicked) {
+                selectedInstructionIndex_ = instructionIndex;
+            }
+
+            if (stepBadgeHovered) {
+                ImGui::SetMouseCursor(
+                    ImGuiMouseCursor_Hand
+                );
+
+                ImGui::SetTooltip(
+                    "Execution step %zu\nGate: %s",
+                    instructionIndex + 1,
+                    instruction.name.c_str()
+                );
+            }
 
             // Short execution stem. It stops before the first wire.
             if (highlighted) {
@@ -435,7 +616,7 @@ namespace quantum_sim::gui {
             ImU32 gateColor =
                     highlighted
                         ? activeOrange(style_, pulse)
-                        : style_.inactiveGateColor;
+                        : style_.controlledGateColor;
 
             // -----------------------------------------------------
             // Controlled gate such as CX
@@ -516,8 +697,17 @@ namespace quantum_sim::gui {
                         selectedInstructionIndex_.has_value() &&
                         selectedInstructionIndex_.value() == instructionIndex;
 
+                const bool isSwap =
+                        instruction.name == "SWAP";
+
+                const bool isISwap =
+                        instruction.name == "iSWAP";
+
+                const bool isSwapFamily =
+                        isSwap || isISwap;
+
                 if (!highlighted && hovered) {
-                    gateColor = style_.hoveredGateOutlineColor;
+                    gateColor = style_.hoveredControlledGateColor;
                 }
 
                 // Remove the horizontal wire beneath both symbols.
@@ -545,6 +735,134 @@ namespace quantum_sim::gui {
                     backgroundColor
                 );
 
+                if (isSwapFamily) {
+                    const float crossRadius =
+                            style_.targetRadius * 0.9F;
+
+                    const auto drawSwapCross =
+                            [&](const ImVec2 &center, const ImU32 color, const float thickness) {
+                        drawList->AddLine(
+                            ImVec2{center.x - crossRadius, center.y - crossRadius},
+                            ImVec2{center.x + crossRadius, center.y + crossRadius},
+                            color,
+                            thickness
+                        );
+
+                        drawList->AddLine(
+                            ImVec2{center.x - crossRadius, center.y + crossRadius},
+                            ImVec2{center.x + crossRadius, center.y - crossRadius},
+                            color,
+                            thickness
+                        );
+                    };
+
+                    // One clean outline around the entire SWAP instruction.
+                    // Do not draw circular endpoint outlines.
+                    if (selected) {
+                        const float horizontalPadding =
+                                style_.selectedGateOutlinePadding + 4.0F;
+
+                        const float verticalPadding =
+                                style_.selectedGateOutlinePadding + 4.0F;
+
+                        drawList->AddRect(
+                            ImVec2{
+                                x - crossRadius - horizontalPadding,
+                                controlledMinY - crossRadius - verticalPadding
+                            },
+                            ImVec2{
+                                x + crossRadius + horizontalPadding,
+                                controlledMaxY + crossRadius + verticalPadding
+                            },
+                            style_.selectedGateOutlineColor,
+                            style_.selectedGateOutlineCornerRadius,
+                            0,
+                            style_.selectedGateOutlineThickness
+                        );
+                    }
+
+                    // Glow follows the SWAP geometry instead of producing circles.
+                    if (highlighted) {
+                        const int glowAlpha =
+                                static_cast<int>(
+                                    style_.controlledGlowBaseAlpha +
+                                    pulse * style_.controlledGlowPulseAlpha
+                                );
+
+                        const ImU32 glowColor =
+                                withAlpha(style_.controlledGlowColor, glowAlpha);
+
+                        drawList->AddLine(
+                            controlCenter,
+                            targetCenter,
+                            glowColor,
+                            style_.controlledGlowLineThickness
+                        );
+
+                        drawSwapCross(
+                            controlCenter,
+                            glowColor,
+                            style_.controlledGlowLineThickness
+                        );
+
+                        drawSwapCross(
+                            targetCenter,
+                            glowColor,
+                            style_.controlledGlowLineThickness
+                        );
+                    }
+
+                    // Draw the connection first so the crosses stay crisp.
+                    drawList->AddLine(
+                        controlCenter,
+                        targetCenter,
+                        gateColor,
+                        style_.controlledConnectionThickness
+                    );
+
+                    drawSwapCross(
+                        controlCenter,
+                        gateColor,
+                        style_.controlledConnectionThickness
+                    );
+
+                    drawSwapCross(
+                        targetCenter,
+                        gateColor,
+                        style_.controlledConnectionThickness
+                    );
+
+                    if (isISwap) {
+                        const char *iSwapLabel = "i";
+
+                        const float iScale = 1.8F;
+
+                        const ImVec2 baseSize =
+                                ImGui::CalcTextSize(iSwapLabel);
+
+                        const ImVec2 midpoint{
+                            controlCenter.x,
+                            (
+                                controlCenter.y +
+                                targetCenter.y
+                            ) * 0.5F
+                        };
+
+                        drawList->AddText(
+                            ImGui::GetFont(),
+                            ImGui::GetFontSize() * iScale,
+                            ImVec2{
+                                midpoint.x + 7.0F,
+                                midpoint.y - (baseSize.y * iScale) * 0.5F
+                            },
+                            gateColor,
+                            iSwapLabel
+                        );
+                    }
+
+                    continue;
+                }
+
                 const float direction =
                         targetY >= controlY
                             ? 1.0F
@@ -560,7 +878,7 @@ namespace quantum_sim::gui {
                 const ImVec2 connectionEnd{
                     x,
                     targetY -
-                    direction * style_.targetRadius
+                    direction * style_.gateHalfHeight
                 };
 
                 // Selection is drawn behind the controlled gate.
@@ -573,12 +891,28 @@ namespace quantum_sim::gui {
                         style_.selectedGateOutlineThickness * 2.0F
                     );
 
-                    drawList->AddCircle(
-                        controlCenter,
-                        style_.controlRadius +
-                        style_.selectedGateOutlinePadding,
+                    drawList->AddRect(
+                        ImVec2{
+                            targetCenter.x -
+                            style_.gateHalfWidth -
+                            style_.selectedGateOutlinePadding,
+
+                            targetCenter.y -
+                            style_.gateHalfHeight -
+                            style_.selectedGateOutlinePadding
+                        },
+                        ImVec2{
+                            targetCenter.x +
+                            style_.gateHalfWidth +
+                            style_.selectedGateOutlinePadding,
+
+                            targetCenter.y +
+                            style_.gateHalfHeight +
+                            style_.selectedGateOutlinePadding
+                        },
                         style_.selectedGateOutlineColor,
-                        32,
+                        style_.selectedGateOutlineCornerRadius,
+                        0,
                         style_.selectedGateOutlineThickness
                     );
 
@@ -613,10 +947,27 @@ namespace quantum_sim::gui {
                         glowColor
                     );
 
-                    drawList->AddCircleFilled(
-                        targetCenter,
-                        style_.targetRadius + style_.targetGlowPadding,
-                        glowColor
+                    drawList->AddRectFilled(
+                        ImVec2{
+                            targetCenter.x -
+                            style_.gateHalfWidth -
+                            style_.targetGlowPadding,
+
+                            targetCenter.y -
+                            style_.gateHalfHeight -
+                            style_.targetGlowPadding
+                        },
+                        ImVec2{
+                            targetCenter.x +
+                            style_.gateHalfWidth +
+                            style_.targetGlowPadding,
+
+                            targetCenter.y +
+                            style_.gateHalfHeight +
+                            style_.targetGlowPadding
+                        },
+                        glowColor,
+                        style_.gateCornerRadius
                     );
                 }
 
@@ -635,45 +986,55 @@ namespace quantum_sim::gui {
                     gateColor
                 );
 
-                // Target circle.
-                drawList->AddCircle(
-                    targetCenter,
-                    style_.targetRadius,
+                const char *targetLabel = "?";
+
+                if (instruction.name == "CX") {
+                    targetLabel = "X";
+                } else if (instruction.name == "CY") {
+                    targetLabel = "Y";
+                } else if (instruction.name == "CZ") {
+                    targetLabel = "Z";
+                }
+
+                const ImVec2 targetBoxMin{
+                    targetCenter.x - style_.gateHalfWidth,
+                    targetCenter.y - style_.gateHalfHeight
+                };
+
+                const ImVec2 targetBoxMax{
+                    targetCenter.x + style_.gateHalfWidth,
+                    targetCenter.y + style_.gateHalfHeight
+                };
+
+                // Background fill.
+                drawList->AddRectFilled(
+                    targetBoxMin,
+                    targetBoxMax,
+                    backgroundColor,
+                    style_.gateCornerRadius
+                );
+
+                // Purple outline.
+                drawList->AddRect(
+                    targetBoxMin,
+                    targetBoxMax,
                     gateColor,
-                    32,
+                    style_.gateCornerRadius,
+                    0,
                     style_.controlledConnectionThickness
                 );
 
-                // Target horizontal cross-line.
-                drawList->AddLine(
-                    ImVec2{
-                        targetCenter.x -
-                        style_.targetRadius + style_.targetCrossInset,
-                        targetCenter.y
-                    },
-                    ImVec2{
-                        targetCenter.x +
-                        style_.targetRadius - style_.targetCrossInset,
-                        targetCenter.y
-                    },
-                    gateColor,
-                    style_.controlledConnectionThickness
-                );
+                // Center the X, Y, or Z.
+                const ImVec2 targetLabelSize =
+                        ImGui::CalcTextSize(targetLabel);
 
-                // Target vertical cross-line.
-                drawList->AddLine(
+                drawList->AddText(
                     ImVec2{
-                        targetCenter.x,
-                        targetCenter.y -
-                        style_.targetRadius + style_.targetCrossInset
-                    },
-                    ImVec2{
-                        targetCenter.x,
-                        targetCenter.y +
-                        style_.targetRadius - style_.targetCrossInset
+                        targetCenter.x - targetLabelSize.x * 0.5F,
+                        targetCenter.y - targetLabelSize.y * 0.5F
                     },
                     gateColor,
-                    style_.controlledConnectionThickness
+                    targetLabel
                 );
 
                 continue;
@@ -740,7 +1101,9 @@ namespace quantum_sim::gui {
         }
 
         const float circuitContentWidth =
-                lastGateX - origin.x + style_.rightPadding + style_.canvasPaddingX;
+                displayedWireEndX
+                - origin.x
+                + style_.canvasPaddingX;
 
         ImGui::Dummy(
             ImVec2{
@@ -781,13 +1144,18 @@ namespace quantum_sim::gui {
     }
 
     std::optional<ControlledPlacement> CircuitRenderer::completedControlledPlacement() const noexcept {
-        if (!pendingControlQubit_.has_value() || !pendingTargetQubit_.has_value()) {
+        if (!pendingControlledGateName_.has_value() ||
+            !pendingControlQubit_.has_value() ||
+            !pendingTargetQubit_.has_value() ||
+            !pendingInsertionIndex_.has_value()) {
             return std::nullopt;
         }
 
         return ControlledPlacement{
+            pendingControlledGateName_.value(),
             pendingControlQubit_.value(),
-            pendingTargetQubit_.value()
+            pendingTargetQubit_.value(),
+            pendingInsertionIndex_.value()
         };
     }
 
@@ -823,9 +1191,15 @@ namespace quantum_sim::gui {
     }
 
     void CircuitRenderer::cancelPlacement() noexcept {
+        pendingControlledGateName_.reset();
         pendingControlQubit_.reset();
         pendingTargetQubit_.reset();
+        pendingInsertionIndex_.reset();
         completedSingleQubitPlacement_.reset();
+    }
+
+    std::optional<std::size_t> CircuitRenderer::pendingInsertionIndex() const noexcept {
+        return pendingInsertionIndex_;
     }
 
     void CircuitRenderer::drawGate(ImDrawList *drawList, const ImVec2 &center, const std::string &label,

@@ -2,6 +2,7 @@
 
 #include "imgui.h"
 
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -23,6 +24,11 @@ namespace quantum_sim::gui {
 
     private:
         BlochSphereRenderer blochSphereRenderer_;
+        std::array<char, 64> amplitudeFilter_{};
+        bool showOnlyLiveAmplitudes_{true};
+        bool sortAmplitudesByProbability_{true};
+        int maximumVisibleAmplitudes_{96};
+        int inspectedBlochQubit_{0};
         double navigationConfirmationUntil_{0.0};
         std::string navigationConfirmationMessage_;
 
@@ -64,6 +70,10 @@ namespace quantum_sim::gui {
         );
 
         void drawProbabilities(
+            const quantum::QuantumRegister &state
+        );
+
+        void drawStateHeatmap(
             const quantum::QuantumRegister &state
         );
 

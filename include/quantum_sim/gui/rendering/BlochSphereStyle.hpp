@@ -19,6 +19,22 @@ namespace quantum_sim::gui {
             IM_COL32(210, 210, 220, 255)
         };
 
+        ImU32 sphereFillTopColor{
+            IM_COL32(35, 78, 118, 120)
+        };
+
+        ImU32 sphereFillBottomColor{
+            IM_COL32(17, 24, 43, 180)
+        };
+
+        ImU32 meridianColor{
+            IM_COL32(90, 150, 190, 105)
+        };
+
+        ImU32 shadowColor{
+            IM_COL32(2, 5, 10, 135)
+        };
+
         ImU32 axisColor{
             IM_COL32(125, 135, 155, 255)
         };
@@ -37,6 +53,8 @@ namespace quantum_sim::gui {
         float negativeZLabelOffsetY{5.0F};
 
         float canvasPadding{16.0F};
+        float equatorSquash{0.36F};
+        float meridianSquash{0.56F};
 
         float minimumDepthMarkerRadius{2.0F};
         float maximumDepthMarkerRadius{12.0F};

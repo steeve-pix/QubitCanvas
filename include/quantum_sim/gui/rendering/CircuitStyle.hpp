@@ -117,5 +117,26 @@ namespace quantum_sim::gui {
 
         float placementGuideDashLength{6.0F};
         float placementGuideGapLength{5.0F};
+
+        ImU32 controlledGateColor{
+            IM_COL32(175, 100, 255, 255)
+        };
+
+        ImU32 hoveredControlledGateColor{
+            IM_COL32(210, 150, 255, 255)
+        };
+
+        ImU32 stepBadgeFillColor{
+            IM_COL32(28, 38, 52, 230)
+        };
+
+        ImU32 activeStepBadgeFillColor{
+            IM_COL32(90, 55, 20, 240)
+        };
+
+        float stepBadgePaddingX{8.0F};
+        float stepBadgePaddingY{3.0F};
+        float stepBadgeCornerRadius{5.0F};
+        float executionOrderLabelOffsetY{-18.0F};
     };
 }

@@ -20,6 +20,14 @@ namespace quantum_sim::gui {
         {
             "Z",
             "Pauli-Z gate: changes the phase of |1>."
+        },
+        {
+            "S",
+            "S gate: applies a quarter-turn phase shift."
+        },
+        {
+            "T",
+            "T gate: applies an eighth-turn phase shift."
         }
     };
 
@@ -27,6 +35,22 @@ namespace quantum_sim::gui {
         {
             "CX",
             "Controlled-X gate: flips the target when the control is |1>."
+        },
+        {
+            "CY",
+            "Controlled-Y gate: applies the Pauli-Y gate to the target when the control is |1>."
+        },
+        {
+            "CZ",
+            "Controlled-Z gate: applies a phase flip to the target when the control is |1>."
+        },
+        {
+            "SWAP",
+            "SWAP gate: exchanges the states of two qubits."
+        },
+        {
+            "iSWAP",
+            "iSWAP gate: exchanges the |01⟩ and |10⟩ amplitudes and multiplies them by i."
         }
     };
 

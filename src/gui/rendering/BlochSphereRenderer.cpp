@@ -76,6 +76,124 @@ namespace quantum_sim::gui {
     void BlochSphereRenderer::drawSphereGeometry(ImDrawList *drawList, const ImVec2 &center, float radius,
                                                  int sphereSegments, ImU32 sphereOutlineColor,
                                                  const quantum::BlochVector &bloch) const {
+        const auto drawEllipse =
+                [&](const ImVec2 &ellipseCenter, const float radiusX, const float radiusY,
+                    const float rotation, const ImU32 color, const float thickness) {
+            constexpr int segmentCount = 96;
+
+            const float cosine =
+                    std::cos(rotation);
+
+            const float sine =
+                    std::sin(rotation);
+
+            drawList->PathClear();
+
+            for (int segment = 0; segment <= segmentCount; ++segment) {
+                const float angle =
+                        (static_cast<float>(segment) / static_cast<float>(segmentCount)) *
+                        2.0F *
+                        3.1415926535F;
+
+                const float x =
+                        std::cos(angle) * radiusX;
+
+                const float y =
+                        std::sin(angle) * radiusY;
+
+                drawList->PathLineTo(
+                    ImVec2{
+                        ellipseCenter.x + x * cosine - y * sine,
+                        ellipseCenter.y + x * sine + y * cosine
+                    }
+                );
+            }
+
+            drawList->PathStroke(
+                color,
+                ImDrawFlags_Closed,
+                thickness
+            );
+        };
+
+        const auto drawFilledEllipse =
+                [&](const ImVec2 &ellipseCenter, const float radiusX, const float radiusY,
+                    const ImU32 color) {
+            constexpr int segmentCount = 64;
+
+            drawList->PathClear();
+
+            for (int segment = 0; segment < segmentCount; ++segment) {
+                const float angle =
+                        (static_cast<float>(segment) / static_cast<float>(segmentCount)) *
+                        2.0F *
+                        3.1415926535F;
+
+                drawList->PathLineTo(
+                    ImVec2{
+                        ellipseCenter.x + std::cos(angle) * radiusX,
+                        ellipseCenter.y + std::sin(angle) * radiusY
+                    }
+                );
+            }
+
+            drawList->PathFillConvex(color);
+        };
+
+        drawFilledEllipse(
+            ImVec2{
+                center.x,
+                center.y + radius * 0.72F
+            },
+            radius * 0.86F,
+            radius * 0.18F,
+            style_.shadowColor
+        );
+
+        drawList->AddCircleFilled(
+            center,
+            radius,
+            style_.sphereFillBottomColor,
+            sphereSegments
+        );
+
+        drawList->AddCircleFilled(
+            ImVec2{
+                center.x - radius * 0.16F,
+                center.y - radius * 0.20F
+            },
+            radius * 0.78F,
+            style_.sphereFillTopColor,
+            sphereSegments
+        );
+
+        drawEllipse(
+            center,
+            radius,
+            radius * style_.equatorSquash,
+            0.0F,
+            style_.meridianColor,
+            1.2F
+        );
+
+        drawEllipse(
+            center,
+            radius * style_.meridianSquash,
+            radius,
+            0.0F,
+            style_.meridianColor,
+            1.1F
+        );
+
+        drawEllipse(
+            center,
+            radius * style_.meridianSquash,
+            radius,
+            0.78F,
+            style_.meridianColor,
+            1.0F
+        );
+
         drawList->AddCircle(
             center,
             radius,
@@ -137,13 +255,32 @@ namespace quantum_sim::gui {
             style_.negativeZLabel.data() + style_.negativeZLabel.size()
         );
 
+        const float depth =
+                std::clamp(
+                    static_cast<float>(bloch.y),
+                    -1.0F,
+                    1.0F
+                );
+
         const ImVec2 vectorEnd{
-            center.x + static_cast<float>(bloch.x) * radius,
-            center.y - static_cast<float>(bloch.z) * radius
+            center.x +
+            static_cast<float>(bloch.x) * radius +
+            depth * radius * 0.24F,
+
+            center.y -
+            static_cast<float>(bloch.z) * radius +
+            depth * radius * 0.10F
         };
 
         const ImU32 vectorColor =
                 style_.vectorColor;
+
+        drawList->AddLine(
+            ImVec2{center.x + 3.0F, center.y + 3.0F},
+            ImVec2{vectorEnd.x + 3.0F, vectorEnd.y + 3.0F},
+            IM_COL32(0, 0, 0, 95),
+            style_.vectorThickness + 2.0F
+        );
 
         drawList->AddLine(
             center,
@@ -154,7 +291,7 @@ namespace quantum_sim::gui {
 
         const float rawDepthMarkerRadius =
                 style_.depthMarkerBaseRadius
-                + static_cast<float>(bloch.y)
+                + depth
                 * style_.depthMarkerScale;
 
         const float depthMarkerRadius =
