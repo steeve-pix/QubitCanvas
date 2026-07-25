@@ -95,6 +95,8 @@ namespace quantum_sim::gui {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
+            pushApplicationFont();
+
             applyQueuedCircuitEdits();
 
             debug::DebuggerSnapshot snapshot =
@@ -407,6 +409,8 @@ namespace quantum_sim::gui {
 
             drawBottomStatus(snapshot);
 
+            popApplicationFont();
+
             // Interface -> drawable geometry.
             ImGui::Render();
 
@@ -477,6 +481,18 @@ namespace quantum_sim::gui {
         colors[ImGuiCol_SliderGrabActive] = ImVec4{1.0F, 0.78F, 0.22F, 1.0F};
         colors[ImGuiCol_TitleBg] = ImVec4{0.030F, 0.045F, 0.070F, 0.96F};
         colors[ImGuiCol_TitleBgActive] = ImVec4{0.045F, 0.075F, 0.110F, 0.98F};
+    }
+
+    void GuiApplication::pushApplicationFont() const {
+        if (jetBrainsMonoFont_ != nullptr) {
+            ImGui::PushFont(jetBrainsMonoFont_);
+        }
+    }
+
+    void GuiApplication::popApplicationFont() const {
+        if (jetBrainsMonoFont_ != nullptr) {
+            ImGui::PopFont();
+        }
     }
 
     void GuiApplication::drawBackdrop(const debug::DebuggerSnapshot &snapshot) const {
