@@ -255,7 +255,7 @@ namespace quantum_sim::quantum {
         return result;
     }
 
-    BlockVector QuantumRegister::blockVector() const {
+    BlochVector QuantumRegister::blockVector() const {
         if (qubitCount_ != 1) {
             throw std::invalid_argument{"A Bloch vector can only represent a single qubit."};
         }
@@ -267,11 +267,11 @@ namespace quantum_sim::quantum {
         const double y = 2.0 * (alpha.real() * beta.imaginary() - alpha.imaginary() * beta.real());
         const double z = alpha.magnitudeSquared() - beta.magnitudeSquared();
 
-        return BlockVector{x, y, z};
+        return BlochVector{x, y, z};
     }
 
     BlochAngles QuantumRegister::blochAngles() const {
-        const BlockVector vector = blockVector();
+        const BlochVector vector = blockVector();
 
         const double clampedZ =
                 std::clamp(vector.z, -1.0, 1.0);

@@ -95,6 +95,10 @@ namespace quantum_sim::gates {
      */
     [[nodiscard]] math::ComplexMatrix cxGate();
 
+    [[nodiscard]] math::ComplexMatrix cyGate();
+
+    [[nodiscard]] math::ComplexMatrix czGate();
+
     /**
      * Constructs the SWAP gate for two qubits in the form of a 4x4 complex matrix.
      * The SWAP gate exchanges the states of two qubits. It maps the basis states
@@ -104,6 +108,19 @@ namespace quantum_sim::gates {
      */
     [[nodiscard]] math::ComplexMatrix swapGate();
 
+    [[nodiscard]] math::ComplexMatrix swapGate(std::size_t qubitCount, std::size_t firstQubit, std::size_t secondQubit);
+
     [[nodiscard]] math::ComplexMatrix cxGate(std::size_t qubitCount, std::size_t controlQubit,
                                              std::size_t targetQubit);
+
+    [[nodiscard]] math::ComplexMatrix cyGate(std::size_t qubitCount, std::size_t controlQubit,
+                                             std::size_t targetQubit);
+
+    [[nodiscard]] math::ComplexMatrix czGate(std::size_t qubitCount, std::size_t controlQubit,
+                                             std::size_t targetQubit);
+
+    [[nodiscard]] math::ComplexMatrix iSwapGate();
+
+    [[nodiscard]] math::ComplexMatrix iSwapGate(std::size_t qubitCount, std::size_t controlQubit,
+                                                        std::size_t targetQubit);
 }
