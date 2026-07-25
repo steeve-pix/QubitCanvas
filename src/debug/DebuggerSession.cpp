@@ -5,6 +5,7 @@ namespace quantum_sim::debug {
     DebuggerSession::DebuggerSession(const circuit::QuantumCircuit &circuit,
                                      const quantum::QuantumRegister &initialState)
         : initialState_{initialState} {
+        // Reuse rebuild so construction and later circuit edits follow one path.
         rebuild(circuit, initialState);
     }
 
@@ -60,9 +61,11 @@ namespace quantum_sim::debug {
 
     const quantum::QuantumRegister &DebuggerSession::stateBeforeCurrentStep() const noexcept {
         if (currentStep_ == 0) {
+            // Step zero compares against the user-provided initial register.
             return initialState_;
         }
 
+        // Later steps compare against the state after the previous instruction.
         return trace_[currentStep_ - 1].state;
     }
 
@@ -72,6 +75,7 @@ namespace quantum_sim::debug {
 
     DebuggerSnapshot DebuggerSession::snapshot() const {
         if (trace_.empty()) {
+            // Empty circuits still need a stable snapshot so the GUI can render.
             return DebuggerSnapshot{
                 .currentStepIndex = 0,
                 .stepCount = 0,
@@ -114,6 +118,8 @@ namespace quantum_sim::debug {
     void DebuggerSession::rebuild(const circuit::QuantumCircuit &circuit,
                                   const quantum::QuantumRegister &initialState) {
         initialState_ = initialState;
+
+        // Trace and metadata are rebuilt together so indices stay aligned.
         trace_ =
                 circuit.executeWithTrace(initialState_);
 

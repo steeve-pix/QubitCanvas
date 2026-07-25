@@ -1,258 +1,195 @@
 #pragma once
 
-#include "quantum_sim/math/ComplexVector.hpp"
-#include "quantum_sim/math/ComplexMatrix.hpp"
 #include "Qubit.hpp"
+#include "quantum_sim/math/ComplexMatrix.hpp"
+#include "quantum_sim/math/ComplexVector.hpp"
 
 #include <cstddef>
 #include <random>
+#include <string>
 #include <vector>
 
-
 namespace quantum_sim::quantum {
+    /**
+     * Display-ready data for one computational basis state.
+     */
     struct StateInfo {
         std::string label;
         math::Complex amplitude;
         double probability;
     };
 
+    /**
+     * Cartesian Bloch-vector coordinates.
+     */
     struct BlochVector {
         double x, y, z;
     };
 
+    /**
+     * Spherical Bloch coordinates in radians.
+     */
     struct BlochAngles {
         double theta, phi;
     };
 
     /**
-     * Represents a quantum register composed of qubits, enabling the simulation and manipulation
-     * of quantum states through operations such as quantum gates.
+     * Full quantum register state stored as 2^n normalized amplitudes.
      */
     class QuantumRegister final {
-        /**
-         * Constructs a quantum register with the specified number of qubits and their corresponding amplitudes.
-         *
-         * @param qubitCount The number of qubits in the quantum register. Must be at least 1.
-         *                   The maximum value is limited by the size of the system's representation.
-         * @param amplitudes A vector of complex values representing the quantum state amplitudes.
-         *                   The size of the vector must be equal to 2 raised to the power of the qubit count,
-         *                   and the amplitudes must be normalized.
-         * @throw std::invalid_argument Thrown if:
-         *                              - qubitCount is 0.
-         *                              - qubitCount exceeds the system's representational limits.
-         *                              - The size of amplitudes does not match the expected state count.
-         *                              - The amplitudes are not normalized.
-         */
     public:
+        /**
+         * Creates a register from a normalized amplitude vector.
+         *
+         * @param qubitCount Number of qubits. Must be at least 1.
+         * @param amplitudes Exactly 2^qubitCount normalized amplitudes.
+         * @throws std::invalid_argument if the qubit count, vector size, or normalization is invalid.
+         */
         QuantumRegister(std::size_t qubitCount, math::ComplexVector amplitudes);
 
         /**
-         * Retrieves the number of qubits in the quantum register.
-         *
-         * @return The total number of qubits in the quantum register.
+         * @return Number of qubits represented by this register.
          */
         [[nodiscard]] std::size_t qubitCount() const noexcept;
 
         /**
-         * Returns the total number of possible quantum states for the register,
-         * which is determined by 2 raised to the power of the number of qubits.
-         *
-         * @return The total number of quantum states in the register.
+         * @return Number of computational basis states, equal to 2^qubitCount().
          */
         [[nodiscard]] std::size_t stateCount() const noexcept;
 
         /**
-         * Represents the amplitude of a quantum state, which is a complex value composed of real and imaginary parts.
+         * Reads a basis-state amplitude.
          *
-         * @param real The real part of the amplitude.
-         * @param imaginary The imaginary part of the amplitude.
-         * @return A complex value representing the amplitude of the quantum state.
+         * @param stateIndex Basis-state index.
+         * @return Amplitude for the indexed basis state.
+         * @throws std::out_of_range if stateIndex is outside the register.
          */
         [[nodiscard]] const math::Complex &amplitude(std::size_t stateIndex) const;
 
         /**
-         * Applies a single-qubit quantum gate to the specified target qubit within the quantum register.
+         * Applies a 2x2 gate to one qubit by expanding it across the register.
          *
-         * @param gate A 2x2 unitary matrix representing the single-qubit quantum gate to be applied.
-         *             The matrix must be unitary and of size 2x2.
-         * @param targetQubit The index of the qubit within the register to which the gate will be applied.
-         *                    Must be within the range [0, qubitCount - 1].
-         * @return A new QuantumRegister object with the gate applied to the target qubit. The original register remains unchanged.
-         * @throw std::invalid_argument Thrown if:
-         *                              - The gate is not a 2x2 matrix.
-         *                              - The gate is not unitary.
-         * @throw std::out_of_range Thrown if the target qubit index is outside the valid range of the register.
+         * @param gate Single-qubit unitary gate.
+         * @param targetQubit Qubit index using q0 as the most-significant bit.
+         * @return New register after the transformation.
+         * @throws std::invalid_argument if gate is not a valid single-qubit unitary.
+         * @throws std::out_of_range if targetQubit is outside the register.
          */
         [[nodiscard]] QuantumRegister applySingleQubitGate(const math::ComplexMatrix &gate,
                                                            std::size_t targetQubit) const;
 
         /**
-         * Applies a quantum gate to the quantum register, resulting in a new quantum register
-         * with the state modified according to the given gate's transformation. The gate must
-         * be unitary and its dimensions must align with the state count of the quantum register.
+         * Applies a full-register unitary matrix.
          *
-         * @param gate A unitary matrix representing the quantum gate to apply. Its dimensions
-         * must match the state count of the quantum register.
-         * @return A new QuantumRegister object representing the updated quantum state after
-         * applying the quantum gate.
-         * @throws std::invalid_argument If the gate dimensions do not match the state count
-         * of the quantum register, or if the gate is not unitary.
+         * @param gate Matrix sized stateCount() by stateCount().
+         * @return New register after the transformation.
+         * @throws std::invalid_argument if gate dimensions or unitarity are invalid.
          */
         [[nodiscard]] QuantumRegister applyGate(const math::ComplexMatrix &gate) const;
 
         /**
-         * Calculates the probability of the quantum system being in a specific state
-         * identified by the given state index. The probability is derived from the
-         * squared magnitude of the amplitude corresponding to the state.
-         *
-         * @param stateIndex The index of the state for which the probability is to be calculated.
-         * @return The probability of the quantum system being in the specified state.
+         * @param stateIndex Basis-state index.
+         * @return Measurement probability for the indexed basis state.
+         * @throws std::out_of_range if stateIndex is outside the register.
          */
         [[nodiscard]] double probability(std::size_t stateIndex) const;
 
         /**
-         * Measures the current quantum state, collapsing the superposition into a single basis state
-         * with a probability proportional to the square of its amplitude, and updates the state to the
-         * measured basis state.
+         * Measures the whole register and collapses it to one basis state.
          *
-         * @param randomEngine A random number generator used to sample the measurement result based on
-         *                     the probabilities of the quantum states.
-         * @return The index of the basis state that was measured.
+         * @param randomEngine Random engine used for probability sampling.
+         * @return Measured basis-state index.
          */
         [[nodiscard]] std::size_t measure(std::mt19937 &randomEngine);
 
         /**
-         * Calculates the probability that a specific qubit within the quantum register
-         * collapses to the |1⟩ state when measured.
+         * Computes the marginal probability that one qubit measures as |1>.
          *
-         * @param qubitIndex The index of the qubit within the register for which the
-         *                   probability of being in the |1⟩ state is computed. Must be within
-         *                   the bounds of the register.
-         * @return The probability that the specified qubit is in the |1⟩ state.
-         * @throws std::out_of_range If the provided qubitIndex is outside the bounds of the
-         *                           quantum register.
+         * @param qubitIndex Qubit index using q0 as the most-significant bit.
+         * @return Probability of outcome |1> for that qubit.
+         * @throws std::out_of_range if qubitIndex is outside the register.
          */
         [[nodiscard]] double probabilityOfQubitOne(std::size_t qubitIndex) const;
 
         /**
-         * Computes the probability of a specified qubit being in the |0⟩ state within the quantum register.
+         * Computes the marginal probability that one qubit measures as |0>.
          *
-         * @param qubitIndex The index of the qubit within the quantum register.
-         * @return The probability of the qubit being in the |0⟩ state, represented as a double.
+         * @param qubitIndex Qubit index using q0 as the most-significant bit.
+         * @return Probability of outcome |0> for that qubit.
+         * @throws std::out_of_range if qubitIndex is outside the register.
          */
         [[nodiscard]] double probabilityOfQubitZero(std::size_t qubitIndex) const;
 
         /**
-         * Performs a measurement on the specified qubit, collapsing its state to either |0⟩ or |1⟩
-         * and updating the quantum state accordingly.
+         * Measures a single qubit and renormalizes the surviving amplitudes.
          *
-         * The measurement uses the probabilities of the qubit being in the |0⟩ or |1⟩ states, and it
-         * samples from a uniform random distribution to determine the result.
-         * After the measurement, the quantum state amplitudes are updated to reflect the measured collapse.
-         *
-         * @param qubitIndex The index of the qubit to be measured.
-         * @param randomEngine A random engine used to perform the probabilistic measurement.
-         * @return The result of the measurement, either MeasurementResult::Zero or MeasurementResult::One.
+         * @param qubitIndex Qubit to measure.
+         * @param randomEngine Random engine used for probability sampling.
+         * @return Sampled qubit result.
+         * @throws std::out_of_range if qubitIndex is outside the register.
          */
         [[nodiscard]] MeasurementResult measureQubit(std::size_t qubitIndex, std::mt19937 &randomEngine);
 
         /**
-         * Constructs a quantum register initialized to a specific basis state.
+         * Creates a register initialized to one computational basis state.
          *
-         * A basis state is represented as a quantum state where the amplitude of a single state index
-         * is set to 1 while all others are set to 0. This function verifies that the given qubit count
-         * and state index are valid and creates the corresponding quantum register.
-         *
-         * @param qubitCount The number of qubits in the quantum register. Must be greater than 0 and
-         *                   less than or equal to the maximum supported by the system.
-         * @param stateIndex The index of the basis state to initialize. Must be less than the total number
-         *                   of possible states (2^qubitCount).
-         * @return A QuantumRegister instance representing the specified basis state.
-         * @throws std::invalid_argument If the qubit count is zero, or exceeds the allowable limits.
-         * @throws std::out_of_range If the provided state index is outside the range of valid basis states.
+         * @param qubitCount Number of qubits.
+         * @param stateIndex Basis state whose amplitude should be 1.
+         * @return Register containing only the requested basis state.
+         * @throws std::invalid_argument if qubitCount is invalid.
+         * @throws std::out_of_range if stateIndex is outside the register size.
          */
         [[nodiscard]] static QuantumRegister basisState(std::size_t qubitCount, std::size_t stateIndex);
 
         /**
-         * Generates a string representation of a basis state for the quantum register.
+         * Formats a basis-state label such as |0101>.
          *
-         * @param stateIndex The index of the basis state to label.
-         * @return A string label representing the basis state, formatted as "|...>" where each
-         *         character within represents the state of a qubit ('0' or '1').
-         * @throws std::out_of_range If the provided state index exceeds the valid range of basis states.
+         * @param stateIndex Basis-state index.
+         * @return Label for the indexed state.
+         * @throws std::out_of_range if stateIndex is outside the register.
          */
         [[nodiscard]] std::string basisStateLabel(std::size_t stateIndex) const;
 
         /**
-         * Retrieves detailed information about a specific quantum state in the quantum register,
-         * including its basis state representation, amplitude, and probability.
+         * Collects label, amplitude, and probability for one basis state.
          *
-         * @param stateIndex The index of the quantum state whose information is to be retrieved.
-         * @return A StateInfo object containing the basis state label, amplitude, and probability
-         *         of the specified quantum state.
+         * @param stateIndex Basis-state index.
+         * @return StateInfo for UI and console views.
+         * @throws std::out_of_range if stateIndex is outside the register.
          */
         [[nodiscard]] StateInfo stateInfo(std::size_t stateIndex) const;
 
         /**
-         * Represents a collection of possible system configurations or conditions,
-         * used to define various types of states that an application or system can
-         * transition through or operate within.
-         *
-         * @return A set or group of distinct states applicable within a specific context.
+         * @return StateInfo for every basis state in index order.
          */
         [[nodiscard]] std::vector<StateInfo> states() const;
 
         /**
-         * Computes the Bloch vector representation of the quantum state, which is a geometric
-         * representation of a single qubit's state on the Bloch sphere.
+         * Computes the Bloch vector for a single-qubit register.
          *
-         * @throws std::invalid_argument If the quantum register does not represent a single qubit.
-         * @return The Bloch vector as a BlockVector object, containing x, y, and z components
-         *         corresponding to the state of the qubit.
+         * @return Bloch-vector coordinates.
+         * @throws std::invalid_argument if this register does not contain exactly one qubit.
          */
         [[nodiscard]] BlochVector blockVector() const;
 
+        /**
+         * Computes theta and phi for a single-qubit register.
+         *
+         * @return Bloch-sphere angles in radians.
+         * @throws std::invalid_argument if this register does not contain exactly one qubit.
+         */
         [[nodiscard]] BlochAngles blochAngles() const;
 
     private:
-        /**
-         * @brief Stores the number of qubits in the quantum register.
-         *
-         * This variable represents the total number of qubits that the quantum register
-         * contains. It determines the dimensionality of the quantum state space and
-         * directly impacts the number of quantum states that can be represented.
-         *
-         * @note The value must be at least 1. The maximum allowable value is constrained
-         *       by system limits, as the state count grows exponentially with the number
-         *       of qubits (2^qubitCount).
-         *
-         * @invariant The qubit count must remain consistent with the size of the quantum
-         *            state representation across the lifetime of the quantum register.
-         */
         std::size_t qubitCount_;
-        /**
-         * @brief Stores the quantum state amplitudes of the register.
-         *
-         * This variable represents the complex-valued amplitudes of
-         * the quantum states in the quantum register. Each amplitude
-         * corresponds to the probability amplitude of a specific basis
-         * state in the quantum state superposition. The amplitudes
-         * are stored in a vector of complex numbers, where the index
-         * of each entry maps to the binary representation of the basis
-         * state.
-         *
-         * @note The squared magnitudes of the amplitudes should sum to 1
-         *       to satisfy the quantum mechanical constraint of
-         *       normalization.
-         */
         math::ComplexVector amplitudes_;
 
         /**
-         * Determines whether the specified qubit in the given quantum state index has the state |1⟩.
+         * Checks one bit inside a basis-state index.
          *
-         * @param stateIndex The index representing the quantum state.
-         * @param qubitIndex The index of the qubit to check, relative to the quantum register.
-         * @return True if the qubit at the specified index has the state |1⟩, otherwise false.
+         * @param stateIndex Basis-state index.
+         * @param qubitIndex Qubit index using q0 as the most-significant bit.
+         * @return True when the selected qubit bit is 1.
          */
         [[nodiscard]] bool stateHasQubitOne(std::size_t stateIndex, std::size_t qubitIndex) const noexcept;
     };

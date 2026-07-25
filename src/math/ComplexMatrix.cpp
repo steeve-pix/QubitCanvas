@@ -28,6 +28,7 @@ namespace quantum_sim::math {
             throw std::out_of_range{"Matrix position is outside its dimensions."};
         }
 
+        // Values are row-major: row stride is the matrix column count.
         const std::size_t index = row * columns_ + column;
         return values_[index];
     }
@@ -37,6 +38,7 @@ namespace quantum_sim::math {
 
         for (std::size_t newRow{}; newRow < rows_; ++newRow) {
             for (std::size_t newColumn{}; newColumn < columns_; ++newColumn) {
+                // Swap row/column and conjugate the value to build A*.
                 const std::size_t outputIndex = newColumn * rows() + newRow;
 
                 result[outputIndex] = at(newRow, newColumn).conjugate();
@@ -58,6 +60,7 @@ namespace quantum_sim::math {
     bool ComplexMatrix::isUnitary(double epsilon) const {
         if (rows_ != columns_) return false;
 
+        // A matrix is unitary when A* A equals identity within tolerance.
         const ComplexMatrix product = conjugateTranspose() * (*this);
         const ComplexMatrix expected = identity(rows());
 
@@ -83,6 +86,7 @@ namespace quantum_sim::math {
 
         std::vector result(outputRows * outputColumns, Complex{});
 
+        // Each source entry expands into a scaled copy of the right-hand matrix.
         for (std::size_t leftRow{}; leftRow < rows_; ++leftRow) {
             for (std::size_t rightRow{}; rightRow < other.rows_; ++rightRow) {
                 for (std::size_t leftColumn{}; leftColumn < columns_; ++leftColumn) {
@@ -113,6 +117,7 @@ namespace quantum_sim::math {
         for (std::size_t row{}; row < rows_; ++row) {
             Complex sum{};
 
+            // Dot product between this matrix row and the input vector.
             for (std::size_t column{}; column < columns_; ++column) {
                 sum += this->at(row, column) * vector.at(column);
             }
@@ -131,6 +136,8 @@ namespace quantum_sim::math {
         for (std::size_t row{}; row < rows_; ++row) {
             for (std::size_t column{}; column < matrix.columns_; ++column) {
                 Complex sum{};
+
+                // Dot product of a row from the left matrix and a column from the right.
                 for (std::size_t position{}; position < columns_; ++position) {
                     sum += this->at(row, position) * matrix.at(position, column);
                 }

@@ -95,6 +95,7 @@ namespace quantum_sim::gui {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
+            // Keep the regular JetBrains Mono face active for the complete UI pass.
             pushApplicationFont();
 
             applyQueuedCircuitEdits();
@@ -102,6 +103,7 @@ namespace quantum_sim::gui {
             debug::DebuggerSnapshot snapshot =
                     session_.snapshot();
 
+            // Playback can mutate the session, so refresh the snapshot afterward.
             applyPlayback(session_, snapshot);
             snapshot = session_.snapshot();
 
@@ -129,6 +131,7 @@ namespace quantum_sim::gui {
                         workSize.y - topBarHeight - bottomBarHeight - gap * 3.0F
                     );
 
+            // Center circuit canvas gets all remaining width after fixed side panels.
             const float circuitPanelWidth =
                     std::max(
                         360.0F,
@@ -520,6 +523,7 @@ namespace quantum_sim::gui {
         );
 
         for (float y = minimum.y; y < maximum.y; y += 4.0F) {
+            // Scanlines add a stable instrument-panel texture behind the 3D field.
             drawList->AddLine(
                 ImVec2{minimum.x, y},
                 ImVec2{maximum.x, y},
@@ -549,6 +553,7 @@ namespace quantum_sim::gui {
                     (stateCount + maximumCells - 1) / maximumCells
                 );
 
+        // Large registers are bucketed so 1024+ amplitudes still render quickly.
         const std::size_t cellCount =
                 (stateCount + stride - 1) / stride;
 
@@ -610,6 +615,7 @@ namespace quantum_sim::gui {
             double bucketProbability = 0.0;
             double bucketPhase = 0.0;
 
+            // Represent each bucket by its strongest amplitude.
             for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
                 const double probability =
                         state.probability(stateIndex);
@@ -663,6 +669,7 @@ namespace quantum_sim::gui {
             const float height =
                     14.0F + normalizedProbability * 118.0F;
 
+            // Phase drives hue; probability drives height and opacity.
             const float phaseT =
                     static_cast<float>(
                         (bucketPhase + std::numbers::pi) /
@@ -808,6 +815,7 @@ namespace quantum_sim::gui {
                 : "Floor Field",
             ImVec2{142.0F, 0.0F}
         )) {
+            // Toggle between the two main state-field renderings.
             canvasMode_ =
                     canvasMode_ == CanvasMode::LayerStack
                         ? CanvasMode::FloorField
@@ -866,6 +874,7 @@ namespace quantum_sim::gui {
                     static_cast<int>(snapshot.stepCount)
                 )
             ) {
+                // Slider is one-based for humans; session indices are zero-based.
                 session.moveToStep(
                     static_cast<std::size_t>(
                         std::max(1, scrubStep) - 1
@@ -972,6 +981,7 @@ namespace quantum_sim::gui {
         circuit_ =
                 createPresetCircuit(preset);
 
+        // Presets always start in the all-zero basis state for predictable demos.
         initialState_ =
                 quantum::QuantumRegister::basisState(
                     circuit_.qubitCount(),
@@ -980,6 +990,8 @@ namespace quantum_sim::gui {
 
         undoHistory_.clear();
         redoHistory_.clear();
+
+        // Clear transient edit state so old placements do not leak into new circuits.
         pendingGate_.reset();
         queuedControlledPlacement_.reset();
         queuedSingleQubitPlacement_.reset();
@@ -997,6 +1009,7 @@ namespace quantum_sim::gui {
                     std::clamp(presetQubitCount_, 1, 10)
                 );
 
+        // The classic demos keep their canonical qubit counts.
         if (preset == CircuitPreset::Bell) {
             return algorithms::bellStateCircuit();
         }
@@ -1019,6 +1032,7 @@ namespace quantum_sim::gui {
             );
 
             for (std::size_t qubit = 1; qubit < qubitCount; ++qubit) {
+                // Chain each qubit into the previous one to build GHZ-like correlation.
                 presetCircuit.addControlledGate(
                     "CX",
                     gates::cxGate(qubitCount, qubit - 1, qubit),
@@ -1031,6 +1045,7 @@ namespace quantum_sim::gui {
         }
 
         for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
+            // Phase and scramble presets begin from broad superposition.
             presetCircuit.addSingleQubitGate(
                 "H",
                 gates::hadamardGate(),
@@ -1104,6 +1119,7 @@ namespace quantum_sim::gui {
         quantum::QuantumRegister sampledState =
                 state;
 
+        // Copy before measuring so sampling does not mutate the debugger state.
         const std::size_t measuredIndex =
                 sampledState.measure(randomEngine_);
 
@@ -1203,6 +1219,7 @@ namespace quantum_sim::gui {
 
             recordCircuitForUndo();
 
+            // Remove first, then rebuild only if the index was valid.
             const bool removed =
                     circuit_.removeInstruction(instructionIndex);
 
@@ -1225,6 +1242,7 @@ namespace quantum_sim::gui {
 
             recordCircuitForUndo();
 
+            // Placement stores the insertion slot picked by the circuit renderer.
             const std::size_t instructionIndex =
                     queuedSingleQubitPlacement_->instructionIndex;
 
@@ -1252,6 +1270,7 @@ namespace quantum_sim::gui {
 
             recordCircuitForUndo();
 
+            // Controlled, CZ, SWAP, and iSWAP all enter the circuit as full-register matrices.
             circuit_.insertControlledGate(
                 instructionIndex,
                 gateName,
@@ -1279,6 +1298,7 @@ namespace quantum_sim::gui {
             circuit_
         );
 
+        // Move the latest undo snapshot back into the active circuit.
         circuit_ =
                 std::move(
                     undoHistory_.back()
@@ -1301,6 +1321,7 @@ namespace quantum_sim::gui {
             circuit_
         );
 
+        // Symmetric with undo: active state returns to undo history first.
         circuit_ =
                 std::move(
                     redoHistory_.back()
