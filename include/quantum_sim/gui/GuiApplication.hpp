@@ -107,11 +107,15 @@ namespace quantum_sim::gui {
         std::vector<circuit::QuantumCircuit> undoHistory_;
         std::vector<circuit::QuantumCircuit> redoHistory_;
         std::mt19937 randomEngine_{std::random_device{}()};
-        CanvasMode canvasMode_{CanvasMode::FloorField};
+        CanvasMode canvasMode_{CanvasMode::LayerStack};
         int presetQubitCount_{3};
         bool playbackPaused_{true};
         double nextAutoStepAt_{0.0};
         float heatAmount_{0.78F};
+        float renderYaw_{-0.62F};
+        float renderPitch_{0.18F};
+        float renderZoom_{1.0F};
+        ImVec2 renderPan_{0.0F, 0.0F};
         std::string lastSampleLabel_{"none"};
 
         /**
@@ -144,7 +148,20 @@ namespace quantum_sim::gui {
          *
          * @param snapshot Current debugger snapshot used as the source state.
          */
-        void drawBackdrop(const debug::DebuggerSnapshot &snapshot) const;
+        void drawBackdrop(const debug::DebuggerSnapshot &snapshot);
+
+        /**
+         * Applies mouse orbit, pan, zoom, and reset gestures to the state render.
+         *
+         * @param minimum Screen-space top-left corner of the interactive render area.
+         * @param maximum Screen-space bottom-right corner of the interactive render area.
+         */
+        void handleRenderCameraInput(const ImVec2 &minimum, const ImVec2 &maximum);
+
+        /**
+         * Restores the state-volume camera to its reference composition.
+         */
+        void resetRenderCamera();
 
         /**
          * Draws playback, scrub, view-mode, and sampling controls.
