@@ -511,6 +511,37 @@ namespace quantum_sim::gui {
         // Layer 3: timeline, execution marker and instructions
         // ---------------------------------------------------------
 
+        drawList->AddText(
+            ImVec2{
+                origin.x,
+                origin.y + style_.timelineLabelOffsetY
+            },
+            style_.inactiveTimelineColor,
+            "STEPS"
+        );
+
+        const std::size_t stepNumberWidth =
+                std::to_string(
+                    std::max<std::size_t>(
+                        instructions.size(),
+                        1U
+                    )
+                ).size();
+
+        const std::string widestStepLabel(
+            stepNumberWidth,
+            '0'
+        );
+
+        const float stepBadgeWidth =
+                std::max(
+                    style_.stepBadgeMinimumWidth,
+                    ImGui::CalcTextSize(
+                        widestStepLabel.c_str()
+                    ).x +
+                    style_.stepBadgePaddingX * 2.0F
+                );
+
         for (std::size_t instructionIndex = 0;
              instructionIndex < instructions.size();
              ++instructionIndex) {
@@ -542,7 +573,7 @@ namespace quantum_sim::gui {
 
 
             const std::string instructionLabel =
-                    "Step " + std::to_string(instructionIndex + 1);
+                    std::to_string(instructionIndex + 1);
 
             const ImVec2 labelSize =
                     ImGui::CalcTextSize(
@@ -555,14 +586,12 @@ namespace quantum_sim::gui {
             };
 
             const ImVec2 badgeMin{
-                labelPosition.x - style_.stepBadgePaddingX,
+                x - stepBadgeWidth * 0.5F,
                 labelPosition.y - style_.stepBadgePaddingY
             };
 
             const ImVec2 badgeMax{
-                labelPosition.x
-                + labelSize.x
-                + style_.stepBadgePaddingX,
+                x + stepBadgeWidth * 0.5F,
                 labelPosition.y
                 + labelSize.y
                 + style_.stepBadgePaddingY
@@ -607,15 +636,17 @@ namespace quantum_sim::gui {
 
                 if (instruction.angleRadians.has_value()) {
                     ImGui::SetTooltip(
-                        "Execution step %zu\nGate: %s\nAngle: %.6f rad",
+                        "Step %zu of %zu\nGate: %s\nAngle: %.6f rad",
                         instructionIndex + 1,
+                        instructions.size(),
                         instruction.name.c_str(),
                         instruction.angleRadians.value()
                     );
                 } else {
                     ImGui::SetTooltip(
-                        "Execution step %zu\nGate: %s",
+                        "Step %zu of %zu\nGate: %s",
                         instructionIndex + 1,
+                        instructions.size(),
                         instruction.name.c_str()
                     );
                 }
@@ -1160,6 +1191,49 @@ namespace quantum_sim::gui {
                 circuitContentHeight
             }
         );
+
+        const bool activeStepNeedsFocus =
+                !instructions.empty() &&
+                (
+                    !lastFocusedStepIndex_.has_value() ||
+                    lastFocusedStepIndex_.value() != snapshot.currentStepIndex ||
+                    lastFocusedInstructionCount_ != instructions.size()
+                );
+
+        if (activeStepNeedsFocus) {
+            const std::size_t activeStepIndex =
+                    std::min(
+                        snapshot.currentStepIndex,
+                        instructions.size() - 1U
+                    );
+
+            const float firstGateContentX =
+                    firstGateX -
+                    canvasMin.x +
+                    ImGui::GetScrollX();
+
+            const float activeStepContentX =
+                    firstGateContentX +
+                    gateSpacing *
+                    static_cast<float>(activeStepIndex);
+
+            const float centeredScrollX =
+                    activeStepContentX -
+                    ImGui::GetWindowWidth() * 0.52F;
+
+            ImGui::SetScrollX(
+                std::max(
+                    centeredScrollX,
+                    0.0F
+                )
+            );
+
+            lastFocusedStepIndex_ =
+                    snapshot.currentStepIndex;
+
+            lastFocusedInstructionCount_ =
+                    instructions.size();
+        }
 
         if (
             ImGui::IsWindowHovered() &&

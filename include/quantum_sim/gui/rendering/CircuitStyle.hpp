@@ -49,6 +49,7 @@ namespace quantum_sim::gui {
         float qubitLabelOffsetY{8.0F};
         float stepBadgePaddingX{8.0F};
         float stepBadgePaddingY{3.0F};
+        float stepBadgeMinimumWidth{28.0F};
         float stepBadgeCornerRadius{5.0F};
         float executionOrderLabelOffsetY{-18.0F};
 
