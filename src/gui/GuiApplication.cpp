@@ -21,6 +21,84 @@
 #include "quantum_sim/gates/QuantumGates.hpp"
 
 namespace quantum_sim::gui {
+    namespace {
+        /**
+         * Screen-space point and depth produced by the light-weight volume camera.
+         */
+        struct ProjectedVolumePoint {
+            ImVec2 screen{};
+            float depth{};
+        };
+
+        /**
+         * One drawable square in the state-volume preview.
+         */
+        struct StateVolumeVoxel {
+            float depth{};
+            ImVec2 center{};
+            float size{};
+            float glowRadius{};
+            ImU32 color{};
+            ImU32 glowColor{};
+        };
+
+        /**
+         * Clamps a floating color channel before packing it into ImGui's RGBA format.
+         */
+        [[nodiscard]] int colorChannel(float value) {
+            return static_cast<int>(
+                std::clamp(value, 0.0F, 255.0F)
+            );
+        }
+
+        /**
+         * Projects one 3D point through a tiny orbit camera into ImGui coordinates.
+         */
+        [[nodiscard]] ProjectedVolumePoint projectVolumePoint(
+            float x,
+            float y,
+            float z,
+            float yaw,
+            float pitch,
+            float scale,
+            const ImVec2 &origin
+        ) {
+            const float yawCosine =
+                    std::cos(yaw);
+
+            const float yawSine =
+                    std::sin(yaw);
+
+            const float pitchCosine =
+                    std::cos(pitch);
+
+            const float pitchSine =
+                    std::sin(pitch);
+
+            // Yaw spins the slab around its vertical axis.
+            const float yawedX =
+                    x * yawCosine - z * yawSine;
+
+            const float yawedZ =
+                    x * yawSine + z * yawCosine;
+
+            // Pitch tilts the slab so stacked amplitudes read as a volume.
+            const float pitchedY =
+                    y * pitchCosine - yawedZ * pitchSine;
+
+            const float depth =
+                    y * pitchSine + yawedZ * pitchCosine;
+
+            return ProjectedVolumePoint{
+                ImVec2{
+                    origin.x + yawedX * scale,
+                    origin.y - pitchedY * scale
+                },
+                depth
+            };
+        }
+    }
+
     GuiApplication::GuiApplication(circuit::QuantumCircuit &circuit,
                                    const quantum::QuantumRegister &initialState)
         : circuit_{circuit}, initialState_{initialState}, session_{circuit_, initialState_} {
@@ -498,7 +576,7 @@ namespace quantum_sim::gui {
         }
     }
 
-    void GuiApplication::drawBackdrop(const debug::DebuggerSnapshot &snapshot) const {
+    void GuiApplication::drawBackdrop(const debug::DebuggerSnapshot &snapshot) {
         const ImGuiViewport *viewport =
                 ImGui::GetMainViewport();
 
@@ -532,6 +610,66 @@ namespace quantum_sim::gui {
             );
         }
 
+        constexpr float topBarHeight = 58.0F;
+        constexpr float bottomBarHeight = 28.0F;
+        constexpr float gap = 10.0F;
+        constexpr float leftPanelWidth = 354.0F;
+        constexpr float rightPanelWidth = 390.0F;
+
+        const ImVec2 workPosition =
+                viewport->WorkPos;
+
+        const ImVec2 workSize =
+                viewport->WorkSize;
+
+        const float usableHeight =
+                std::max(
+                    260.0F,
+                    workSize.y - topBarHeight - bottomBarHeight - gap * 3.0F
+                );
+
+        const float centerPanelWidth =
+                std::max(
+                    360.0F,
+                    workSize.x - leftPanelWidth - rightPanelWidth - gap * 4.0F
+                );
+
+        const ImVec2 renderMinimum{
+            workPosition.x + leftPanelWidth + gap * 2.0F,
+            workPosition.y + topBarHeight + gap + usableHeight * 0.45F + gap
+        };
+
+        const ImVec2 renderMaximum{
+            workPosition.x + leftPanelWidth + gap * 2.0F + centerPanelWidth,
+            workPosition.y + topBarHeight + usableHeight
+        };
+
+        if (
+            renderMaximum.x > renderMinimum.x + 64.0F &&
+            renderMaximum.y > renderMinimum.y + 64.0F
+        ) {
+            handleRenderCameraInput(renderMinimum, renderMaximum);
+        }
+
+        const ImVec2 visualMinimum{
+            workPosition.x + leftPanelWidth + gap * 2.0F - 96.0F,
+            workPosition.y + topBarHeight + gap
+        };
+
+        const ImVec2 visualMaximum{
+            workPosition.x + leftPanelWidth + gap * 2.0F + centerPanelWidth + 72.0F,
+            workPosition.y + topBarHeight + usableHeight
+        };
+
+        drawList->AddRectFilledMultiColor(
+            visualMinimum,
+            visualMaximum,
+            IM_COL32(24, 7, 10, 38),
+            IM_COL32(10, 10, 20, 10),
+            IM_COL32(54, 20, 16, 48),
+            IM_COL32(8, 8, 14, 0)
+        );
+
         const quantum::QuantumRegister &state =
                 snapshot.afterState.get();
 
@@ -542,220 +680,499 @@ namespace quantum_sim::gui {
             return;
         }
 
-        const std::size_t maximumCells =
-                canvasMode_ == CanvasMode::FloorField
-                    ? 144
-                    : 180;
+        const bool layerStack =
+                canvasMode_ == CanvasMode::LayerStack;
 
-        const std::size_t stride =
-                std::max<std::size_t>(
-                    1,
-                    (stateCount + maximumCells - 1) / maximumCells
-                );
+        std::size_t layerCount =
+                layerStack ? 42U : 26U;
 
-        // Large registers are bucketed so 1024+ amplitudes still render quickly.
-        const std::size_t cellCount =
-                (stateCount + stride - 1) / stride;
+        if (stateCount >= 512U) {
+            layerCount =
+                    layerStack ? 44U : 30U;
+        } else if (stateCount <= 16U) {
+            layerCount =
+                    layerStack ? 36U : 22U;
+        }
 
-        const std::size_t columns =
-                std::max<std::size_t>(
-                    1,
+        const std::size_t rowCount =
+                std::clamp<std::size_t>(
                     static_cast<std::size_t>(
                         std::ceil(
-                            std::sqrt(
-                                static_cast<double>(cellCount)
+                            std::log2(
+                                static_cast<double>(stateCount)
                             )
                         )
-                    )
+                    ) + 2U,
+                    7U,
+                    9U
                 );
 
-        const float centerX =
-                minimum.x + viewport->Size.x * 0.53F;
+        const std::size_t depthCount =
+                layerStack
+                    ? 7U
+                    : rowCount;
 
-        const float baseY =
-                minimum.y + viewport->Size.y * 0.70F;
+        const float renderWidth =
+                std::max(
+                    1.0F,
+                    visualMaximum.x - visualMinimum.x
+                );
 
-        const float cellWidth =
-                canvasMode_ == CanvasMode::FloorField
-                    ? 28.0F
-                    : 16.0F;
+        const float renderHeight =
+                std::max(
+                    1.0F,
+                    visualMaximum.y - visualMinimum.y
+                );
 
-        const float cellHeight =
-                canvasMode_ == CanvasMode::FloorField
-                    ? 14.0F
-                    : 8.0F;
+        const float scale =
+                std::clamp(
+                    std::min(renderWidth / 720.0F, renderHeight / 390.0F),
+                    0.58F,
+                    1.28F
+                ) * renderZoom_;
+
+        const ImVec2 origin{
+            visualMinimum.x + renderWidth * 0.52F + renderPan_.x,
+            visualMinimum.y + renderHeight * (layerStack ? 0.58F : 0.64F) + renderPan_.y
+        };
+
+        const float pitch =
+                renderPitch_ + (layerStack ? 0.0F : 0.34F);
+
+        const float sliceSpacing =
+                layerStack ? 8.7F : 12.2F;
+
+        const float rowSpacing =
+                layerStack ? 8.4F : 12.0F;
+
+        const float depthSpacing =
+                layerStack ? 9.6F : 12.0F;
+
+        const float halfX =
+                (static_cast<float>(layerCount) - 1.0F) * sliceSpacing * 0.5F;
+
+        const float halfY =
+                (static_cast<float>(rowCount) - 1.0F) * rowSpacing * 0.5F;
+
+        const float halfZ =
+                (static_cast<float>(depthCount) - 1.0F) * depthSpacing * 0.5F;
+
+        const std::array<ProjectedVolumePoint, 8> corners{
+            projectVolumePoint(-halfX, -halfY, -halfZ, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(halfX, -halfY, -halfZ, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(halfX, halfY, -halfZ, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(-halfX, halfY, -halfZ, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(-halfX, -halfY, halfZ, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(halfX, -halfY, halfZ, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(halfX, halfY, halfZ, renderYaw_, pitch, scale, origin),
+            projectVolumePoint(-halfX, halfY, halfZ, renderYaw_, pitch, scale, origin)
+        };
+
+        const std::array<std::pair<int, int>, 12> edges{
+            std::pair<int, int>{0, 1},
+            std::pair<int, int>{1, 2},
+            std::pair<int, int>{2, 3},
+            std::pair<int, int>{3, 0},
+            std::pair<int, int>{4, 5},
+            std::pair<int, int>{5, 6},
+            std::pair<int, int>{6, 7},
+            std::pair<int, int>{7, 4},
+            std::pair<int, int>{0, 4},
+            std::pair<int, int>{1, 5},
+            std::pair<int, int>{2, 6},
+            std::pair<int, int>{3, 7}
+        };
+
+        for (const auto &[firstCorner, secondCorner] : edges) {
+            drawList->AddLine(
+                corners[static_cast<std::size_t>(firstCorner)].screen,
+                corners[static_cast<std::size_t>(secondCorner)].screen,
+                IM_COL32(94, 118, 155, 28),
+                1.0F
+            );
+        }
 
         const float time =
                 static_cast<float>(ImGui::GetTime());
 
-        for (std::size_t gridLine = 0; gridLine <= columns + 2; ++gridLine) {
-            const float offset =
-                    static_cast<float>(gridLine) - static_cast<float>(columns) * 0.5F;
+        for (std::size_t layer = 0; layer < layerCount; layer += 4U) {
+            const float x =
+                    static_cast<float>(layer) * sliceSpacing - halfX;
 
-            const ImVec2 left{
-                centerX - 360.0F + offset * cellWidth,
-                baseY + offset * cellHeight
-            };
+            const ProjectedVolumePoint bottom =
+                    projectVolumePoint(x, -halfY, -halfZ, renderYaw_, pitch, scale, origin);
 
-            const ImVec2 right{
-                centerX + 360.0F + offset * cellWidth,
-                baseY + offset * cellHeight + 180.0F
-            };
+            const ProjectedVolumePoint top =
+                    projectVolumePoint(x, halfY, -halfZ, renderYaw_, pitch, scale, origin);
 
-            drawList->AddLine(left, right, IM_COL32(58, 90, 122, 34), 1.0F);
+            // Slice rails make the stack read as many computation layers.
+            drawList->AddLine(
+                bottom.screen,
+                top.screen,
+                IM_COL32(128, 65, 154, 32),
+                1.0F
+            );
         }
 
-        for (std::size_t displayIndex = 0; displayIndex < cellCount; ++displayIndex) {
-            const std::size_t firstState =
-                    displayIndex * stride;
+        std::vector<StateVolumeVoxel> voxels;
 
-            const std::size_t lastState =
-                    std::min(stateCount, firstState + stride);
+        const std::size_t volumeCellCount =
+                layerCount * rowCount * depthCount;
 
-            double bucketProbability = 0.0;
-            double bucketPhase = 0.0;
+        voxels.reserve(volumeCellCount);
 
-            // Represent each bucket by its strongest amplitude.
-            for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
-                const double probability =
-                        state.probability(stateIndex);
+        const float depthNormalizer =
+                halfX + halfY + halfZ + 1.0F;
 
-                if (probability > bucketProbability) {
-                    bucketProbability = probability;
-                    bucketPhase = std::atan2(
-                        state.amplitude(stateIndex).imaginary(),
-                        state.amplitude(stateIndex).real()
+        for (std::size_t layer = 0; layer < layerCount; ++layer) {
+            for (std::size_t row = 0; row < rowCount; ++row) {
+                for (std::size_t depth = 0; depth < depthCount; ++depth) {
+                    const std::size_t volumeIndex =
+                            (layer * rowCount + row) * depthCount + depth;
+
+                    std::size_t firstState =
+                            std::min(
+                                stateCount - 1U,
+                                volumeIndex * stateCount / volumeCellCount
+                            );
+
+                    std::size_t lastState =
+                            std::min(
+                                stateCount,
+                                std::max<std::size_t>(
+                                    firstState + 1U,
+                                    ((volumeIndex + 1U) * stateCount + volumeCellCount - 1U) /
+                                    volumeCellCount
+                                )
+                            );
+
+                    if (volumeCellCount > stateCount) {
+                        // Small registers repeat amplitudes through the volume;
+                        // hashing spreads those repeats so a basis state becomes
+                        // a readable field instead of one solid colored chunk.
+                        const std::size_t hashedState =
+                                (
+                                    volumeIndex * 1'140'071'481'932'319'845ULL +
+                                    layer * 97U +
+                                    row * 37U +
+                                    depth * 17U
+                                ) %
+                                stateCount;
+
+                        firstState =
+                                hashedState;
+
+                        lastState =
+                                hashedState + 1U;
+                    }
+
+                    double bucketProbability =
+                            0.0;
+
+                    double bucketPhase =
+                            0.0;
+
+                    // A volume cell may summarize several amplitudes in large registers.
+                    for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
+                        const double probability =
+                                state.probability(stateIndex);
+
+                        if (probability > bucketProbability) {
+                            bucketProbability =
+                                    probability;
+
+                            bucketPhase =
+                                    std::atan2(
+                                        state.amplitude(stateIndex).imaginary(),
+                                        state.amplitude(stateIndex).real()
+                                    );
+                        }
+                    }
+
+                    const float normalizedProbability =
+                            std::pow(
+                                std::clamp(
+                                    static_cast<float>(
+                                        bucketProbability * static_cast<double>(stateCount)
+                                    ),
+                                    0.0F,
+                                    1.0F
+                                ),
+                                heatAmount_
+                            );
+
+                    const float phase =
+                            static_cast<float>(bucketPhase);
+
+                    const float phaseT =
+                            static_cast<float>(
+                                (bucketPhase + std::numbers::pi) /
+                                (2.0 * std::numbers::pi)
+                            );
+
+                    const float ripple =
+                            0.5F + 0.5F * std::sin(
+                                time * 0.56F +
+                                static_cast<float>(layer) * 0.23F +
+                                static_cast<float>(row) * 0.71F +
+                                static_cast<float>(depth) * 0.39F +
+                                phase
+                            );
+
+                    const float energy =
+                            std::clamp(
+                                0.10F + normalizedProbability * 0.54F + ripple * 0.12F,
+                                0.0F,
+                                1.0F
+                            );
+
+                    const float hot =
+                            std::clamp(
+                                (normalizedProbability - 0.72F) / 0.28F,
+                                0.0F,
+                                1.0F
+                            ) *
+                            std::clamp(
+                                (ripple - 0.84F) / 0.16F,
+                                0.0F,
+                                1.0F
+                            );
+
+                    const bool cyanPhaseAccent =
+                            std::sin(phaseT * 6.28318F) < -0.78F;
+
+                    const bool edgeCell =
+                            layer == 0U ||
+                            layer + 1U == layerCount ||
+                            depth == 0U ||
+                            depth + 1U == depthCount;
+
+                    const float x =
+                            static_cast<float>(layer) * sliceSpacing - halfX;
+
+                    const float y =
+                            (static_cast<float>(row) -
+                             (static_cast<float>(rowCount) - 1.0F) * 0.5F) *
+                            rowSpacing;
+
+                    const float z =
+                            (static_cast<float>(depth) -
+                             (static_cast<float>(depthCount) - 1.0F) * 0.5F) *
+                            depthSpacing;
+
+                    const ProjectedVolumePoint projected =
+                            projectVolumePoint(
+                                x,
+                                y,
+                                z,
+                                renderYaw_,
+                                pitch,
+                                scale,
+                                origin
+                            );
+
+                    const float depthLight =
+                            std::clamp(
+                                (projected.depth + depthNormalizer) /
+                                (depthNormalizer * 2.0F),
+                                0.0F,
+                                1.0F
+                            );
+
+                    const float edgeBoost =
+                            edgeCell ? 0.08F : 0.0F;
+
+                    const int red =
+                            colorChannel(42.0F + energy * 176.0F + hot * 64.0F + edgeBoost * 68.0F);
+
+                    const int green =
+                            colorChannel(
+                                14.0F + energy * 42.0F + hot * 168.0F +
+                                (cyanPhaseAccent ? 42.0F : 0.0F)
+                            );
+
+                    const int blue =
+                            colorChannel(
+                                118.0F + (1.0F - energy) * 70.0F - hot * 70.0F +
+                                (cyanPhaseAccent ? 82.0F : 0.0F)
+                            );
+
+                    const int alpha =
+                            colorChannel(
+                                (50.0F + energy * 128.0F + hot * 44.0F) *
+                                (0.58F + depthLight * 0.50F)
+                            );
+
+                    const float voxelSize =
+                            (layerStack ? 4.8F : 7.0F) *
+                            scale *
+                            (0.84F + energy * 0.24F + depthLight * 0.12F);
+
+                    const float glowRadius =
+                            hot > 0.20F
+                                ? voxelSize * (0.9F + hot * 1.25F)
+                                : 0.0F;
+
+                    voxels.push_back(
+                        StateVolumeVoxel{
+                            projected.depth,
+                            projected.screen,
+                            voxelSize,
+                            glowRadius,
+                            IM_COL32(red, green, blue, alpha),
+                            IM_COL32(255, colorChannel(142.0F + hot * 92.0F), 78, colorChannel(hot * 48.0F))
+                        }
                     );
                 }
             }
+        }
 
-            const float normalizedProbability =
-                    std::pow(
-                        std::clamp(
-                            static_cast<float>(bucketProbability * static_cast<double>(stateCount)),
-                            0.0F,
-                            1.0F
-                        ),
-                        heatAmount_
-                    );
-
-            if (normalizedProbability <= 0.001F) {
-                continue;
+        std::sort(
+            voxels.begin(),
+            voxels.end(),
+            [](const StateVolumeVoxel &left, const StateVolumeVoxel &right) {
+                return left.depth < right.depth;
             }
+        );
 
-            const std::size_t row =
-                    displayIndex / columns;
-
-            const std::size_t column =
-                    displayIndex % columns;
-
-            const float gridX =
-                    static_cast<float>(column) - static_cast<float>(columns) * 0.5F;
-
-            const float gridY =
-                    static_cast<float>(row);
-
-            const float layerSkew =
-                    canvasMode_ == CanvasMode::LayerStack
-                        ? std::sin(time * 0.65F + gridY * 0.34F) * 18.0F
-                        : 0.0F;
-
-            const ImVec2 base{
-                centerX + (gridX - gridY) * cellWidth + layerSkew,
-                baseY + (gridX + gridY) * cellHeight -
-                (canvasMode_ == CanvasMode::LayerStack ? gridY * 3.0F : 0.0F)
-            };
-
-            const float height =
-                    14.0F + normalizedProbability * 118.0F;
-
-            // Phase drives hue; probability drives height and opacity.
-            const float phaseT =
-                    static_cast<float>(
-                        (bucketPhase + std::numbers::pi) /
-                        (2.0 * std::numbers::pi)
-                    );
-
-            const int red =
-                    static_cast<int>(190.0F + std::sin(phaseT * 6.28318F) * 50.0F);
-
-            const int green =
-                    static_cast<int>(74.0F + normalizedProbability * 170.0F);
-
-            const int blue =
-                    static_cast<int>(150.0F + std::cos(phaseT * 6.28318F) * 74.0F);
-
-            const int alpha =
-                    static_cast<int>(76.0F + normalizedProbability * 128.0F);
-
-            const ImU32 topColor =
-                    IM_COL32(
-                        std::clamp(red, 0, 255),
-                        std::clamp(green, 0, 255),
-                        std::clamp(blue, 0, 255),
-                        std::clamp(alpha + 38, 0, 220)
-                    );
-
-            const ImU32 sideColor =
-                    IM_COL32(
-                        std::clamp(red - 60, 0, 255),
-                        std::clamp(green - 40, 0, 255),
-                        std::clamp(blue - 20, 0, 255),
-                        std::clamp(alpha, 0, 190)
-                    );
-
-            const ImVec2 top{
-                base.x,
-                base.y - height
-            };
-
-            const ImVec2 right{
-                base.x + cellWidth,
-                base.y + cellHeight
-            };
-
-            const ImVec2 bottom{
-                base.x,
-                base.y + cellHeight * 2.0F
-            };
-
-            const ImVec2 left{
-                base.x - cellWidth,
-                base.y + cellHeight
-            };
-
-            drawList->AddQuadFilled(
-                ImVec2{left.x, left.y - height},
-                ImVec2{top.x, top.y},
-                ImVec2{right.x, right.y - height},
-                ImVec2{base.x, base.y},
-                topColor
-            );
-
-            drawList->AddQuadFilled(
-                ImVec2{left.x, left.y - height},
-                ImVec2{base.x, base.y},
-                bottom,
-                left,
-                sideColor
-            );
-
-            drawList->AddQuadFilled(
-                ImVec2{base.x, base.y},
-                ImVec2{right.x, right.y - height},
-                right,
-                bottom,
-                IM_COL32(84, 38, 88, std::clamp(alpha, 0, 170))
-            );
-
-            if (normalizedProbability > 0.72F) {
-                drawList->AddCircleFilled(
-                    ImVec2{top.x, top.y - 4.0F},
-                    5.0F + normalizedProbability * 5.0F,
-                    IM_COL32(255, 241, 160, 115)
+        for (const StateVolumeVoxel &voxel : voxels) {
+            if (voxel.glowRadius > 0.0F) {
+                drawList->AddRectFilled(
+                    ImVec2{
+                        voxel.center.x - voxel.glowRadius,
+                        voxel.center.y - voxel.glowRadius
+                    },
+                    ImVec2{
+                        voxel.center.x + voxel.glowRadius,
+                        voxel.center.y + voxel.glowRadius
+                    },
+                    voxel.glowColor,
+                    2.4F
                 );
             }
+
+            const ImVec2 voxelMinimum{
+                voxel.center.x - voxel.size * 0.5F,
+                voxel.center.y - voxel.size * 0.5F
+            };
+
+            const ImVec2 voxelMaximum{
+                voxel.center.x + voxel.size * 0.5F,
+                voxel.center.y + voxel.size * 0.5F
+            };
+
+            drawList->AddRectFilled(
+                voxelMinimum,
+                voxelMaximum,
+                voxel.color,
+                1.2F
+            );
         }
+    }
+
+    void GuiApplication::handleRenderCameraInput(const ImVec2 &minimum, const ImVec2 &maximum) {
+        const ImVec2 size{
+            maximum.x - minimum.x,
+            maximum.y - minimum.y
+        };
+
+        if (
+            size.x <= 0.0F ||
+            size.y <= 0.0F
+        ) {
+            return;
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0F, 0.0F});
+        ImGui::SetNextWindowPos(minimum, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+
+        ImGui::Begin(
+            "QubitCanvasStateRenderSurface",
+            nullptr,
+            ImGuiWindowFlags_NoDecoration |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoScrollWithMouse |
+            ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoBringToFrontOnFocus
+        );
+
+        ImGui::SetCursorScreenPos(minimum);
+        ImGui::InvisibleButton("##StateVolumeCamera", size);
+
+        const bool hovered =
+                ImGui::IsItemHovered();
+
+        const ImGuiIO &io =
+                ImGui::GetIO();
+
+        if (hovered) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+        }
+
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0F)) {
+            renderYaw_ +=
+                    io.MouseDelta.x * 0.008F;
+
+            renderPitch_ =
+                    std::clamp(
+                        renderPitch_ + io.MouseDelta.y * 0.006F,
+                        -0.88F,
+                        0.82F
+                    );
+        }
+
+        if (
+            hovered &&
+            (
+                ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0F) ||
+                ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0F)
+            )
+        ) {
+            renderPan_.x +=
+                    io.MouseDelta.x;
+
+            renderPan_.y +=
+                    io.MouseDelta.y;
+        }
+
+        if (hovered && io.MouseWheel != 0.0F) {
+            renderZoom_ =
+                    std::clamp(
+                        renderZoom_ * std::pow(1.12F, io.MouseWheel),
+                        0.48F,
+                        2.35F
+                    );
+        }
+
+        if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+            resetRenderCamera();
+        }
+
+        if (hovered) {
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted("Drag orbit  |  wheel zoom  |  right drag pan");
+            ImGui::EndTooltip();
+        }
+
+        ImGui::End();
+        ImGui::PopStyleVar();
+    }
+
+    void GuiApplication::resetRenderCamera() {
+        renderYaw_ =
+                -0.62F;
+
+        renderPitch_ =
+                0.18F;
+
+        renderZoom_ =
+                1.0F;
+
+        renderPan_ =
+                ImVec2{0.0F, 0.0F};
     }
 
     void GuiApplication::drawTopBar(
