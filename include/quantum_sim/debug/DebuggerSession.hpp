@@ -26,13 +26,19 @@ namespace quantum_sim::debug {
         [[nodiscard]] std::size_t stepCount() const noexcept;
 
         /**
-         * @return Current trace step index.
+         * @return Current timeline step number. Zero is the initial state and
+         *         values 1..stepCount correspond to executed instructions.
          */
-        [[nodiscard]] std::size_t currentStepIndex() const noexcept;
+        [[nodiscard]] std::size_t currentStepNumber() const noexcept;
+
+        /**
+         * @return True while the untouched initial register is displayed.
+         */
+        [[nodiscard]] bool isAtInitialState() const noexcept;
 
         /**
          * @return Current trace step.
-         * @throws std::logic_error if the trace is empty.
+         * @throws std::logic_error at initial step zero or when the trace is empty.
          */
         [[nodiscard]] const circuit::TraceStep &currentStep() const;
 
@@ -61,7 +67,7 @@ namespace quantum_sim::debug {
         bool movePrevious() noexcept;
 
         /**
-         * Returns navigation to the first trace step.
+         * Returns navigation to initial step zero.
          */
         void restart() noexcept;
 
@@ -77,6 +83,7 @@ namespace quantum_sim::debug {
 
         /**
          * @return Metadata for the current instruction.
+         * @throws std::logic_error at initial step zero.
          * @throws std::out_of_range if the current step is invalid.
          */
         [[nodiscard]] const circuit::CircuitInstructionInfo &currentInstruction() const;
@@ -104,6 +111,15 @@ namespace quantum_sim::debug {
         void moveToStep(std::size_t index);
 
         /**
+         * Jumps to a displayed timeline position.
+         *
+         * @param stepNumber Zero for the initial state, or 1..stepCount for an
+         *                   executed circuit instruction.
+         * @throws std::out_of_range if stepNumber exceeds stepCount.
+         */
+        void moveToStepNumber(std::size_t stepNumber);
+
+        /**
          * Replaces the stored trace after the circuit or initial state changes.
          *
          * @param circuit Circuit to execute.
@@ -120,6 +136,7 @@ namespace quantum_sim::debug {
         quantum::QuantumRegister initialState_;
         std::vector<circuit::TraceStep> trace_;
         std::vector<circuit::CircuitInstructionInfo> instructions_;
-        std::size_t currentStep_{};
+        // Counts executed instructions, so zero naturally represents the initial state.
+        std::size_t currentStepNumber_{};
     };
 }

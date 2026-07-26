@@ -133,7 +133,7 @@ namespace quantum_sim::gui {
         float heatAmount_{0.78F};
         std::string lastSampleLabel_{"none"};
         std::size_t selectedDensityLayer_{};
-        std::optional<std::size_t> lastDensityDebuggerStep_;
+        std::optional<std::size_t> lastDensityDebuggerStepNumber_;
         bool densityVolumePointerDragged_{false};
         bool densityVolumeCameraFramePending_{true};
 

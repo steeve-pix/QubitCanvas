@@ -437,10 +437,10 @@ namespace quantum_sim::gui {
 
             if (
                 requestedStepJump.has_value() &&
-                requestedStepJump.value() < session_.stepCount()
+                requestedStepJump.value() <= session_.stepCount()
             ) {
                 playbackPaused_ = true;
-                session_.moveToStep(
+                session_.moveToStepNumber(
                     requestedStepJump.value()
                 );
 
@@ -1064,7 +1064,7 @@ namespace quantum_sim::gui {
                     );
         }
 
-        lastDensityDebuggerStep_.reset();
+        lastDensityDebuggerStepNumber_.reset();
         densityVolumeCameraFramePending_ = true;
     }
 
@@ -1077,20 +1077,21 @@ namespace quantum_sim::gui {
         }
 
         if (
-            lastDensityDebuggerStep_.has_value() &&
-            lastDensityDebuggerStep_.value() == snapshot.currentStepIndex
+            lastDensityDebuggerStepNumber_.has_value() &&
+            lastDensityDebuggerStepNumber_.value() ==
+                snapshot.currentStepNumber
         ) {
             return;
         }
 
         selectedDensityLayer_ =
                 std::min(
-                    snapshot.currentStepIndex + 1U,
+                    snapshot.currentStepNumber,
                     densityVolumeStack_.layers.size() - 1U
                 );
 
-        lastDensityDebuggerStep_ =
-                snapshot.currentStepIndex;
+        lastDensityDebuggerStepNumber_ =
+                snapshot.currentStepNumber;
     }
 
     void GuiApplication::selectDensityLayer(
@@ -1107,9 +1108,10 @@ namespace quantum_sim::gui {
                     densityVolumeStack_.layers.size() - 1U
                 );
 
-        if (selectedDensityLayer_ > 0U && session_.hasSteps()) {
-            session_.moveToStep(selectedDensityLayer_ - 1U);
-            lastDensityDebuggerStep_ = session_.currentStepIndex();
+        if (selectedDensityLayer_ <= session_.stepCount()) {
+            session_.moveToStepNumber(selectedDensityLayer_);
+            lastDensityDebuggerStepNumber_ =
+                    session_.currentStepNumber();
         }
     }
 
@@ -1151,7 +1153,7 @@ namespace quantum_sim::gui {
         ImGui::SameLine();
         ImGui::TextDisabled(
             "step %zu/%zu",
-            snapshot.stepCount == 0 ? 0 : snapshot.currentStepIndex + 1,
+            snapshot.currentStepNumber,
             snapshot.stepCount
         );
 

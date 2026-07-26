@@ -5,6 +5,7 @@
 #include <limits>
 #include <cctype>
 #include <chrono>
+#include <optional>
 #include <thread>
 #include <string>
 
@@ -136,22 +137,46 @@ namespace quantum_sim::debug {
             const quantum::QuantumRegister &currentState =
                     snapshot.afterState.get();
 
-            const std::size_t currentStep =
-                    snapshot.currentStepIndex;
+            const std::size_t currentStepNumber =
+                    snapshot.currentStepNumber;
 
-            const circuit::CircuitInstructionInfo &instruction =
-                    snapshot.instruction->get();
+            const std::optional<std::size_t> currentInstructionIndex =
+                    currentStepNumber == 0U
+                        ? std::nullopt
+                        : std::optional<std::size_t>{
+                            currentStepNumber - 1U
+                        };
 
 
             std::cout << "\nCircuit:\n";
-            visualization::printCircuitDiagram(circuit, std::cout, currentStep);
+            visualization::printCircuitDiagram(
+                circuit,
+                std::cout,
+                currentInstructionIndex
+            );
 
-            std::cout << "\n========== Step " << (currentStep + 1) << " / " << snapshot.stepCount << " ==========\n";
-            std::cout << instruction.name << "\n";
             std::cout
-                    << "Explanation: "
-                    << gateExplanation(instruction.name)
-                    << '\n';
+                    << "\n========== Step "
+                    << currentStepNumber
+                    << " / "
+                    << snapshot.stepCount
+                    << " ==========\n";
+
+            if (snapshot.instruction.has_value()) {
+                const circuit::CircuitInstructionInfo &instruction =
+                        snapshot.instruction->get();
+
+                std::cout << instruction.name << "\n";
+                std::cout
+                        << "Explanation: "
+                        << gateExplanation(instruction.name)
+                        << '\n';
+            } else {
+                std::cout << "I on all qubits\n";
+                std::cout
+                        << "Explanation: Initial register before any "
+                           "circuit instruction executes.\n";
+            }
 
             visualization::printProbabilityBars(currentState, std::cout);
             if (autoPlay) {
@@ -179,7 +204,7 @@ namespace quantum_sim::debug {
             } else if (command == 'p') {
                 if (!session.movePrevious()) {
                     std::cout
-                            << "\nAlready at the first step.\n";
+                            << "\nAlready at initial step zero.\n";
                 }
             } else if (command == 'r') {
                 session.restart();
@@ -204,7 +229,11 @@ namespace quantum_sim::debug {
 
                 std::cout
                         << "\nChanges caused by "
-                        << instruction.name
+                        << (
+                            snapshot.instruction.has_value()
+                                ? snapshot.instruction->get().name
+                                : "initial identity step"
+                        )
                         << ":\n";
 
                 visualization::printStateComparison(beforeState, afterState, std::cout);

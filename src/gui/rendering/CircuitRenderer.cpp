@@ -143,8 +143,9 @@ namespace quantum_sim::gui {
         const float circuitContentHeight =
                 std::max(calculatedContentHeight, style_.minimumCanvasHeight);
 
-        const std::size_t instructionCount =
-                std::max<std::size_t>(instructions.size(), 1);
+        // Step zero occupies its own column before every executable instruction.
+        const std::size_t timelineColumnCount =
+                instructions.size() + 1U;
 
         const float wireStartX =
                 origin.x + style_.wireStartOffset;
@@ -160,8 +161,10 @@ namespace quantum_sim::gui {
 
         float gateSpacing = style_.gateSpacing;
 
-        if (instructionCount > 1) {
-            const float fittedSpacing = usableGateWidth / static_cast<float>(instructionCount - 1);
+        if (timelineColumnCount > 1U) {
+            const float fittedSpacing =
+                    usableGateWidth /
+                    static_cast<float>(timelineColumnCount - 1U);
 
             gateSpacing =
                     std::clamp(fittedSpacing, style_.minimumGateSpacing, style_.gateSpacing);
@@ -170,7 +173,10 @@ namespace quantum_sim::gui {
         const float lastGateX =
                 firstGateX +
                 gateSpacing *
-                static_cast<float>(instructionCount - 1);
+                static_cast<float>(timelineColumnCount - 1U);
+
+        const float firstInstructionX =
+                firstGateX + gateSpacing;
 
         const float firstWireY =
                 origin.y + style_.topMargin;
@@ -189,7 +195,7 @@ namespace quantum_sim::gui {
                     ImGui::GetMousePos();
 
             const float relativeMouseX =
-                    insertionMousePosition.x - firstGateX;
+                    insertionMousePosition.x - firstInstructionX;
 
             const float rawInsertionIndex =
                     relativeMouseX / gateSpacing;
@@ -230,7 +236,7 @@ namespace quantum_sim::gui {
                 ++candidateIndex
             ) {
                 const float insertionX =
-                        firstGateX +
+                        firstInstructionX +
                         gateSpacing *
                         static_cast<float>(candidateIndex);
 
@@ -255,7 +261,8 @@ namespace quantum_sim::gui {
                 pendingInsertionIndex_.value_or(instructions.size());
 
         const float placementX =
-                firstGateX + gateSpacing * static_cast<float>(insertionIndex);
+                firstInstructionX +
+                gateSpacing * static_cast<float>(insertionIndex);
 
         const float shiftedLastGateX =
                 placementModeActive
@@ -300,9 +307,29 @@ namespace quantum_sim::gui {
         // Layer 1: subtle instruction-column guides
         // ---------------------------------------------------------
 
+        const bool initialStepHighlighted =
+                snapshot.currentStepNumber == 0U;
+
+        drawList->AddLine(
+            ImVec2{
+                firstGateX,
+                firstWireY - style_.columnGuideVerticalPadding
+            },
+            ImVec2{
+                firstGateX,
+                lastWireY + style_.columnGuideVerticalPadding
+            },
+            initialStepHighlighted
+                ? style_.activeColumnGuideColor
+                : style_.inactiveColumnGuideColor,
+            initialStepHighlighted
+                ? style_.activeColumnGuideThickness
+                : style_.columnGuideThickness
+        );
+
         for (std::size_t instructionIndex = 0; instructionIndex < instructions.size(); ++instructionIndex) {
             std::size_t displayedInstructionIndex =
-                    instructionIndex;
+                    instructionIndex + 1U;
 
             if (placementModeActive &&
                 pendingInsertionIndex_.has_value() &&
@@ -314,8 +341,8 @@ namespace quantum_sim::gui {
                     firstGateX + gateSpacing * static_cast<float>(displayedInstructionIndex);
 
             const bool highlighted =
-                    instructionIndex ==
-                    snapshot.currentStepIndex;
+                    snapshot.currentStepNumber ==
+                    instructionIndex + 1U;
 
             const ImU32 columnGuideColor =
                     highlighted
@@ -542,6 +569,154 @@ namespace quantum_sim::gui {
                     style_.stepBadgePaddingX * 2.0F
                 );
 
+        const std::string initialStepLabel{"0"};
+
+        const ImVec2 initialLabelSize =
+                ImGui::CalcTextSize(
+                    initialStepLabel.c_str()
+                );
+
+        const ImVec2 initialLabelPosition{
+            firstGateX - initialLabelSize.x * 0.5F,
+            origin.y + style_.timelineLabelOffsetY
+        };
+
+        const ImVec2 initialBadgeMin{
+            firstGateX - stepBadgeWidth * 0.5F,
+            initialLabelPosition.y - style_.stepBadgePaddingY
+        };
+
+        const ImVec2 initialBadgeMax{
+            firstGateX + stepBadgeWidth * 0.5F,
+            initialLabelPosition.y
+            + initialLabelSize.y
+            + style_.stepBadgePaddingY
+        };
+
+        drawList->AddRectFilled(
+            initialBadgeMin,
+            initialBadgeMax,
+            initialStepHighlighted
+                ? style_.activeStepBadgeFillColor
+                : style_.stepBadgeFillColor,
+            style_.stepBadgeCornerRadius
+        );
+
+        drawList->AddText(
+            initialLabelPosition,
+            initialStepHighlighted
+                ? activeOrange(style_, pulse)
+                : style_.inactiveTimelineColor,
+            initialStepLabel.c_str()
+        );
+
+        bool initialIdentityHovered = false;
+
+        for (
+            std::size_t qubit = 0U;
+            qubit < circuit.qubitCount();
+            ++qubit
+        ) {
+            const float y =
+                    firstWireY +
+                    style_.wireSpacing *
+                    static_cast<float>(qubit);
+
+            const bool identityHovered =
+                    ImGui::IsWindowHovered() &&
+                    isPointInsideRect(
+                        mousePosition,
+                        ImVec2{
+                            firstGateX - style_.gateHalfWidth,
+                            y - style_.gateHalfHeight
+                        },
+                        ImVec2{
+                            firstGateX + style_.gateHalfWidth,
+                            y + style_.gateHalfHeight
+                        }
+                    );
+
+            initialIdentityHovered =
+                    initialIdentityHovered ||
+                    identityHovered;
+
+            drawGate(
+                drawList,
+                ImVec2{firstGateX, y},
+                "I",
+                initialStepHighlighted,
+                identityHovered,
+                false,
+                false
+            );
+        }
+
+        const bool initialBadgeHovered =
+                ImGui::IsWindowHovered() &&
+                isPointInsideRect(
+                    mousePosition,
+                    initialBadgeMin,
+                    initialBadgeMax
+                );
+
+        const bool initialStepHovered =
+                !placementModeActive &&
+                (
+                    initialBadgeHovered ||
+                    initialIdentityHovered
+                );
+
+        const bool initialStepDoubleClicked =
+                initialStepHovered &&
+                ImGui::IsMouseDoubleClicked(
+                    ImGuiMouseButton_Left
+                );
+
+        const bool initialStepClicked =
+                initialStepHovered &&
+                ImGui::IsMouseClicked(
+                    ImGuiMouseButton_Left
+                );
+
+        if (initialStepDoubleClicked) {
+            gateClickedThisFrame = true;
+            selectedInstructionIndex_.reset();
+            requestedStepJumpNumber_ = 0U;
+        } else if (initialStepClicked) {
+            gateClickedThisFrame = true;
+            selectedInstructionIndex_.reset();
+        }
+
+        if (initialStepHovered) {
+            ImGui::SetMouseCursor(
+                ImGuiMouseCursor_Hand
+            );
+
+            ImGui::SetTooltip(
+                "Step 0 of %zu\nInitial state\nIdentity on all qubits",
+                instructions.size()
+            );
+        }
+
+        if (initialStepHighlighted) {
+            drawList->AddLine(
+                ImVec2{
+                    firstGateX,
+                    origin.y + style_.executionStemStartOffsetY
+                },
+                ImVec2{
+                    firstGateX,
+                    firstWireY - style_.executionStemEndGap
+                },
+                activeOrange(
+                    style_,
+                    pulse,
+                    style_.executionStemAlpha
+                ),
+                style_.executionStemThickness
+            );
+        }
+
         for (std::size_t instructionIndex = 0;
              instructionIndex < instructions.size();
              ++instructionIndex) {
@@ -549,7 +724,7 @@ namespace quantum_sim::gui {
                     instructions[instructionIndex];
 
             std::size_t displayedInstructionIndex =
-                    instructionIndex;
+                    instructionIndex + 1U;
 
             if (
                 placementModeActive &&
@@ -563,8 +738,8 @@ namespace quantum_sim::gui {
                     firstGateX + gateSpacing * static_cast<float>(displayedInstructionIndex);
 
             const bool highlighted =
-                    instructionIndex ==
-                    snapshot.currentStepIndex;
+                    snapshot.currentStepNumber ==
+                    instructionIndex + 1U;
 
             const ImU32 instructionColor =
                     highlighted
@@ -634,7 +809,8 @@ namespace quantum_sim::gui {
             if (stepBadgeDoubleClicked) {
                 gateClickedThisFrame = true;
                 selectedInstructionIndex_ = instructionIndex;
-                requestedStepJumpIndex_ = instructionIndex;
+                requestedStepJumpNumber_ =
+                        instructionIndex + 1U;
             } else if (stepBadgeClicked) {
                 // Step badges select gates without requiring a precise gate click.
                 gateClickedThisFrame = true;
@@ -760,8 +936,8 @@ namespace quantum_sim::gui {
                     selectedInstructionIndex_ =
                             instructionIndex;
 
-                    requestedStepJumpIndex_ =
-                            instructionIndex;
+                    requestedStepJumpNumber_ =
+                            instructionIndex + 1U;
                 } else if (clicked) {
                     gateClickedThisFrame = true;
 
@@ -1186,8 +1362,8 @@ namespace quantum_sim::gui {
                 selectedInstructionIndex_ =
                         instructionIndex;
 
-                requestedStepJumpIndex_ =
-                        instructionIndex;
+                requestedStepJumpNumber_ =
+                        instructionIndex + 1U;
             } else if (clicked) {
                 gateClickedThisFrame = true;
                 if (
@@ -1242,18 +1418,16 @@ namespace quantum_sim::gui {
         );
 
         const bool activeStepNeedsFocus =
-                !instructions.empty() &&
-                (
-                    !lastFocusedStepIndex_.has_value() ||
-                    lastFocusedStepIndex_.value() != snapshot.currentStepIndex ||
-                    lastFocusedInstructionCount_ != instructions.size()
-                );
+                !lastFocusedStepNumber_.has_value() ||
+                lastFocusedStepNumber_.value() !=
+                    snapshot.currentStepNumber ||
+                lastFocusedInstructionCount_ != instructions.size();
 
         if (activeStepNeedsFocus) {
-            const std::size_t activeStepIndex =
+            const std::size_t activeStepNumber =
                     std::min(
-                        snapshot.currentStepIndex,
-                        instructions.size() - 1U
+                        snapshot.currentStepNumber,
+                        instructions.size()
                     );
 
             const float firstGateContentX =
@@ -1264,7 +1438,7 @@ namespace quantum_sim::gui {
             const float activeStepContentX =
                     firstGateContentX +
                     gateSpacing *
-                    static_cast<float>(activeStepIndex);
+                    static_cast<float>(activeStepNumber);
 
             const float centeredScrollX =
                     activeStepContentX -
@@ -1277,8 +1451,8 @@ namespace quantum_sim::gui {
                 )
             );
 
-            lastFocusedStepIndex_ =
-                    snapshot.currentStepIndex;
+            lastFocusedStepNumber_ =
+                    snapshot.currentStepNumber;
 
             lastFocusedInstructionCount_ =
                     instructions.size();
@@ -1313,9 +1487,9 @@ namespace quantum_sim::gui {
 
     std::optional<std::size_t> CircuitRenderer::consumeStepJumpRequest() noexcept {
         const std::optional<std::size_t> request =
-                requestedStepJumpIndex_;
+                requestedStepJumpNumber_;
 
-        requestedStepJumpIndex_.reset();
+        requestedStepJumpNumber_.reset();
         return request;
     }
 

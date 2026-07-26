@@ -52,6 +52,9 @@ intensity, phase in radians, real component, and imaginary component.
 | Click a voxel | Select its density layer |
 | Double-click a circuit step or gate | Jump the debugger to that step |
 
+Circuit step `0` shows an identity gate on every qubit and represents the
+untouched initial register before any instruction executes.
+
 ## Gate Library
 
 | Category | Gates |

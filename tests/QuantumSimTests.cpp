@@ -63,16 +63,39 @@ int main() {
 
     session.restart();
 
-    // After restart, the "before" state of the first step should be the original |000>.
+    // Restart exposes step zero without executing the first circuit instruction.
     const quantum_sim::debug::DebuggerSnapshot snapshot =
             session.snapshot();
 
     check(
+        snapshot.currentStepNumber == 0U &&
+        !snapshot.instruction.has_value() &&
+        !snapshot.canMovePrevious &&
+        snapshot.canMoveNext &&
+        approximatelyEqual(
+            snapshot.afterState.get().probability(0),
+            1.0
+        ) &&
         approximatelyEqual(
             snapshot.beforeState.get().probability(0),
             1.0
         ),
-        "Debugger snapshot exposes the state before the current instruction"
+        "Debugger restart exposes the untouched initial register as step zero"
+    );
+
+    session.moveNext();
+
+    const quantum_sim::debug::DebuggerSnapshot firstInstructionSnapshot =
+            session.snapshot();
+
+    check(
+        firstInstructionSnapshot.currentStepNumber == 1U &&
+        firstInstructionSnapshot.instruction.has_value() &&
+        approximatelyEqual(
+            firstInstructionSnapshot.beforeState.get().probability(0),
+            1.0
+        ),
+        "Debugger advances from initial step zero to the first instruction"
     );
 
     // The GUI default relies on this script to provide a rich density-history stack.
@@ -194,7 +217,7 @@ int main() {
 
     check(
         tenQubitSession.stepCount() == tenQubitQft.instructionCount() &&
-        tenQubitSession.currentStep().state.stateCount() == 1024U,
+        tenQubitSession.stepAt(0U).state.stateCount() == 1024U,
         "Ten-qubit QFT builds a complete debugger trace without register-sized gates"
     );
 

@@ -215,7 +215,7 @@ namespace quantum_sim::gui {
         session.restart();
 
         showNavigationConfirmation(
-            "Debugger restarted."
+            "Returned to the initial state."
         );
     }
 
@@ -341,7 +341,7 @@ namespace quantum_sim::gui {
 
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
-                "Return to the first instruction. Shortcut: R"
+                "Return to initial step zero. Shortcut: R"
             );
         }
 
@@ -526,8 +526,8 @@ namespace quantum_sim::gui {
                         )
                     );
 
-            if (selectedDensityLayer > 0U && session.hasSteps()) {
-                session.moveToStep(selectedDensityLayer - 1U);
+            if (selectedDensityLayer <= session.stepCount()) {
+                session.moveToStepNumber(selectedDensityLayer);
             }
         }
 
@@ -1268,20 +1268,20 @@ namespace quantum_sim::gui {
             ImGui::PopFont();
         }
 
-        if (snapshot.stepCount == 0) {
-            ImGui::TextUnformatted("Step 0 / 0");
-        } else {
-            ImGui::Text(
-                "Step %d / %d",
-                static_cast<int>(snapshot.currentStepIndex + 1),
-                static_cast<int>(snapshot.stepCount)
-            );
-        }
+        ImGui::Text(
+            "Step %zu / %zu",
+            snapshot.currentStepNumber,
+            snapshot.stepCount
+        );
 
-        if (selectedInstructionIndex.has_value()) {
+        if (snapshot.currentStepNumber == 0U) {
+            ImGui::TextDisabled(
+                "Showing the untouched initial register."
+            );
+        } else if (selectedInstructionIndex.has_value()) {
             ImGui::TextDisabled(
                 "Showing state after instruction %zu.",
-                selectedInstructionIndex.value()
+                selectedInstructionIndex.value() + 1U
             );
         } else {
             ImGui::TextDisabled(
