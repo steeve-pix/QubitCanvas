@@ -750,12 +750,36 @@ flat out vec4 vMaterial;
 
 void main() {
     vec3 safeSize = max(aInstanceSize, vec3(0.001));
-    vec3 worldPosition = aInstanceCenter + aPosition * safeSize;
+    vec3 roundedNormal = normalize(aNormal);
+
+    // Reconstruct the rounded box in world units so a tall Floor Field column
+    // keeps the same corner radius as a regular voxel. Directly scaling the
+    // shared mesh would stretch its top and bottom curves into a capsule.
+    const float unitRadius = 0.22;
+    const float unitInnerExtent = 0.50 - unitRadius;
+    float worldRadius =
+        min(min(safeSize.x, safeSize.y), safeSize.z) *
+        unitRadius;
+    vec3 unitNearest =
+        aPosition -
+        roundedNormal * unitRadius;
+    vec3 normalizedNearest =
+        unitNearest /
+        unitInnerExtent;
+    vec3 worldInnerExtent =
+        max(
+            safeSize * 0.5 - vec3(worldRadius),
+            vec3(0.0005)
+        );
+    vec3 worldPosition =
+        aInstanceCenter +
+        normalizedNearest * worldInnerExtent +
+        roundedNormal * worldRadius;
     vec4 viewPosition = uView * vec4(worldPosition, 1.0);
 
     vWorldPosition = worldPosition;
     vViewPosition = viewPosition.xyz;
-    vNormal = normalize(aNormal / safeSize);
+    vNormal = roundedNormal;
     vLocalPosition = aPosition;
     vColor = aInstanceColor;
     vMaterial = aInstanceMaterial;
@@ -793,31 +817,49 @@ void main() {
 
     float fill = max(dot(normal, fillDirection), 0.0);
     float hemisphere = normal.y * 0.5 + 0.5;
+    float viewFacing = max(dot(normal, viewDirection), 0.0);
 
     vec3 halfVector = normalize(keyDirection + viewDirection);
     float specular = pow(
         max(dot(normal, halfVector), 0.0),
-        42.0
+        18.0
     );
 
     float selected = abs(vMaterial.z - uSelectedLayer) < 0.45
-        ? 1.06
-        : 0.92;
+        ? 1.04
+        : 0.94;
 
     float faceLight =
-        0.72 +
-        wrappedKey * 0.20 +
-        fill * 0.055 +
+        0.82 +
+        wrappedKey * 0.10 +
+        fill * 0.025 +
         hemisphere * 0.045;
 
     vec3 base = max(vColor * uHeat, vec3(0.0005));
+
+    // QuantumAtom's density points read as soft samples because their centers
+    // carry the color while their silhouettes recede. Recreate that behavior
+    // on a real rounded cuboid by darkening its geometric rim and corners.
+    float surfaceRadius = length(vLocalPosition);
+    float densityCore =
+        1.0 -
+        smoothstep(0.50, 0.82, surfaceRadius);
+    float fresnelRim = pow(1.0 - viewFacing, 1.65);
+    float softBody =
+        mix(0.74, 1.07, densityCore) *
+        mix(1.0, 0.82, fresnelRim);
+
     vec3 highlight =
-        vec3(1.0, 0.78, 0.44) *
+        mix(base, vec3(1.0, 0.72, 0.38), 0.30) *
         specular *
-        (0.08 + vMaterial.x * 0.18);
+        (0.025 + vMaterial.x * 0.075);
 
     vec3 lit =
-        base * faceLight * selected +
+        base *
+        faceLight *
+        selected *
+        softBody +
+        base * (0.025 + vMaterial.x * 0.075) +
         highlight;
 
     sceneColor = vec4(lit, 1.0);
@@ -828,12 +870,17 @@ void main() {
         vec3(0.2126, 0.7152, 0.0722)
     );
     float bloomMask = smoothstep(
-        0.15,
-        0.55,
+        0.12,
+        0.48,
         luminance
     );
+
+    float bloomEnergy =
+        (0.32 + vMaterial.x * 0.68) *
+        mix(0.62, 1.0, densityCore);
+
     brightColor = vec4(
-        lit * bloomMask,
+        lit * bloomMask * bloomEnergy,
         1.0
     );
 }

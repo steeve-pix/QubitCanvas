@@ -12,11 +12,13 @@ namespace quantum_sim::gui::density_volume {
     /**
      * Instanced OpenGL renderer for the interactive density-matrix history.
      *
-     * A shared rounded cube is drawn once per visible density cell. A separate
-     * instanced edge pass preserves the shape of exact small matrices without
-     * filling near-zero cells. The scene is rendered into linear HDR,
-     * integer-picking, and emissive attachments before restrained bloom and
-     * linear-to-sRGB conversion produce the Dear ImGui texture.
+     * A shared rounded cube with a soft density-core material is drawn once per
+     * visible density cell. Its vertex transform preserves a constant corner
+     * radius under non-uniform Floor Field scaling. A separate instanced edge
+     * pass preserves exact small matrices without filling near-zero cells. The
+     * scene is rendered into linear HDR, integer-picking, and emissive
+     * attachments before restrained bloom and linear-to-sRGB conversion
+     * produce the Dear ImGui texture.
      */
     class Renderer {
     public:
