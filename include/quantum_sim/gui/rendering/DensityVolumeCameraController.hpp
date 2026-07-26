@@ -17,6 +17,18 @@ namespace quantum_sim::gui::density_volume {
         void frameScene(const Vector3 &center, float radius);
 
         /**
+         * Refreshes scene-aware reset and clipping bounds without moving the camera.
+         *
+         * Playback calls this when the visible layer range changes. The current
+         * orbit, pan target, and zoom remain untouched, while a later reset uses
+         * the newest complete-scene composition.
+         *
+         * @param center Stable look-at target at the latest scene bounds center.
+         * @param radius Bounding-sphere radius used for reset distance and clip planes.
+         */
+        void updateSceneBounds(const Vector3 &center, float radius) noexcept;
+
+        /**
          * Advances current camera values toward their input targets.
          *
          * @param deltaTime Frame duration in seconds.

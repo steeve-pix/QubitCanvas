@@ -10,6 +10,7 @@
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeLayout.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeMeshBuilder.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
 
 #include <algorithm>
 #include <sstream>
@@ -580,6 +581,53 @@ int main() {
             metadataAngle
         ),
         "Rotation circuits retain their angle in instruction metadata"
+    );
+
+    quantum_sim::gui::density_volume::CameraController densityCamera;
+    densityCamera.frameScene(
+        quantum_sim::gui::density_volume::Vector3{0.0F, 0.0F, 0.0F},
+        4.0F
+    );
+    densityCamera.orbit(80.0F, -25.0F);
+    densityCamera.pan(12.0F, -6.0F);
+    densityCamera.zoom(1.0F);
+    densityCamera.update(0.1F);
+
+    const auto userCameraView =
+            densityCamera.viewMatrix();
+
+    densityCamera.updateSceneBounds(
+        quantum_sim::gui::density_volume::Vector3{6.0F, 2.0F, -3.0F},
+        12.0F
+    );
+
+    const auto playbackUpdatedView =
+            densityCamera.viewMatrix();
+
+    check(
+        std::equal(
+            userCameraView.begin(),
+            userCameraView.end(),
+            playbackUpdatedView.begin(),
+            [](const float left, const float right) {
+                return approximatelyEqual(left, right, 1e-6);
+            }
+        ),
+        "Density scene updates preserve the user camera pose"
+    );
+
+    densityCamera.reset();
+
+    check(
+        !std::equal(
+            userCameraView.begin(),
+            userCameraView.end(),
+            densityCamera.viewMatrix().begin(),
+            [](const float left, const float right) {
+                return approximatelyEqual(left, right, 1e-6);
+            }
+        ),
+        "Density camera reset uses the latest scene bounds"
     );
 
     if (failures == 0) {

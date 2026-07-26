@@ -713,8 +713,19 @@ namespace quantum_sim::gui {
                     visualizationMode
                 );
 
-        if (sceneChanged || !densityVolumeCamera_.isFramed()) {
+        if (
+            densityVolumeCameraFramePending_ ||
+            !densityVolumeCamera_.isFramed()
+        ) {
             densityVolumeCamera_.frameScene(
+                densityVolumeRenderer_.sceneCenter(),
+                densityVolumeRenderer_.sceneRadius()
+            );
+            densityVolumeCameraFramePending_ = false;
+        } else if (sceneChanged) {
+            // Playback changes the visible layer range, but that data refresh
+            // must not overwrite the camera pose chosen by the user.
+            densityVolumeCamera_.updateSceneBounds(
                 densityVolumeRenderer_.sceneCenter(),
                 densityVolumeRenderer_.sceneRadius()
             );
@@ -951,6 +962,7 @@ namespace quantum_sim::gui {
         }
 
         lastDensityDebuggerStep_.reset();
+        densityVolumeCameraFramePending_ = true;
     }
 
     void GuiApplication::synchronizeDensityLayer(
@@ -1077,7 +1089,10 @@ namespace quantum_sim::gui {
             }
 
             if (pressed) {
-                canvasMode_ = mode;
+                if (canvasMode_ != mode) {
+                    canvasMode_ = mode;
+                    densityVolumeCameraFramePending_ = true;
+                }
             }
         };
 
@@ -1286,13 +1301,19 @@ namespace quantum_sim::gui {
                  ImGui::GetStyle().ItemSpacing.x) * 0.5F;
 
         if (ImGui::Button("Layer Stack", ImVec2{modeWidth, 0.0F})) {
-            canvasMode_ = CanvasMode::LayerStack;
+            if (canvasMode_ != CanvasMode::LayerStack) {
+                canvasMode_ = CanvasMode::LayerStack;
+                densityVolumeCameraFramePending_ = true;
+            }
         }
 
         ImGui::SameLine();
 
         if (ImGui::Button("Floor Field", ImVec2{modeWidth, 0.0F})) {
-            canvasMode_ = CanvasMode::FloorField;
+            if (canvasMode_ != CanvasMode::FloorField) {
+                canvasMode_ = CanvasMode::FloorField;
+                densityVolumeCameraFramePending_ = true;
+            }
         }
 
         ImGui::TextDisabled("Heat");
