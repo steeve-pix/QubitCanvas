@@ -111,9 +111,5 @@ namespace quantum_sim::gui {
          */
         void drawRotationAngleControl();
 
-        /**
-         * Draws the selected-gate readout and clear button.
-         */
-        void drawSelectionSummary();
     };
 }
