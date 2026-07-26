@@ -43,6 +43,9 @@ namespace quantum_sim::gui::density_volume {
      */
     class MeshBuilder {
     public:
+        static constexpr std::size_t verticesPerVoxel = 24U;
+        static constexpr std::size_t indicesPerBeveledVoxel = 132U;
+
         /**
          * Creates 24 shared face vertices plus indexed face, edge, and corner
          * triangles for each beveled cuboid. Face-aligned normals blend across
@@ -52,5 +55,17 @@ namespace quantum_sim::gui::density_volume {
          * @return Upload-ready mesh and one-based GPU pick mapping.
          */
         [[nodiscard]] static Mesh build(const SceneLayout &layout);
+
+        /**
+         * Appends positioned voxels to an existing indexed mesh.
+         *
+         * Existing vertex offsets and one-based picking identifiers are
+         * preserved so playback can add one history layer without rebuilding
+         * geometry for earlier layers.
+         *
+         * @param mesh Existing mesh receiving the new geometry.
+         * @param layout Positioned voxels to append.
+         */
+        static void append(Mesh &mesh, const SceneLayout &layout);
     };
 }

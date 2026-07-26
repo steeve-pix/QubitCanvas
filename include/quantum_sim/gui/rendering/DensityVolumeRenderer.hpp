@@ -119,7 +119,13 @@ namespace quantum_sim::gui::density_volume {
         std::optional<VisualizationMode> sceneMode_;
         Vector3 sceneCenter_{};
         float sceneRadius_{1.0F};
-        std::vector<Selection> pickRecords_;
+        Mesh sceneMesh_;
+        std::vector<std::size_t> layerIndexCounts_;
+        std::vector<Vector3> layerSceneCenters_;
+        std::vector<float> layerSceneRadii_;
+        std::optional<std::size_t> builtThroughLayer_;
+        std::size_t vertexCapacity_{};
+        std::size_t indexCapacity_{};
         bool initialized_{false};
 
         /**
@@ -136,6 +142,30 @@ namespace quantum_sim::gui::density_volume {
          * Uploads one generated scene mesh to the existing VBO and EBO.
          */
         void uploadMesh(const Mesh &mesh);
+
+        /**
+         * Preallocates GPU storage for an incrementally generated layer stack.
+         *
+         * @param vertexCapacity Maximum number of MeshVertex elements.
+         * @param indexCapacity Maximum number of uint32 indices.
+         */
+        void allocateMeshStorage(
+            std::size_t vertexCapacity,
+            std::size_t indexCapacity
+        );
+
+        /**
+         * Uploads only the suffix appended since the previous playback step.
+         *
+         * @param mesh Complete CPU-side scene mesh.
+         * @param firstVertex First newly appended vertex.
+         * @param firstIndex First newly appended index.
+         */
+        void uploadMeshSuffix(
+            const Mesh &mesh,
+            std::size_t firstVertex,
+            std::size_t firstIndex
+        );
 
         /**
          * Allocates color, picking, and depth attachments for a viewport size.

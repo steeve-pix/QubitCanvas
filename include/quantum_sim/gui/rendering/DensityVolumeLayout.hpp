@@ -60,5 +60,21 @@ namespace quantum_sim::gui::density_volume {
             std::size_t selectedLayer,
             VisualizationMode mode
         );
+
+        /**
+         * Positions exactly one density layer for incremental mesh generation.
+         *
+         * Layer-stack mode retains the layer's absolute history height and
+         * reports bounds through that layer. Floor-field mode places the layer
+         * at ground level.
+         *
+         * @param layer Numerical density layer to position.
+         * @param mode Spatial presentation to build.
+         * @return One-layer layout with scene bounds matching the selected layer.
+         */
+        [[nodiscard]] static SceneLayout buildLayer(
+            const DensityLayer &layer,
+            VisualizationMode mode
+        );
     };
 }

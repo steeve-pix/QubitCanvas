@@ -118,21 +118,10 @@ namespace quantum_sim::gui::density_volume {
             }
         }
 
-        [[nodiscard]] SceneLayout buildFloorField(
+        void setFloorFieldBounds(
+            SceneLayout &layout,
             const DensityLayer &layer
-        ) {
-            SceneLayout layout;
-            layout.voxels.reserve(layer.cells.size() * 2U);
-
-            appendDensityLayer(
-                layout,
-                layer,
-                0.0F,
-                floorBaseThickness,
-                floorMaximumVoxelHeight,
-                floorMinimumVisibleHeight
-            );
-
+        ) noexcept {
             const float totalHeight =
                     floorBaseThickness + floorMaximumVoxelHeight;
 
@@ -150,6 +139,50 @@ namespace quantum_sim::gui::density_volume {
                         std::pow(layerSide * 0.5F, 2.0F) * 2.0F +
                         std::pow(totalHeight * 0.5F, 2.0F)
                     );
+        }
+
+        void setLayerStackBounds(
+            SceneLayout &layout,
+            const DensityLayer &lastLayer
+        ) noexcept {
+            const float historyHeight =
+                    static_cast<float>(lastLayer.index) *
+                    stackLayerSpacing +
+                    stackBaseThickness +
+                    stackMaximumVoxelHeight;
+
+            const float layerSide =
+                    matrixSide(lastLayer);
+
+            layout.center = Vector3{
+                0.0F,
+                historyHeight * 0.5F,
+                0.0F
+            };
+
+            layout.radius =
+                    std::sqrt(
+                        std::pow(layerSide * 0.5F, 2.0F) * 2.0F +
+                        std::pow(historyHeight * 0.5F, 2.0F)
+                    );
+        }
+
+        [[nodiscard]] SceneLayout buildFloorField(
+            const DensityLayer &layer
+        ) {
+            SceneLayout layout;
+            layout.voxels.reserve(layer.cells.size() * 2U);
+
+            appendDensityLayer(
+                layout,
+                layer,
+                0.0F,
+                floorBaseThickness,
+                floorMaximumVoxelHeight,
+                floorMinimumVisibleHeight
+            );
+
+            setFloorFieldBounds(layout, layer);
 
             return layout;
         }
@@ -179,26 +212,7 @@ namespace quantum_sim::gui::density_volume {
                 );
             }
 
-            const float historyHeight =
-                    static_cast<float>(lastLayer) *
-                    stackLayerSpacing +
-                    stackBaseThickness +
-                    stackMaximumVoxelHeight;
-
-            const float layerSide =
-                    matrixSide(stack.layers[lastLayer]);
-
-            layout.center = Vector3{
-                0.0F,
-                historyHeight * 0.5F,
-                0.0F
-            };
-
-            layout.radius =
-                    std::sqrt(
-                        std::pow(layerSide * 0.5F, 2.0F) * 2.0F +
-                        std::pow(historyHeight * 0.5F, 2.0F)
-                    );
+            setLayerStackBounds(layout, stack.layers[lastLayer]);
 
             return layout;
         }
@@ -222,5 +236,29 @@ namespace quantum_sim::gui::density_volume {
         return mode == VisualizationMode::FloorField
                    ? buildFloorField(stack.layers[lastLayer])
                    : buildLayerStack(stack, lastLayer);
+    }
+
+    SceneLayout LayerStackLayout::buildLayer(
+        const DensityLayer &layer,
+        const VisualizationMode mode
+    ) {
+        if (mode == VisualizationMode::FloorField) {
+            return buildFloorField(layer);
+        }
+
+        SceneLayout layout;
+        layout.voxels.reserve(layer.cells.size() * 2U);
+
+        appendDensityLayer(
+            layout,
+            layer,
+            static_cast<float>(layer.index) * stackLayerSpacing,
+            stackBaseThickness,
+            stackMaximumVoxelHeight,
+            stackMinimumVisibleHeight
+        );
+
+        setLayerStackBounds(layout, layer);
+        return layout;
     }
 }
