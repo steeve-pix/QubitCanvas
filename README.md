@@ -25,11 +25,13 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 ## Density Volume
 
 The Density Volume panel converts each debugger state into
-`ρ = |ψ><ψ|`. Numerically visible cells become fixed-size opaque instances of
-one indexed rounded cube, while near-zero cells are omitted from the solid
-pass. Exact matrices up to 16x16 retain a separate faint edge-only ghost pass
-so every layer stays recognizable; bucketed large-register matrices skip those
-ghosts to preserve clarity and performance.
+`ρ = |ψ><ψ|`. Numerically visible cells become opaque instances of one indexed,
+smoothly rounded cube with a soft density-core material. The roundover keeps a
+constant world-space radius when Floor Field instances grow vertically, so
+tall values remain cuboids instead of stretching into capsules. Near-zero cells
+are omitted from the solid pass. Exact matrices up to 16x16 retain a separate
+faint edge-only ghost pass so every layer stays recognizable; bucketed
+large-register matrices skip those ghosts to preserve clarity and performance.
 
 Magnitude follows a tone-shaped Inferno ramp. Colors are converted from sRGB
 to linear space before amplitude-dependent glow is applied, then a half-size

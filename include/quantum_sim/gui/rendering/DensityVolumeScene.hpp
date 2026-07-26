@@ -83,8 +83,10 @@ namespace quantum_sim::gui::density_volume {
         /**
          * Generates a unit cube with broad planar faces and rounded transitions.
          *
-         * Face vertices are intentionally duplicated so each face can retain a
-         * stable tangent orientation while bevel normals blend around edges.
+         * Face vertices are intentionally duplicated so each face retains a
+         * stable tangent orientation. A densely sampled, deep bevel blends
+         * normals around the silhouette without replacing the real mesh with
+         * a screen-facing sprite.
          *
          * @return Counter-clockwise indexed geometry centered on the origin.
          */

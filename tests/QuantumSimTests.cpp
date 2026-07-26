@@ -560,8 +560,8 @@ int main() {
             quantum_sim::gui::density_volume::VoxelGeometryBuilder::buildRoundedCube();
 
     check(
-        roundedCube.vertices.size() == 54U &&
-        roundedCube.indices.size() == 144U &&
+        roundedCube.vertices.size() == 150U &&
+        roundedCube.indices.size() == 576U &&
         std::all_of(
             roundedCube.vertices.begin(),
             roundedCube.vertices.end(),
@@ -597,7 +597,7 @@ int main() {
         largeHistoryScene.ghostVoxels.empty() &&
         largeHistoryScene.layerEndInstanceCounts.at(105U) <=
             106U * 256U &&
-        roundedCube.vertices.size() < 100U,
+        roundedCube.vertices.size() < 200U,
         "Ten-qubit history omits zero geometry and reuses one shared cube"
     );
 
