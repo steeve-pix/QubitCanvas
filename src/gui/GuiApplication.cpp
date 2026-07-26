@@ -274,6 +274,13 @@ namespace quantum_sim::gui {
             const bool canRedo =
                     !redoHistory_.empty();
 
+            const auto toolbarSelectedInstructionIndex =
+                    circuitRenderer_.selectedInstructionIndex();
+
+            const bool canDeleteSelectedInstruction =
+                    toolbarSelectedInstructionIndex.has_value() &&
+                    !pendingGate_.has_value();
+
             const bool redoShortcutPressed =
                     canRedo &&
                     !io.WantTextInput &&
@@ -335,6 +342,48 @@ namespace quantum_sim::gui {
                 redoLastCircuitEdit();
             }
 
+            ImGui::SameLine();
+
+            if (!canDeleteSelectedInstruction) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool deleteButtonPressed =
+                    ImGui::Button(
+                        "Delete selected gate  [Delete]"
+                    );
+
+            if (
+                ImGui::IsItemHovered(
+                    ImGuiHoveredFlags_AllowWhenDisabled
+                )
+            ) {
+                ImGui::SetTooltip(
+                    canDeleteSelectedInstruction
+                        ? "Remove the selected circuit instruction. Shortcut: Delete"
+                        : "Select a circuit gate before deleting it."
+                );
+            }
+
+            if (!canDeleteSelectedInstruction) {
+                ImGui::EndDisabled();
+            }
+
+            const bool deleteShortcutPressed =
+                    canDeleteSelectedInstruction &&
+                    !io.WantTextInput &&
+                    ImGui::IsKeyPressed(ImGuiKey_Delete);
+
+            if (
+                canDeleteSelectedInstruction &&
+                (
+                    deleteButtonPressed ||
+                    deleteShortcutPressed
+                )
+            ) {
+                queuedInstructionDeletion_ =
+                        toolbarSelectedInstructionIndex.value();
+            }
 
             if (showHistoryDebugInfo_) {
                 ImGui::TextDisabled(
@@ -373,39 +422,6 @@ namespace quantum_sim::gui {
 
             const auto selectedInstructionIndex =
                     circuitRenderer_.selectedInstructionIndex();
-
-            const bool canDeleteSelectedInstruction =
-                    selectedInstructionIndex.has_value() &&
-                    !pendingGate_.has_value();
-
-            if (!canDeleteSelectedInstruction) {
-                ImGui::BeginDisabled();
-            }
-
-            const bool deleteButtonPressed =
-                    ImGui::Button(
-                        "Delete selected gate  [Delete]"
-                    );
-
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
-                    "Remove the selected circuit instruction. Shortcut: Delete"
-                );
-            }
-
-            const bool deleteShortcutPressed =
-                    canDeleteSelectedInstruction &&
-                    !io.WantTextInput &&
-                    ImGui::IsKeyPressed(ImGuiKey_Delete);
-
-            if (canDeleteSelectedInstruction && (deleteButtonPressed || deleteShortcutPressed)) {
-                queuedInstructionDeletion_ =
-                        selectedInstructionIndex.value();
-            }
-
-            if (!canDeleteSelectedInstruction) {
-                ImGui::EndDisabled();
-            }
 
             ImGui::End();
 
