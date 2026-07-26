@@ -13,8 +13,9 @@ namespace quantum_sim::gui::density_volume {
     /**
      * Raw OpenGL renderer for the interactive Density Volume density-matrix history.
      *
-     * The renderer owns the scene VAO/VBO/EBO, shader program, color texture,
-     * integer picking texture, depth buffer, and framebuffer.
+     * The renderer owns the scene VAO/VBO/EBO, geometry and post-process
+     * shaders, HDR scene/bloom textures, integer picking texture, depth buffer,
+     * blur targets, and the final framebuffer displayed by Dear ImGui.
      */
     class Renderer {
     public:
@@ -103,16 +104,28 @@ namespace quantum_sim::gui::density_volume {
         unsigned int vertexBuffer_{};
         unsigned int indexBuffer_{};
         unsigned int shaderProgram_{};
+        unsigned int blurShaderProgram_{};
+        unsigned int compositeShaderProgram_{};
+        unsigned int postProcessVertexArray_{};
         unsigned int framebuffer_{};
         unsigned int colorTexture_{};
+        unsigned int sceneColorTexture_{};
+        unsigned int brightTexture_{};
         unsigned int pickTexture_{};
         unsigned int depthStencilBuffer_{};
+        unsigned int blurFramebuffers_[2]{};
+        unsigned int blurTextures_[2]{};
+        unsigned int compositeFramebuffer_{};
         int framebufferWidth_{};
         int framebufferHeight_{};
         int modelUniform_{-1};
         int viewUniform_{-1};
         int projectionUniform_{-1};
         int selectedLayerUniform_{-1};
+        int blurInputUniform_{-1};
+        int blurHorizontalUniform_{-1};
+        int compositeSceneUniform_{-1};
+        int compositeBloomUniform_{-1};
         std::size_t indexCount_{};
         std::uint64_t sceneFingerprint_{};
         std::optional<std::size_t> sceneVisibleThroughLayer_;
@@ -129,14 +142,25 @@ namespace quantum_sim::gui::density_volume {
         bool initialized_{false};
 
         /**
-         * Compiles and links the Density Volume color/picking shader program.
+         * Compiles and links the Density Volume scene, picking, and bright-pass
+         * shader program.
          */
         void createShaderProgram();
+
+        /**
+         * Compiles the separable blur and final tone-mapping shader programs.
+         */
+        void createPostProcessPrograms();
 
         /**
          * Creates the VAO, VBO, EBO, and interleaved vertex attributes.
          */
         void createMeshBuffers();
+
+        /**
+         * Creates the empty core-profile VAO used by full-screen triangle passes.
+         */
+        void createPostProcessVertexArray();
 
         /**
          * Uploads one generated scene mesh to the existing VBO and EBO.
@@ -168,8 +192,20 @@ namespace quantum_sim::gui::density_volume {
         );
 
         /**
-         * Allocates color, picking, and depth attachments for a viewport size.
+         * Allocates HDR scene, emissive, picking, blur, final-color, and depth
+         * attachments for a viewport size.
          */
         void resizeFramebuffer(int width, int height);
+
+        /**
+         * Blurs the emissive attachment and composites it with the HDR scene.
+         *
+         * The final tone-mapped result is written to colorTexture_ for display
+         * through ImGui::Image().
+         *
+         * @param width Current framebuffer width.
+         * @param height Current framebuffer height.
+         */
+        void renderPostProcess(int width, int height);
     };
 }

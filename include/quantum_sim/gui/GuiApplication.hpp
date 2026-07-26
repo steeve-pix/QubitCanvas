@@ -183,6 +183,13 @@ namespace quantum_sim::gui {
         void popApplicationFont() const;
 
         /**
+         * Handles application-wide keyboard commands that are safe outside text input.
+         *
+         * Escape cancels an armed gate placement and Space toggles playback.
+         */
+        void handleGlobalShortcuts();
+
+        /**
          * Draws the application background behind the docked panels.
          */
         void drawBackdrop() const;

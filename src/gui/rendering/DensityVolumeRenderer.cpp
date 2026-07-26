@@ -44,6 +44,78 @@ namespace quantum_sim::gui::density_volume {
                 std::string{"Failed to compile "} + label + ": " + log
             };
         }
+
+        [[nodiscard]] unsigned int createProgram(
+            const char *vertexSource,
+            const char *fragmentSource,
+            const char *label
+        ) {
+            const unsigned int vertexShader =
+                    compileShader(
+                        GL_VERTEX_SHADER,
+                        vertexSource,
+                        label
+                    );
+
+            unsigned int fragmentShader{};
+            unsigned int program{};
+
+            try {
+                fragmentShader =
+                        compileShader(
+                            GL_FRAGMENT_SHADER,
+                            fragmentSource,
+                            label
+                        );
+
+                program =
+                        glCreateProgram();
+
+                glAttachShader(program, vertexShader);
+                glAttachShader(program, fragmentShader);
+                glLinkProgram(program);
+
+                int linked{};
+                glGetProgramiv(program, GL_LINK_STATUS, &linked);
+
+                if (linked != GL_TRUE) {
+                    int logLength{};
+                    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
+
+                    std::string log(
+                        static_cast<std::size_t>(std::max(logLength, 1)),
+                        '\0'
+                    );
+
+                    glGetProgramInfoLog(
+                        program,
+                        logLength,
+                        nullptr,
+                        log.data()
+                    );
+
+                    throw std::runtime_error{
+                        std::string{"Failed to link "} + label + ": " + log
+                    };
+                }
+            } catch (...) {
+                if (program != 0U) {
+                    glDeleteProgram(program);
+                }
+
+                glDeleteShader(vertexShader);
+
+                if (fragmentShader != 0U) {
+                    glDeleteShader(fragmentShader);
+                }
+
+                throw;
+            }
+
+            glDeleteShader(vertexShader);
+            glDeleteShader(fragmentShader);
+            return program;
+        }
     }
 
     void Renderer::initialize() {
@@ -53,11 +125,18 @@ namespace quantum_sim::gui::density_volume {
 
         try {
             createShaderProgram();
+            createPostProcessPrograms();
             createMeshBuffers();
+            createPostProcessVertexArray();
 
             glGenFramebuffers(1, &framebuffer_);
+            glGenFramebuffers(1, &compositeFramebuffer_);
+            glGenFramebuffers(2, blurFramebuffers_);
             glGenTextures(1, &colorTexture_);
+            glGenTextures(1, &sceneColorTexture_);
+            glGenTextures(1, &brightTexture_);
             glGenTextures(1, &pickTexture_);
+            glGenTextures(2, blurTextures_);
             glGenRenderbuffers(1, &depthStencilBuffer_);
             initialized_ = true;
         } catch (...) {
@@ -309,10 +388,20 @@ namespace quantum_sim::gui::density_volume {
         int previousViewport[4]{};
         int previousProgram{};
         int previousVertexArray{};
+        int previousActiveTexture{};
+        int previousTexture0{};
+        int previousTexture1{};
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
         glGetIntegerv(GL_VIEWPORT, previousViewport);
         glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
         glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVertexArray);
+        glGetIntegerv(GL_ACTIVE_TEXTURE, &previousActiveTexture);
+
+        glActiveTexture(GL_TEXTURE0);
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture0);
+        glActiveTexture(GL_TEXTURE1);
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture1);
+        glActiveTexture(static_cast<unsigned int>(previousActiveTexture));
 
         const bool depthTestWasEnabled =
                 glIsEnabled(GL_DEPTH_TEST) == GL_TRUE;
@@ -323,6 +412,9 @@ namespace quantum_sim::gui::density_volume {
         const bool blendingWasEnabled =
                 glIsEnabled(GL_BLEND) == GL_TRUE;
 
+        const bool scissorTestWasEnabled =
+                glIsEnabled(GL_SCISSOR_TEST) == GL_TRUE;
+
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
         glViewport(0, 0, safeWidth, safeHeight);
         glEnable(GL_DEPTH_TEST);
@@ -331,18 +423,21 @@ namespace quantum_sim::gui::density_volume {
         glCullFace(GL_BACK);
         glFrontFace(GL_CCW);
         glDisable(GL_BLEND);
+        glDisable(GL_SCISSOR_TEST);
 
         constexpr float clearColor[4]{
-            0.006F,
-            0.010F,
-            0.020F,
+            0.00008F,
+            0.00014F,
+            0.00035F,
             1.0F
         };
 
         constexpr unsigned int clearPick[4]{0U, 0U, 0U, 0U};
+        constexpr float clearBloom[4]{0.0F, 0.0F, 0.0F, 1.0F};
 
         glClearBufferfv(GL_COLOR, 0, clearColor);
         glClearBufferuiv(GL_COLOR, 1, clearPick);
+        glClearBufferfv(GL_COLOR, 2, clearBloom);
         glClearBufferfi(GL_DEPTH_STENCIL, 0, 1.0F, 0);
 
         const Matrix4 model =
@@ -379,20 +474,46 @@ namespace quantum_sim::gui::density_volume {
             );
         }
 
+        renderPostProcess(safeWidth, safeHeight);
+
         glBindVertexArray(static_cast<unsigned int>(previousVertexArray));
         glUseProgram(static_cast<unsigned int>(previousProgram));
 
-        if (!depthTestWasEnabled) {
+        if (depthTestWasEnabled) {
+            glEnable(GL_DEPTH_TEST);
+        } else {
             glDisable(GL_DEPTH_TEST);
         }
 
-        if (!cullFaceWasEnabled) {
+        if (cullFaceWasEnabled) {
+            glEnable(GL_CULL_FACE);
+        } else {
             glDisable(GL_CULL_FACE);
         }
 
         if (blendingWasEnabled) {
             glEnable(GL_BLEND);
+        } else {
+            glDisable(GL_BLEND);
         }
+
+        if (scissorTestWasEnabled) {
+            glEnable(GL_SCISSOR_TEST);
+        } else {
+            glDisable(GL_SCISSOR_TEST);
+        }
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(
+            GL_TEXTURE_2D,
+            static_cast<unsigned int>(previousTexture0)
+        );
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(
+            GL_TEXTURE_2D,
+            static_cast<unsigned int>(previousTexture1)
+        );
+        glActiveTexture(static_cast<unsigned int>(previousActiveTexture));
 
         glBindFramebuffer(
             GL_FRAMEBUFFER,
@@ -457,14 +578,41 @@ namespace quantum_sim::gui::density_volume {
     }
 
     void Renderer::shutdown() noexcept {
+        if (compositeFramebuffer_ != 0U) {
+            glDeleteFramebuffers(1, &compositeFramebuffer_);
+            compositeFramebuffer_ = 0U;
+        }
+
+        if (blurFramebuffers_[0] != 0U || blurFramebuffers_[1] != 0U) {
+            glDeleteFramebuffers(2, blurFramebuffers_);
+            blurFramebuffers_[0] = 0U;
+            blurFramebuffers_[1] = 0U;
+        }
+
         if (depthStencilBuffer_ != 0U) {
             glDeleteRenderbuffers(1, &depthStencilBuffer_);
             depthStencilBuffer_ = 0U;
         }
 
+        if (blurTextures_[0] != 0U || blurTextures_[1] != 0U) {
+            glDeleteTextures(2, blurTextures_);
+            blurTextures_[0] = 0U;
+            blurTextures_[1] = 0U;
+        }
+
         if (pickTexture_ != 0U) {
             glDeleteTextures(1, &pickTexture_);
             pickTexture_ = 0U;
+        }
+
+        if (brightTexture_ != 0U) {
+            glDeleteTextures(1, &brightTexture_);
+            brightTexture_ = 0U;
+        }
+
+        if (sceneColorTexture_ != 0U) {
+            glDeleteTextures(1, &sceneColorTexture_);
+            sceneColorTexture_ = 0U;
         }
 
         if (colorTexture_ != 0U) {
@@ -497,12 +645,31 @@ namespace quantum_sim::gui::density_volume {
             shaderProgram_ = 0U;
         }
 
+        if (blurShaderProgram_ != 0U) {
+            glDeleteProgram(blurShaderProgram_);
+            blurShaderProgram_ = 0U;
+        }
+
+        if (compositeShaderProgram_ != 0U) {
+            glDeleteProgram(compositeShaderProgram_);
+            compositeShaderProgram_ = 0U;
+        }
+
+        if (postProcessVertexArray_ != 0U) {
+            glDeleteVertexArrays(1, &postProcessVertexArray_);
+            postProcessVertexArray_ = 0U;
+        }
+
         framebufferWidth_ = 0;
         framebufferHeight_ = 0;
         modelUniform_ = -1;
         viewUniform_ = -1;
         projectionUniform_ = -1;
         selectedLayerUniform_ = -1;
+        blurInputUniform_ = -1;
+        blurHorizontalUniform_ = -1;
+        compositeSceneUniform_ = -1;
+        compositeBloomUniform_ = -1;
         indexCount_ = 0U;
         sceneFingerprint_ = 0U;
         sceneVisibleThroughLayer_.reset();
@@ -582,12 +749,13 @@ uniform int uSelectedLayer;
 
 layout (location = 0) out vec4 fragmentColor;
 layout (location = 1) out uint pickOutput;
+layout (location = 2) out vec4 brightColor;
 
 void main() {
     vec3 normal = normalize(vViewNormal);
     vec3 viewDirection = normalize(-vViewPosition);
-    vec3 keyDirection = normalize(vec3(-0.48, 0.76, 0.54));
-    vec3 fillDirection = normalize(vec3(0.72, 0.28, 0.46));
+    vec3 keyDirection = normalize(vec3(-0.44, 0.82, 0.36));
+    vec3 fillDirection = normalize(vec3(0.76, 0.34, -0.46));
     vec3 halfDirection = normalize(keyDirection + viewDirection);
 
     float keyDiffuse = max(dot(normal, keyDirection), 0.0);
@@ -606,36 +774,54 @@ void main() {
 
     float selected = abs(vLayer - float(uSelectedLayer)) < 0.25 ? 1.0 : 0.0;
     float selectedValue = selected * vMagnitudeVoxel;
-    float emissive = pow(max(max(vColor.r, vColor.g), vColor.b), 2.0);
+    float luminance = max(max(vColor.r, vColor.g), vColor.b);
+    float emissive = pow(luminance, 1.45) * vMagnitudeVoxel;
+    float topFace = smoothstep(0.18, 0.94, normal.y);
+    float sideFace = 1.0 - topFace;
 
-    float ambient = mix(0.16, 0.30, hemisphere);
+    float ambient = mix(0.12, 0.26, hemisphere);
     vec3 color = vColor * (
         ambient +
-        0.58 * wrappedDiffuse +
-        0.24 * keyDiffuse +
-        0.12 * fillDiffuse
+        0.66 * wrappedDiffuse +
+        0.28 * keyDiffuse +
+        0.15 * fillDiffuse
     );
 
+    color *= mix(0.86, 1.12, topFace);
+    color += vColor * sideFace * 0.055;
+
     color += mix(
-        vec3(0.014, 0.020, 0.040),
+        vec3(0.010, 0.018, 0.040),
         vColor,
-        0.42
-    ) * rim * (0.10 + 0.16 * vMagnitudeVoxel);
+        0.54
+    ) * rim * (0.13 + 0.22 * vMagnitudeVoxel);
 
     color += vec3(1.00, 0.82, 0.58) *
              specular *
-             (0.08 + 0.30 * vMagnitudeVoxel);
+             (0.10 + 0.40 * vMagnitudeVoxel);
 
-    color += vColor * emissive * 0.24 * vMagnitudeVoxel;
+    vec3 emission = vColor * emissive * (0.34 + 0.22 * topFace);
+    emission += vec3(1.00, 0.72, 0.30) * selectedValue * emissive * 0.32;
+    color += emission;
+
     color = mix(
         color,
-        color * 1.08 + vec3(0.085, 0.040, 0.010),
+        color * 1.12 + vec3(0.11, 0.045, 0.008),
         selectedValue
     );
-    color = pow(max(color, vec3(0.0)), vec3(0.92));
 
     fragmentColor = vec4(color, 1.0);
     pickOutput = uint(vPickId + 0.5);
+
+    vec3 thresholded =
+        max(color - vec3(mix(0.20, 0.10, selectedValue)), vec3(0.0));
+
+    brightColor = vec4(
+        vMagnitudeVoxel > 0.5
+            ? thresholded * (0.92 + emissive * 1.35)
+            : vec3(0.0),
+        1.0
+    );
 }
 )glsl";
 
@@ -721,6 +907,126 @@ void main() {
         }
     }
 
+    void Renderer::createPostProcessPrograms() {
+        constexpr const char *fullScreenVertexShader = R"glsl(
+#version 330 core
+out vec2 vUv;
+
+void main() {
+    const vec2 positions[3] = vec2[](
+        vec2(-1.0, -1.0),
+        vec2( 3.0, -1.0),
+        vec2(-1.0,  3.0)
+    );
+
+    const vec2 textureCoordinates[3] = vec2[](
+        vec2(0.0, 0.0),
+        vec2(2.0, 0.0),
+        vec2(0.0, 2.0)
+    );
+
+    gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+    vUv = textureCoordinates[gl_VertexID];
+}
+)glsl";
+
+        constexpr const char *blurFragmentShader = R"glsl(
+#version 330 core
+in vec2 vUv;
+
+uniform sampler2D uInput;
+uniform bool uHorizontal;
+
+out vec4 fragmentColor;
+
+void main() {
+    const float weights[5] = float[](
+        0.227027,
+        0.1945946,
+        0.1216216,
+        0.054054,
+        0.016216
+    );
+
+    vec2 texel = 1.0 / vec2(textureSize(uInput, 0));
+    vec3 result = texture(uInput, vUv).rgb * weights[0];
+
+    for (int sampleIndex = 1; sampleIndex < 5; ++sampleIndex) {
+        vec2 offset = uHorizontal
+            ? vec2(texel.x * float(sampleIndex), 0.0)
+            : vec2(0.0, texel.y * float(sampleIndex));
+
+        result += texture(uInput, vUv + offset).rgb * weights[sampleIndex];
+        result += texture(uInput, vUv - offset).rgb * weights[sampleIndex];
+    }
+
+    fragmentColor = vec4(result, 1.0);
+}
+)glsl";
+
+        constexpr const char *compositeFragmentShader = R"glsl(
+#version 330 core
+in vec2 vUv;
+
+uniform sampler2D uScene;
+uniform sampler2D uBloom;
+
+out vec4 fragmentColor;
+
+void main() {
+    vec3 scene = texture(uScene, vUv).rgb;
+    vec3 bloom = texture(uBloom, vUv).rgb;
+    vec3 hdrColor = scene + bloom * 1.42;
+
+    vec3 mapped = vec3(1.0) - exp(-hdrColor * 1.14);
+    mapped = pow(max(mapped, vec3(0.0)), vec3(1.0 / 2.2));
+
+    vec2 centered = vUv * 2.0 - 1.0;
+    float vignette = 1.0 - smoothstep(0.48, 1.42, dot(centered, centered));
+    mapped *= mix(0.82, 1.0, vignette);
+
+    fragmentColor = vec4(mapped, 1.0);
+}
+)glsl";
+
+        blurShaderProgram_ =
+                createProgram(
+                    fullScreenVertexShader,
+                    blurFragmentShader,
+                    "Density Volume bloom blur shader"
+                );
+
+        compositeShaderProgram_ =
+                createProgram(
+                    fullScreenVertexShader,
+                    compositeFragmentShader,
+                    "Density Volume bloom composite shader"
+                );
+
+        blurInputUniform_ =
+                glGetUniformLocation(blurShaderProgram_, "uInput");
+
+        blurHorizontalUniform_ =
+                glGetUniformLocation(blurShaderProgram_, "uHorizontal");
+
+        compositeSceneUniform_ =
+                glGetUniformLocation(compositeShaderProgram_, "uScene");
+
+        compositeBloomUniform_ =
+                glGetUniformLocation(compositeShaderProgram_, "uBloom");
+
+        if (
+            blurInputUniform_ < 0 ||
+            blurHorizontalUniform_ < 0 ||
+            compositeSceneUniform_ < 0 ||
+            compositeBloomUniform_ < 0
+        ) {
+            throw std::runtime_error{
+                "Density Volume post-process shader uniforms are unavailable."
+            };
+        }
+    }
+
     void Renderer::createMeshBuffers() {
         glGenVertexArrays(1, &vertexArray_);
         glGenBuffers(1, &vertexBuffer_);
@@ -793,6 +1099,10 @@ void main() {
         glEnableVertexAttribArray(5);
 
         glBindVertexArray(0);
+    }
+
+    void Renderer::createPostProcessVertexArray() {
+        glGenVertexArrays(1, &postProcessVertexArray_);
     }
 
     void Renderer::uploadMesh(const Mesh &mesh) {
@@ -926,22 +1236,75 @@ void main() {
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture);
         glGetIntegerv(GL_RENDERBUFFER_BINDING, &previousRenderbuffer);
 
-        glBindTexture(GL_TEXTURE_2D, colorTexture_);
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGBA8,
-            width,
-            height,
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            nullptr
+        const auto allocateColorTexture =
+                [width, height](
+                    const unsigned int texture,
+                    const int internalFormat,
+                    const unsigned int dataType
+                ) {
+                    glBindTexture(GL_TEXTURE_2D, texture);
+                    glTexImage2D(
+                        GL_TEXTURE_2D,
+                        0,
+                        internalFormat,
+                        width,
+                        height,
+                        0,
+                        GL_RGBA,
+                        dataType,
+                        nullptr
+                    );
+                    glTexParameteri(
+                        GL_TEXTURE_2D,
+                        GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR
+                    );
+                    glTexParameteri(
+                        GL_TEXTURE_2D,
+                        GL_TEXTURE_MAG_FILTER,
+                        GL_LINEAR
+                    );
+                    glTexParameteri(
+                        GL_TEXTURE_2D,
+                        GL_TEXTURE_WRAP_S,
+                        GL_CLAMP_TO_EDGE
+                    );
+                    glTexParameteri(
+                        GL_TEXTURE_2D,
+                        GL_TEXTURE_WRAP_T,
+                        GL_CLAMP_TO_EDGE
+                    );
+                };
+
+        allocateColorTexture(
+            sceneColorTexture_,
+            GL_RGBA16F,
+            GL_FLOAT
         );
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        allocateColorTexture(
+            brightTexture_,
+            GL_RGBA16F,
+            GL_FLOAT
+        );
+
+        allocateColorTexture(
+            blurTextures_[0],
+            GL_RGBA16F,
+            GL_FLOAT
+        );
+
+        allocateColorTexture(
+            blurTextures_[1],
+            GL_RGBA16F,
+            GL_FLOAT
+        );
+
+        allocateColorTexture(
+            colorTexture_,
+            GL_RGBA8,
+            GL_UNSIGNED_BYTE
+        );
 
         glBindTexture(GL_TEXTURE_2D, pickTexture_);
         glTexImage2D(
@@ -973,7 +1336,7 @@ void main() {
             GL_FRAMEBUFFER,
             GL_COLOR_ATTACHMENT0,
             GL_TEXTURE_2D,
-            colorTexture_,
+            sceneColorTexture_,
             0
         );
 
@@ -985,6 +1348,14 @@ void main() {
             0
         );
 
+        glFramebufferTexture2D(
+            GL_FRAMEBUFFER,
+            GL_COLOR_ATTACHMENT2,
+            GL_TEXTURE_2D,
+            brightTexture_,
+            0
+        );
+
         glFramebufferRenderbuffer(
             GL_FRAMEBUFFER,
             GL_DEPTH_STENCIL_ATTACHMENT,
@@ -992,15 +1363,54 @@ void main() {
             depthStencilBuffer_
         );
 
-        constexpr unsigned int drawBuffers[2]{
+        constexpr unsigned int drawBuffers[3]{
             GL_COLOR_ATTACHMENT0,
-            GL_COLOR_ATTACHMENT1
+            GL_COLOR_ATTACHMENT1,
+            GL_COLOR_ATTACHMENT2
         };
 
-        glDrawBuffers(2, drawBuffers);
+        glDrawBuffers(3, drawBuffers);
 
-        const unsigned int framebufferStatus =
-                glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        bool framebuffersComplete =
+                glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                GL_FRAMEBUFFER_COMPLETE;
+
+        for (std::size_t index = 0; index < 2U; ++index) {
+            glBindFramebuffer(
+                GL_FRAMEBUFFER,
+                blurFramebuffers_[index]
+            );
+
+            glFramebufferTexture2D(
+                GL_FRAMEBUFFER,
+                GL_COLOR_ATTACHMENT0,
+                GL_TEXTURE_2D,
+                blurTextures_[index],
+                0
+            );
+
+            glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+            framebuffersComplete =
+                    framebuffersComplete &&
+                    glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                    GL_FRAMEBUFFER_COMPLETE;
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, compositeFramebuffer_);
+        glFramebufferTexture2D(
+            GL_FRAMEBUFFER,
+            GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D,
+            colorTexture_,
+            0
+        );
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+
+        framebuffersComplete =
+                framebuffersComplete &&
+                glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
+                GL_FRAMEBUFFER_COMPLETE;
 
         glBindFramebuffer(
             GL_FRAMEBUFFER,
@@ -1017,11 +1427,71 @@ void main() {
             static_cast<unsigned int>(previousTexture)
         );
 
-        if (framebufferStatus != GL_FRAMEBUFFER_COMPLETE) {
-            throw std::runtime_error{"Density Volume framebuffer is incomplete."};
+        if (!framebuffersComplete) {
+            throw std::runtime_error{
+                "Density Volume scene or bloom framebuffer is incomplete."
+            };
         }
 
         framebufferWidth_ = width;
         framebufferHeight_ = height;
+    }
+
+    void Renderer::renderPostProcess(
+        const int width,
+        const int height
+    ) {
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
+        glBindVertexArray(postProcessVertexArray_);
+
+        glUseProgram(blurShaderProgram_);
+        glUniform1i(blurInputUniform_, 0);
+
+        constexpr int blurPassCount = 4;
+
+        for (int pass = 0; pass < blurPassCount; ++pass) {
+            const std::size_t outputIndex =
+                    static_cast<std::size_t>(pass % 2);
+
+            const unsigned int inputTexture =
+                    pass == 0
+                        ? brightTexture_
+                        : blurTextures_[1U - outputIndex];
+
+            glBindFramebuffer(
+                GL_FRAMEBUFFER,
+                blurFramebuffers_[outputIndex]
+            );
+            glViewport(0, 0, width, height);
+            glUniform1i(
+                blurHorizontalUniform_,
+                pass % 2 == 0 ? 1 : 0
+            );
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, inputTexture);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        }
+
+        const unsigned int blurredTexture =
+                blurTextures_[
+                    static_cast<std::size_t>(
+                        (blurPassCount - 1) % 2
+                    )
+                ];
+
+        glBindFramebuffer(GL_FRAMEBUFFER, compositeFramebuffer_);
+        glViewport(0, 0, width, height);
+        glUseProgram(compositeShaderProgram_);
+        glUniform1i(compositeSceneUniform_, 0);
+        glUniform1i(compositeBloomUniform_, 1);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, sceneColorTexture_);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, blurredTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
     }
 }

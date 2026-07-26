@@ -16,17 +16,19 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 - Hover documentation with matrices for every gate in the gate library.
 - JetBrains Mono typography throughout the interface.
 - Raw OpenGL 3.3 Core density visualization rendered through an off-screen
-  framebuffer and displayed inside Dear ImGui.
+  HDR framebuffer, bloom composite, and Dear ImGui texture display.
 - Automated regression coverage for simulation, algorithms, debugger state,
   and density-volume conversion.
 
 ## Density Volume
 
 The Density Volume panel converts each debugger state into
-`rho = |psi><psi|` and renders every visible matrix cell as an opaque indexed
+`ρ = |ψ><ψ|` and renders every visible matrix cell as an opaque indexed
 OpenGL cuboid. Magnitude controls voxel height and phase controls color.
 Dimension-aware spacing keeps full-strength cells cube-like at every matrix
 size, while indexed bevel faces and smooth lighting soften their silhouettes.
+Emissive magnitude voxels are isolated into a bright pass, blurred, and
+tone-mapped with the HDR scene so phase colors glow without transparent cubes.
 
 Two synchronized layouts are available:
 
@@ -34,9 +36,9 @@ Two synchronized layouts are available:
   through the selected debugger step.
 - **Floor Field** shows the selected density matrix as one square X-Z grid.
 
-The inspector heatmap always follows the selected 3D layer. Hovering a voxel
-reports its row, column, magnitude, intensity, phase in radians, real component,
-and imaginary component.
+The inspector heatmap always follows the selected 3D layer and outlines the
+cell under the pointer. Hovering either view reports row, column, magnitude,
+intensity, phase in radians, real component, and imaginary component.
 
 | Input | Action |
 | --- | --- |
@@ -56,7 +58,11 @@ and imaginary component.
 | Controlled and exchange | `CX`, `CY`, `CZ`, `SWAP`, `iSWAP` |
 
 Rotation angles are entered and displayed in radians. Hover a gate button to
-see its name, purpose, and unitary matrix.
+see its name, purpose, and unitary matrix; zero-valued entries are intentionally
+subdued so the matrix structure scans quickly.
+
+`Escape` cancels an active gate placement. `Space` toggles playback whenever a
+text field is not accepting input.
 
 ## Built-in Circuits
 
