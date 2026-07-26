@@ -278,7 +278,6 @@ namespace quantum_sim::gui {
 
         drawGateCategory("Controlled gates", controlledGates, std::size(controlledGates));
 
-        drawSelectionSummary();
     }
 
     bool GateLibraryPanel::drawGateButton(
@@ -582,45 +581,6 @@ namespace quantum_sim::gui {
             if (index + 1 < gateCount && canPlaceNextGateButton()) {
                 ImGui::SameLine();
             }
-        }
-    }
-
-    void GateLibraryPanel::drawSelectionSummary() {
-        ImGui::Spacing();
-        ImGui::SeparatorText("Selection");
-
-        if (!selectedGate_.has_value()) {
-            ImGui::TextDisabled(
-                "No gate selected."
-            );
-
-            return;
-        }
-
-        ImGui::Text(
-            "Selected gate: %s",
-            gateDisplayName(selectedGate_.value())
-        );
-
-        const bool rotationSelected =
-                selectedGate_.value() == "Rx" ||
-                selectedGate_.value() == "Ry" ||
-                selectedGate_.value() == "Rz";
-
-        if (rotationSelected) {
-            const std::string angleText =
-                    notation::formatRadians(
-                        rotationAngleRadians_
-                    );
-
-            ImGui::Text(
-                "Angle: %s",
-                angleText.c_str()
-            );
-        }
-
-        if (ImGui::Button("Clear selection")) {
-            clearSelection();
         }
     }
 

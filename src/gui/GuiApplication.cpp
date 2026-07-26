@@ -432,6 +432,22 @@ namespace quantum_sim::gui {
 
             circuitRenderer_.draw(circuit_, snapshot, pendingGate_);
 
+            const auto requestedStepJump =
+                    circuitRenderer_.consumeStepJumpRequest();
+
+            if (
+                requestedStepJump.has_value() &&
+                requestedStepJump.value() < session_.stepCount()
+            ) {
+                playbackPaused_ = true;
+                session_.moveToStep(
+                    requestedStepJump.value()
+                );
+
+                snapshot = session_.snapshot();
+                synchronizeDensityLayer(snapshot);
+            }
+
             const auto singleQubitPlacement =
                     circuitRenderer_.consumeCompletedSingleQubitPlacement();
 
