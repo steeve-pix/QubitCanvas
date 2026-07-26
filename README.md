@@ -18,25 +18,33 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
   rational multiples of `π`, with compact decimal fallback.
 - JetBrains Mono typography throughout the interface.
 - Raw OpenGL 3.3 Core density visualization rendered through an off-screen
-  HDR framebuffer, bloom composite, and Dear ImGui texture display.
+  linear-HDR framebuffer, restrained bloom composite, and Dear ImGui texture.
 - Automated regression coverage for simulation, algorithms, debugger state,
   and density-volume conversion.
 
 ## Density Volume
 
 The Density Volume panel converts each debugger state into
-`ρ = |ψ><ψ|` and renders every matrix cell as an opaque instance of one shared
-indexed rounded cube. A compact per-instance record supplies position, scale,
-warm amplitude color, emissive strength, layer identity, and picking identity.
-Soft ambient, warm directional key, cool fill, contact darkening, HDR bloom,
-and ACES-style tone mapping give the volume readable top and side faces without
-transparent geometry. A procedural perspective grid anchors the structure.
+`ρ = |ψ><ψ|`. Numerically visible cells become fixed-size opaque instances of
+one indexed rounded cube, while near-zero cells are omitted from the solid
+pass. Exact matrices up to 16x16 retain a separate faint edge-only ghost pass
+so every layer stays recognizable; bucketed large-register matrices skip those
+ghosts to preserve clarity and performance.
+
+Magnitude follows a tone-shaped Inferno ramp. Colors are converted from sRGB
+to linear space before amplitude-dependent glow is applied, then a half-size
+bloom pass and linear-to-sRGB output preserve the warm gold, orange, magenta,
+and violet range without heavy tone-map compression. Restrained face lighting,
+perspective framing, depth testing, and a procedural ground grid keep cube
+tops, sides, matrix depth, and history separation readable.
 
 Two synchronized layouts are available:
 
 - **Layer Stack** places complete Y-Z density matrices along the X axis and
-  reveals their pre-uploaded instances through the selected debugger step.
-- **Floor Field** shows the selected density matrix as one square X-Z grid.
+  reveals pre-uploaded solid and ghost instance ranges through the selected
+  debugger step.
+- **Floor Field** shows the selected density matrix as one square X-Z grid and
+  maps `|ρ|` linearly to voxel height.
 
 The inspector heatmap always follows the selected 3D layer and outlines the
 cell under the pointer. Hovering either view reports row, column, magnitude,

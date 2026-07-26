@@ -13,8 +13,13 @@ namespace quantum_sim::gui::density_volume {
          *
          * @param center Stable look-at target at the scene bounds center.
          * @param radius Bounding-sphere radius used for distance and clip planes.
+         * @param floorField True when framing the height-field presentation.
          */
-        void frameScene(const Vector3 &center, float radius);
+        void frameScene(
+            const Vector3 &center,
+            float radius,
+            bool floorField = false
+        );
 
         /**
          * Refreshes scene-aware reset and clipping bounds without moving the camera.
@@ -26,8 +31,13 @@ namespace quantum_sim::gui::density_volume {
          *
          * @param center Stable look-at target at the latest scene bounds center.
          * @param radius Bounding-sphere radius used for reset distance and clip planes.
+         * @param floorField True when framing the height-field presentation.
          */
-        void updateSceneBounds(const Vector3 &center, float radius) noexcept;
+        void updateSceneBounds(
+            const Vector3 &center,
+            float radius,
+            bool floorField = false
+        ) noexcept;
 
         /**
          * Advances current camera values toward their input targets.

@@ -12,9 +12,11 @@ namespace quantum_sim::gui::density_volume {
     /**
      * Instanced OpenGL renderer for the interactive density-matrix history.
      *
-     * A shared rounded cube is drawn once per compact VoxelInstance. The scene
-     * is rendered into HDR, integer-picking, and emissive attachments before
-     * bloom and tone mapping produce the texture displayed by Dear ImGui.
+     * A shared rounded cube is drawn once per visible density cell. A separate
+     * instanced edge pass preserves the shape of exact small matrices without
+     * filling near-zero cells. The scene is rendered into linear HDR,
+     * integer-picking, and emissive attachments before restrained bloom and
+     * linear-to-sRGB conversion produce the Dear ImGui texture.
      */
     class Renderer {
     public:
@@ -60,12 +62,14 @@ namespace quantum_sim::gui::density_volume {
          * @param width Framebuffer width in physical pixels.
          * @param height Framebuffer height in physical pixels.
          * @param selectedLayer Layer emphasized by the synchronized views.
+         * @param heatAmount User-controlled glow multiplier.
          * @param camera Camera supplying view and projection matrices.
          */
         void render(
             int width,
             int height,
             std::size_t selectedLayer,
+            float heatAmount,
             const CameraController &camera
         );
 
@@ -84,7 +88,7 @@ namespace quantum_sim::gui::density_volume {
         void shutdown() noexcept;
 
         /**
-         * Returns the tone-mapped OpenGL texture displayed by ImGui::Image().
+         * Returns the bloom-composited sRGB texture displayed by ImGui::Image().
          */
         [[nodiscard]] unsigned int colorTexture() const noexcept;
 
@@ -108,10 +112,15 @@ namespace quantum_sim::gui::density_volume {
         unsigned int voxelVertexBuffer_{};
         unsigned int voxelIndexBuffer_{};
         unsigned int instanceBuffer_{};
+        unsigned int ghostVertexArray_{};
+        unsigned int ghostVertexBuffer_{};
+        unsigned int ghostIndexBuffer_{};
+        unsigned int ghostInstanceBuffer_{};
         unsigned int gridVertexArray_{};
         unsigned int gridVertexBuffer_{};
         unsigned int gridIndexBuffer_{};
         unsigned int voxelShaderProgram_{};
+        unsigned int ghostShaderProgram_{};
         unsigned int gridShaderProgram_{};
         unsigned int blurShaderProgram_{};
         unsigned int compositeShaderProgram_{};
@@ -130,6 +139,10 @@ namespace quantum_sim::gui::density_volume {
         int voxelViewUniform_{-1};
         int voxelProjectionUniform_{-1};
         int voxelSelectedLayerUniform_{-1};
+        int voxelHeatUniform_{-1};
+        int ghostViewUniform_{-1};
+        int ghostProjectionUniform_{-1};
+        int ghostSelectedLayerUniform_{-1};
         int gridViewUniform_{-1};
         int gridProjectionUniform_{-1};
         int gridCenterUniform_{-1};
@@ -140,7 +153,9 @@ namespace quantum_sim::gui::density_volume {
         int compositeBloomUniform_{-1};
         int cubeIndexCount_{};
         int visibleInstanceCount_{};
+        int visibleGhostCount_{};
         std::size_t instanceCapacity_{};
+        std::size_t ghostInstanceCapacity_{};
         std::uint64_t sceneFingerprint_{};
         std::optional<std::size_t> sceneSelectedLayer_;
         std::optional<VisualizationMode> sceneMode_;
@@ -151,7 +166,7 @@ namespace quantum_sim::gui::density_volume {
         bool initialized_{false};
 
         /**
-         * Compiles the instanced material and procedural-grid programs.
+         * Compiles the solid, edge-ghost, and procedural-grid programs.
          */
         void createScenePrograms();
 
@@ -164,6 +179,11 @@ namespace quantum_sim::gui::density_volume {
          * Uploads the shared rounded cube and defines per-instance attributes.
          */
         void createVoxelBuffers();
+
+        /**
+         * Uploads the indexed unit-cube edges used for near-zero matrix cells.
+         */
+        void createGhostBuffers();
 
         /**
          * Creates the normalized quad used by the procedural ground grid.
@@ -186,7 +206,7 @@ namespace quantum_sim::gui::density_volume {
         void resizeFramebuffer(int width, int height);
 
         /**
-         * Blurs emissive highlights and tone maps the final scene texture.
+         * Blurs emissive highlights and converts the final linear scene to sRGB.
          */
         void renderPostProcess(int width, int height);
     };

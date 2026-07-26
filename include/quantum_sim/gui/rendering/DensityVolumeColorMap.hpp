@@ -11,6 +11,19 @@ namespace quantum_sim::gui::density_volume {
     };
 
     /**
+     * Maps density magnitude through the Stella-inspired Inferno tone curve.
+     *
+     * The default curve lifts low non-zero magnitudes without changing the
+     * numerical density value. Returned components are sRGB values in [0, 1].
+     *
+     * @param normalizedMagnitude Density magnitude normalized to [0, 1].
+     * @return Tone-shaped Inferno color in sRGB space.
+     */
+    [[nodiscard]] Color magnitudeColor(
+        double normalizedMagnitude
+    ) noexcept;
+
+    /**
      * Maps density phase to the QubitCanvas cyan/violet/amber/magenta wheel.
      *
      * Magnitude controls brightness without changing the phase hue.
