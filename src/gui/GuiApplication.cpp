@@ -960,7 +960,7 @@ namespace quantum_sim::gui {
                     : densityVolumeStack_.layers[selectedDensityLayer_].dimension;
 
         ImGui::TextDisabled(
-            "%s | LAYER %zu/%zu | \xCF\x81 %zux%zu | opaque indexed voxels",
+            "%s | LAYER %zu/%zu | \xCF\x81 %zux%zu | instanced rounded voxels",
             canvasMode_ == CanvasMode::FloorField
                 ? "FLOOR FIELD"
                 : "LAYER STACK",
