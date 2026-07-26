@@ -9,7 +9,8 @@ namespace quantum_sim::gui::density_volume {
         constexpr float stackBaseThickness = 0.025F;
         constexpr float stackMaximumVoxelHeight = 0.58F;
         constexpr float stackMinimumVisibleHeight = 0.42F;
-        constexpr float stackLayerSpacing = 0.70F;
+        constexpr float stackVerticalSpacing = 0.62F;
+        constexpr float stackDepthSpacing = 0.75F;
         constexpr float floorBaseThickness = 0.035F;
         constexpr float floorMaximumVoxelHeight = 0.64F;
         constexpr float floorMinimumVisibleHeight = 0.42F;
@@ -27,6 +28,7 @@ namespace quantum_sim::gui::density_volume {
             SceneLayout &layout,
             const DensityLayer &layer,
             const float baseY,
+            const float depthOffset,
             const float baseThickness,
             const float maximumVoxelHeight,
             const float minimumVisibleHeight
@@ -60,7 +62,7 @@ namespace quantum_sim::gui::density_volume {
                         .center = Vector3{
                             x,
                             baseY + baseThickness * 0.5F,
-                            z
+                            z + depthOffset
                         },
                         .size = Vector3{
                             tileSide,
@@ -98,7 +100,7 @@ namespace quantum_sim::gui::density_volume {
                         .center = Vector3{
                             x,
                             baseY + baseThickness + height * 0.5F,
-                            z
+                            z + depthOffset
                         },
                         .size = Vector3{
                             voxelSide,
@@ -147,23 +149,31 @@ namespace quantum_sim::gui::density_volume {
         ) noexcept {
             const float historyHeight =
                     static_cast<float>(lastLayer.index) *
-                    stackLayerSpacing +
+                    stackVerticalSpacing +
                     stackBaseThickness +
                     stackMaximumVoxelHeight;
 
             const float layerSide =
                     matrixSide(lastLayer);
 
+            const float historyDepth =
+                    static_cast<float>(lastLayer.index) *
+                    stackDepthSpacing;
+
             layout.center = Vector3{
                 0.0F,
                 historyHeight * 0.5F,
-                0.0F
+                historyDepth * 0.5F
             };
 
             layout.radius =
                     std::sqrt(
-                        std::pow(layerSide * 0.5F, 2.0F) * 2.0F +
-                        std::pow(historyHeight * 0.5F, 2.0F)
+                        std::pow(layerSide * 0.5F, 2.0F) +
+                        std::pow(historyHeight * 0.5F, 2.0F) +
+                        std::pow(
+                            (layerSide + historyDepth) * 0.5F,
+                            2.0F
+                        )
                     );
         }
 
@@ -176,6 +186,7 @@ namespace quantum_sim::gui::density_volume {
             appendDensityLayer(
                 layout,
                 layer,
+                0.0F,
                 0.0F,
                 floorBaseThickness,
                 floorMaximumVoxelHeight,
@@ -205,7 +216,8 @@ namespace quantum_sim::gui::density_volume {
                 appendDensityLayer(
                     layout,
                     stack.layers[index],
-                    static_cast<float>(index) * stackLayerSpacing,
+                    static_cast<float>(index) * stackVerticalSpacing,
+                    static_cast<float>(index) * stackDepthSpacing,
                     stackBaseThickness,
                     stackMaximumVoxelHeight,
                     stackMinimumVisibleHeight
@@ -252,7 +264,8 @@ namespace quantum_sim::gui::density_volume {
         appendDensityLayer(
             layout,
             layer,
-            static_cast<float>(layer.index) * stackLayerSpacing,
+            static_cast<float>(layer.index) * stackVerticalSpacing,
+            static_cast<float>(layer.index) * stackDepthSpacing,
             stackBaseThickness,
             stackMaximumVoxelHeight,
             stackMinimumVisibleHeight
