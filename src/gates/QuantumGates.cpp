@@ -116,7 +116,8 @@ namespace quantum_sim::gates {
 
     math::ComplexMatrix tGate() {
         // T is the fourth root of Z: phase angle pi/4 on |1>.
-        double pi_value = std::numbers::pi;
+        const double phase =
+                std::numbers::pi / 4.0;
 
         return math::ComplexMatrix{
             2, 2,
@@ -124,10 +125,26 @@ namespace quantum_sim::gates {
                 math::Complex{1.0, 0.0},
                 math::Complex{},
                 math::Complex{},
-                math::Complex{std::cos(pi_value / 4), std::sin(pi_value / 4)},
+                math::Complex{std::cos(phase), std::sin(phase)},
             }
         };
     };
+
+    math::ComplexMatrix tDaggerGate() {
+        // T-dagger reverses T with the conjugate phase exp(-i*pi/4).
+        const double phase =
+                -std::numbers::pi / 4.0;
+
+        return math::ComplexMatrix{
+            2, 2,
+            std::vector{
+                math::Complex{1.0, 0.0},
+                math::Complex{},
+                math::Complex{},
+                math::Complex{std::cos(phase), std::sin(phase)},
+            }
+        };
+    }
 
     math::ComplexMatrix hadamardGate() {
         // 1/sqrt(2) keeps the Hadamard columns normalized.

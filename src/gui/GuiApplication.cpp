@@ -1064,40 +1064,16 @@ namespace quantum_sim::gui {
             sampleCurrentState(snapshot.afterState.get());
         }
 
-        if (snapshot.stepCount > 0) {
-            int scrubStep =
-                    static_cast<int>(snapshot.currentStepIndex + 1);
-
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(150.0F);
-
-            if (
-                ImGui::SliderInt(
-                    "##StepScrub",
-                    &scrubStep,
-                    1,
-                    static_cast<int>(snapshot.stepCount)
-                )
-            ) {
-                // Slider is one-based for humans; session indices are zero-based.
-                session.moveToStep(
-                    static_cast<std::size_t>(
-                        std::max(1, scrubStep) - 1
-                    )
-                );
-                playbackPaused_ = true;
-            }
-        }
-
         ImGui::End();
     }
 
     void GuiApplication::drawAlgorithmScripts() {
         ImGui::SeparatorText("Algorithm");
 
+        ImGui::TextDisabled("Register qubits");
         ImGui::SetNextItemWidth(-1.0F);
         ImGui::SliderInt(
-            "Register qubits",
+            "##RegisterQubits",
             &presetQubitCount_,
             1,
             10
@@ -1220,9 +1196,10 @@ namespace quantum_sim::gui {
                         : CanvasMode::FloorField;
         }
 
+        ImGui::TextDisabled("Heat");
         ImGui::SetNextItemWidth(-1.0F);
         ImGui::SliderFloat(
-            "Heat",
+            "##Heat",
             &heatAmount_,
             0.35F,
             1.35F,
@@ -1440,6 +1417,10 @@ namespace quantum_sim::gui {
 
         if (gateName == "T") {
             return gates::tGate();
+        }
+
+        if (gateName == "Tdg") {
+            return gates::tDaggerGate();
         }
 
         if (

@@ -13,6 +13,7 @@
 #include <iostream>
 #include <cmath>
 #include <numbers>
+#include <string>
 
 #include "quantum_sim/debug/DebuggerSession.hpp"
 
@@ -329,6 +330,9 @@ int main() {
     const ComplexMatrix rz =
             quantum_sim::gates::rzGate(halfTurn);
 
+    const ComplexMatrix tDagger =
+            quantum_sim::gates::tDaggerGate();
+
     check(
         approximatelyEqual(rx.at(0, 0).real(), 0.0) &&
         approximatelyEqual(rx.at(0, 1).imaginary(), -1.0) &&
@@ -348,6 +352,25 @@ int main() {
         approximatelyEqual(rz.at(1, 1).imaginary(), 1.0) &&
         approximatelyEqual(rz.at(0, 1).magnitude(), 0.0),
         "Rz(pi) applies opposite diagonal phases"
+    );
+
+    check(
+        approximatelyEqual(tDagger.at(0, 0).real(), 1.0) &&
+        approximatelyEqual(
+            tDagger.at(1, 1).real(),
+            std::sqrt(0.5)
+        ) &&
+        approximatelyEqual(
+            tDagger.at(1, 1).imaginary(),
+            -std::sqrt(0.5)
+        ),
+        "T-dagger applies the inverse pi/4 phase"
+    );
+
+    check(
+        quantum_sim::debug::gateExplanation("Tdg").find("-pi/4") !=
+        std::string::npos,
+        "T-dagger has a debugger and hover-card explanation"
     );
 
     const QuantumRegister rxResult =
