@@ -1,13 +1,152 @@
-# QuantumC
+# QubitCanvas
 
-QuantumC is an educational quantum computer simulator written from scratch in modern C++.
+QubitCanvas is an interactive quantum-circuit simulator and debugger written
+from scratch in C++20. It combines a state-vector simulation core with a
+JetBrains Mono desktop interface for building circuits, stepping through their
+execution, and inspecting how the quantum state changes after every gate.
 
-## Goals
+The simulator does not depend on an external quantum-computing framework.
+GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 
-- Learn modern C++ software engineering
-- Understand the mathematics behind quantum computing
-- Simulate quantum circuits without external quantum libraries
+## Highlights
 
-## Status
+- Editable multi-qubit circuit with gate selection, undo, redo, and deletion.
+- Step-by-step debugger with play, pause, restart, scrub, and sampling controls.
+- Synchronized circuit, density-matrix, probability, and Bloch-sphere views.
+- Hover documentation with matrices for every gate in the gate library.
+- JetBrains Mono typography throughout the interface.
+- Raw OpenGL 3.3 Core density visualization rendered through an off-screen
+  framebuffer and displayed inside Dear ImGui.
+- Automated regression coverage for simulation, algorithms, debugger state,
+  and density-volume conversion.
 
-Early development.
+## Density Volume
+
+The Density Volume panel converts each debugger state into
+`rho = |psi><psi|` and renders every visible matrix cell as an opaque indexed
+OpenGL cuboid. Magnitude controls voxel height and phase controls color.
+
+Two synchronized layouts are available:
+
+- **Layer Stack** shows the initial density matrix and every post-gate matrix
+  through the selected debugger step.
+- **Floor Field** shows the selected density matrix as one square X-Z grid.
+
+The inspector heatmap always follows the selected 3D layer. Hovering a voxel
+reports its row, column, magnitude, intensity, phase in radians, real component,
+and imaginary component.
+
+| Input | Action |
+| --- | --- |
+| Left drag | Orbit |
+| Right drag | Pan |
+| Shift + left drag | Pan |
+| Mouse wheel | Zoom |
+| `R` | Reset the camera |
+| Click a voxel | Select its density layer |
+
+## Gate Library
+
+| Category | Gates |
+| --- | --- |
+| Single-qubit | `H`, `X`, `Y`, `Z`, `S`, `T`, `Tdg` |
+| Rotations | `Rx`, `Ry`, `Rz` |
+| Controlled and exchange | `CX`, `CY`, `CZ`, `SWAP`, `iSWAP` |
+
+Rotation angles are entered and displayed in radians. Hover a gate button to
+see its name, purpose, and unitary matrix.
+
+## Built-in Circuits
+
+- Bell state
+- GHZ state
+- Register-wide `|+>` state
+- Quantum Fourier Transform
+- Inverse Quantum Fourier Transform
+- Grover search
+- Deutsch-Jozsa
+- Bernstein-Vazirani
+- Decomposed Toffoli
+- Phase kickback
+- Coherent teleportation
+- Mixed-gate scramble
+
+The register control supports 1 to 10 qubits for applicable presets.
+
+## Build
+
+### Requirements
+
+- CMake 3.20 or newer
+- A C++20 compiler
+- Git
+- OpenGL 3.3 Core support
+
+Initialize the GLFW and Dear ImGui submodules after cloning:
+
+```powershell
+git submodule update --init --recursive
+```
+
+Configure and build:
+
+```powershell
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --config Debug --target qubit_canvas qubit_canvas_tests
+```
+
+Run the automated tests:
+
+```powershell
+ctest --test-dir build -C Debug --output-on-failure
+```
+
+Run the application from the build directory so the copied font assets are
+available:
+
+```powershell
+.\build\qubit_canvas.exe
+```
+
+For a Visual Studio multi-configuration generator, the executable may instead
+be located at `build\Debug\qubit_canvas.exe`.
+
+## Numerical Behavior
+
+The simulation core stores the complete state vector, so its memory and
+execution cost scale exponentially with qubit count.
+
+Density matrices with at most 16 basis states are rendered exactly. Larger
+registers are grouped into a maximum 16x16 display using
+probability-preserving row and column buckets. This keeps the inspector and 3D
+views readable without changing the simulator's underlying quantum state.
+
+Near-zero density values retain their base grid cell but do not create noisy
+tiny magnitude voxels.
+
+## Project Layout
+
+```text
+assets/                 JetBrains Mono runtime asset
+include/quantum_sim/    Public simulator and GUI headers
+src/                    Core simulator, algorithms, debugger, and GUI sources
+src/gui/rendering/      OpenGL density volume and visualization renderers
+tests/                  Automated regression tests
+third_party/            GLFW, Dear ImGui, and GLAD
+```
+
+The main targets are:
+
+- `qubit_canvas_core`: complex math, gates, registers, circuits, algorithms,
+  and debugger state.
+- `qubit_canvas_gui`: Dear ImGui panels and OpenGL renderers.
+- `qubit_canvas`: desktop executable.
+- `qubit_canvas_tests`: regression test executable.
+
+## Development Workflow
+
+Feature work is kept on focused `feature/*` branches and merged with
+`--no-ff` into `develop`. Release integration then merges `develop` into
+`release/0.1.0`.
+
+QubitCanvas is under active development.
