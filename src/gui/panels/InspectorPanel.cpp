@@ -122,35 +122,51 @@ namespace {
             255
         );
     }
+
+    void pushInspectorTableStyle() {
+        ImGui::PushStyleVar(
+            ImGuiStyleVar_CellPadding,
+            ImVec2{8.0F, 6.0F}
+        );
+
+        ImGui::PushStyleColor(
+            ImGuiCol_TableHeaderBg,
+            ImVec4{0.040F, 0.090F, 0.135F, 1.0F}
+        );
+        ImGui::PushStyleColor(
+            ImGuiCol_TableRowBg,
+            ImVec4{0.018F, 0.028F, 0.047F, 1.0F}
+        );
+        ImGui::PushStyleColor(
+            ImGuiCol_TableRowBgAlt,
+            ImVec4{0.027F, 0.044F, 0.068F, 1.0F}
+        );
+        ImGui::PushStyleColor(
+            ImGuiCol_TableBorderLight,
+            ImVec4{0.14F, 0.28F, 0.40F, 0.62F}
+        );
+        ImGui::PushStyleColor(
+            ImGuiCol_TableBorderStrong,
+            ImVec4{0.20F, 0.42F, 0.58F, 0.78F}
+        );
+    }
+
+    void popInspectorTableStyle() {
+        ImGui::PopStyleColor(5);
+        ImGui::PopStyleVar();
+    }
 }
 
 namespace quantum_sim::gui {
-    bool InspectorPanel::draw(
+    void InspectorPanel::draw(
         debug::DebuggerSession &session,
         const debug::DebuggerSnapshot &snapshot,
-        const circuit::QuantumCircuit &circuit,
         std::optional<std::size_t> selectedInstructionIndex,
         const density_volume::DensityStack &densityStack,
         std::size_t &selectedDensityLayer,
         ImFont *headingFont
     ) {
         drawHeader(snapshot, selectedInstructionIndex, headingFont);
-
-        const bool jumpedToInstruction =
-        drawInstructionSummary(session, snapshot, circuit, selectedInstructionIndex);
-
-        if (
-            jumpedToInstruction &&
-            selectedInstructionIndex.has_value()
-        ) {
-            selectedDensityLayer =
-                    std::min(
-                        selectedInstructionIndex.value() + 1U,
-                        densityStack.layers.empty()
-                            ? 0U
-                            : densityStack.layers.size() - 1U
-                    );
-        }
 
         drawQuantumState(
             session,
@@ -159,8 +175,6 @@ namespace quantum_sim::gui {
         );
 
         drawDebuggerControls(session, snapshot);
-
-        return jumpedToInstruction;
     }
 
     void InspectorPanel::showNavigationConfirmation(
@@ -201,14 +215,6 @@ namespace quantum_sim::gui {
 
         showNavigationConfirmation(
             "Debugger restarted."
-        );
-    }
-
-    void InspectorPanel::jumpToInstruction(debug::DebuggerSession &session, std::size_t instructionIndex) {
-        session.moveToStep(instructionIndex);
-
-        showNavigationConfirmation(
-            "Jumped to the selected instruction."
         );
     }
 
@@ -337,127 +343,8 @@ namespace quantum_sim::gui {
                 "Return to the first instruction. Shortcut: R"
             );
         }
-    }
-
-    bool InspectorPanel::drawInstructionSummary(
-        debug::DebuggerSession &session,
-        const debug::DebuggerSnapshot &snapshot,
-        const circuit::QuantumCircuit &circuit,
-        std::optional<std::size_t> selectedInstructionIndex
-    ) {
-        bool jumpedToInstruction = false;
-
-        const std::size_t inspectedInstructionIndex =
-                selectedInstructionIndex.value_or(
-                    snapshot.currentStepIndex
-                );
-
-        // Selection mode lets the renderer and inspector inspect different steps.
-        ImGui::TextDisabled(
-            selectedInstructionIndex.has_value()
-                ? "Selection"
-                : "Execution"
-        );
-
-        ImGui::SameLine();
-
-        ImGui::Text(
-            "Instruction %zu",
-            inspectedInstructionIndex
-        );
-
-        const auto instructions =
-                circuit.instructionInfo();
-
-        const circuit::CircuitInstructionInfo *inspectedInstruction =
-                nullptr;
-
-        if (            instructions.empty() ||
-            !snapshot.instruction.has_value()        ) {
-            ImGui::SeparatorText("Instruction");
-
-            ImGui::TextDisabled(
-                "The circuit contains no instructions."
-            );
-
-            drawNavigationConfirmation();
-
-            return false;
-        }
-
-        if (inspectedInstructionIndex < instructions.size()) {
-            // Prefer circuit metadata for selected gates.
-            inspectedInstruction =
-                    &instructions[inspectedInstructionIndex];
-        } else {
-            // Fall back to the debugger snapshot when execution is the source.
-            inspectedInstruction =
-                    &snapshot.instruction->get();
-        }
-
-        ImGui::SeparatorText("Instruction");
-
-        ImGui::Text(
-            "%zu — %s",
-            inspectedInstructionIndex,
-            inspectedInstruction->name.c_str()
-        );
-
-        if (inspectedInstruction->angleRadians.has_value()) {
-            ImGui::TextColored(
-                ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
-                "angle %.6f rad",
-                inspectedInstruction->angleRadians.value()
-            );
-        }
-
-        if (
-            selectedInstructionIndex.has_value() &&
-            selectedInstructionIndex.value() != snapshot.currentStepIndex
-        ) {
-            const std::size_t selectedIndex =
-                    selectedInstructionIndex.value();
-
-            if (
-                ImGui::Button(
-                    "Jump to instruction  [J]",
-                    ImVec2{-1.0F, 0.0F}
-                )
-            ) {
-                jumpToInstruction(
-                    session,
-                    selectedIndex
-                );
-
-                jumpedToInstruction = true;
-            }
-
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip(
-                    "Move debugger execution to instruction %zu",
-                    selectedIndex
-                );
-            }
-
-            const ImGuiIO &io =
-                    ImGui::GetIO();
-
-            if (
-                !io.WantTextInput &&
-                ImGui::IsKeyPressed(ImGuiKey_J)
-            ) {
-                jumpToInstruction(
-                    session,
-                    selectedIndex
-                );
-
-                jumpedToInstruction = true;
-            }
-        }
 
         drawNavigationConfirmation();
-
-        return jumpedToInstruction;
     }
 
     void InspectorPanel::drawQuantumState(
@@ -493,16 +380,21 @@ namespace quantum_sim::gui {
     void InspectorPanel::drawProbabilities(const quantum::QuantumRegister &state) {
         ImGui::TextDisabled("Qubit probabilities");
 
+        pushInspectorTableStyle();
+
         if (
             ImGui::BeginTable(
                 "QubitProbabilityTable",
                 3,
                 ImGuiTableFlags_BordersInnerV |
-                ImGuiTableFlags_RowBg
+                ImGuiTableFlags_BordersInnerH |
+                ImGuiTableFlags_BordersOuter |
+                ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_PadOuterX
             )
         ) {
             ImGui::TableSetupColumn("Qubit", ImGuiTableColumnFlags_WidthFixed, 52.0F);
-            ImGui::TableSetupColumn("P(1)");
+            ImGui::TableSetupColumn("P(1)", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableSetupColumn("P(0)", ImGuiTableColumnFlags_WidthFixed, 74.0F);
             ImGui::TableHeadersRow();
 
@@ -530,11 +422,20 @@ namespace quantum_sim::gui {
                     oneProbability * 100.0F
                 );
 
+                ImGui::PushStyleColor(
+                    ImGuiCol_FrameBg,
+                    ImVec4{0.025F, 0.050F, 0.078F, 1.0F}
+                );
+                ImGui::PushStyleColor(
+                    ImGuiCol_PlotHistogram,
+                    ImVec4{0.12F, 0.67F, 0.90F, 1.0F}
+                );
                 ImGui::ProgressBar(
                     oneProbability,
                     ImVec2{-1.0F, 0.0F},
                     overlay
                 );
+                ImGui::PopStyleColor(2);
 
                 ImGui::TableSetColumnIndex(2);
                 ImGui::Text("%.1f%%", zeroProbability * 100.0F);
@@ -542,6 +443,8 @@ namespace quantum_sim::gui {
 
             ImGui::EndTable();
         }
+
+        popInspectorTableStyle();
     }
 
     void InspectorPanel::drawLayerStack(
@@ -712,7 +615,7 @@ namespace quantum_sim::gui {
         };
 
         const std::string header =
-                "rho - 2D - LAYER " +
+                "\xCF\x81 - 2D - LAYER " +
                 std::to_string(selectedDensityLayer) +
                 "/" +
                 std::to_string(densityStack.layers.size() - 1U) +
@@ -752,6 +655,42 @@ namespace quantum_sim::gui {
             gridOrigin.x + gridSide,
             gridOrigin.y + gridSide
         };
+
+        std::optional<std::pair<std::size_t, std::size_t> > hoveredGridCell;
+
+        if (ImGui::IsItemHovered()) {
+            const ImVec2 mouse =
+                    ImGui::GetMousePos();
+
+            if (
+                mouse.x >= gridOrigin.x &&
+                mouse.x <= gridMaximum.x &&
+                mouse.y >= gridOrigin.y &&
+                mouse.y <= gridMaximum.y
+            ) {
+                const std::size_t hoveredColumn =
+                        std::min<std::size_t>(
+                            gridDimension - 1U,
+                            static_cast<std::size_t>(
+                                (mouse.x - gridOrigin.x) / cellSize
+                            )
+                        );
+
+                const std::size_t hoveredRow =
+                        std::min<std::size_t>(
+                            gridDimension - 1U,
+                            static_cast<std::size_t>(
+                                (mouse.y - gridOrigin.y) / cellSize
+                            )
+                        );
+
+                hoveredGridCell =
+                        std::pair{
+                            hoveredRow,
+                            hoveredColumn
+                        };
+            }
+        }
 
         drawList->AddRectFilled(
             gridOrigin,
@@ -833,6 +772,39 @@ namespace quantum_sim::gui {
             1.0F
         );
 
+        if (hoveredGridCell.has_value()) {
+            const auto [hoveredRow, hoveredColumn] =
+                    hoveredGridCell.value();
+
+            const ImVec2 minimum{
+                gridOrigin.x + static_cast<float>(hoveredColumn) * cellSize + 0.5F,
+                gridOrigin.y + static_cast<float>(hoveredRow) * cellSize + 0.5F
+            };
+
+            const ImVec2 maximum{
+                gridOrigin.x + static_cast<float>(hoveredColumn + 1U) * cellSize - 0.5F,
+                gridOrigin.y + static_cast<float>(hoveredRow + 1U) * cellSize - 0.5F
+            };
+
+            drawList->AddRect(
+                minimum,
+                maximum,
+                IM_COL32(118, 224, 255, 255),
+                gridDimension <= 32U ? 2.0F : 0.8F,
+                0,
+                gridDimension <= 32U ? 2.3F : 1.4F
+            );
+
+            drawList->AddRect(
+                ImVec2{minimum.x - 2.0F, minimum.y - 2.0F},
+                ImVec2{maximum.x + 2.0F, maximum.y + 2.0F},
+                IM_COL32(51, 166, 230, 105),
+                gridDimension <= 32U ? 3.0F : 1.0F,
+                0,
+                1.0F
+            );
+        }
+
         constexpr int legendSteps = 42;
         const float legendWidth = 88.0F;
         const float legendHeightPixels = 8.0F;
@@ -869,7 +841,7 @@ namespace quantum_sim::gui {
         }
 
         const char *legendLabel =
-                "phase -pi..+pi";
+                "phase -\xCF\x80..+\xCF\x80";
 
         const ImVec2 legendLabelSize =
                 ImGui::CalcTextSize(legendLabel);
@@ -883,75 +855,52 @@ namespace quantum_sim::gui {
             legendLabel
         );
 
-        if (ImGui::IsItemHovered()) {
-            const ImVec2 mouse =
-                    ImGui::GetMousePos();
+        if (hoveredGridCell.has_value()) {
+            const auto [row, column] =
+                    hoveredGridCell.value();
 
-            if (
-                mouse.x >= gridOrigin.x &&
-                mouse.x <= gridMaximum.x &&
-                mouse.y >= gridOrigin.y &&
-                mouse.y <= gridMaximum.y
-            ) {
-                const std::size_t column =
-                        std::min<std::size_t>(
-                            gridDimension - 1U,
-                            static_cast<std::size_t>(
-                                (mouse.x - gridOrigin.x) / cellSize
-                            )
-                        );
+            const density_volume::DensityCell &cell =
+                    densityLayer.cellAt(row, column);
 
-                const std::size_t row =
-                        std::min<std::size_t>(
-                            gridDimension - 1U,
-                            static_cast<std::size_t>(
-                                (mouse.y - gridOrigin.y) / cellSize
-                            )
-                        );
+            const density_volume::DensityBin &rowBin =
+                    densityLayer.bins[row];
 
-                const density_volume::DensityCell &cell =
-                        densityLayer.cellAt(row, column);
+            const density_volume::DensityBin &columnBin =
+                    densityLayer.bins[column];
 
-                const density_volume::DensityBin &rowBin =
-                        densityLayer.bins[row];
+            ImGui::BeginTooltip();
+            ImGui::Text(
+                "\xCF\x81[%zu][%zu]",
+                row,
+                column
+            );
+            ImGui::Text("row %s", rowBin.label.c_str());
+            ImGui::Text("col %s", columnBin.label.c_str());
 
-                const density_volume::DensityBin &columnBin =
-                        densityLayer.bins[column];
-
-                ImGui::BeginTooltip();
+            if (densityLayer.bucketed) {
                 ImGui::Text(
-                    "rho[%zu][%zu]",
-                    row,
-                    column
+                    "row states %zu-%zu",
+                    rowBin.firstState,
+                    rowBin.lastState - 1U
                 );
-                ImGui::Text("row %s", rowBin.label.c_str());
-                ImGui::Text("col %s", columnBin.label.c_str());
-
-                if (densityLayer.bucketed) {
-                    ImGui::Text(
-                        "row states %zu-%zu",
-                        rowBin.firstState,
-                        rowBin.lastState - 1U
-                    );
-                    ImGui::Text(
-                        "col states %zu-%zu",
-                        columnBin.firstState,
-                        columnBin.lastState - 1U
-                    );
-                }
-
-                ImGui::Text("|rho|       %.8f", cell.magnitude);
-                ImGui::Text("intensity   %.8f", cell.intensity);
-                ImGui::Text("phase       %.6f rad", cell.phaseRadians);
-                ImGui::Text("Re(rho)     %.8f", cell.real);
-                ImGui::Text("Im(rho)     %.8f", cell.imaginary);
-                ImGui::EndTooltip();
+                ImGui::Text(
+                    "col states %zu-%zu",
+                    columnBin.firstState,
+                    columnBin.lastState - 1U
+                );
             }
+
+            ImGui::Text("|\xCF\x81|       %.8f", cell.magnitude);
+            ImGui::Text("intensity   %.8f", cell.intensity);
+            ImGui::Text("phase       %.6f rad", cell.phaseRadians);
+            ImGui::Text("Re(\xCF\x81)     %.8f", cell.real);
+            ImGui::Text("Im(\xCF\x81)     %.8f", cell.imaginary);
+            ImGui::EndTooltip();
         }
     }
 
     void InspectorPanel::drawAmplitudes(const quantum::QuantumRegister &state) {
-        ImGui::TextDisabled("Amplitudes");
+        ImGui::TextDisabled("\xCF\x88 amplitudes");
 
         ImGui::SetNextItemWidth(-1.0F);
         ImGui::InputText(
@@ -1035,22 +984,37 @@ namespace quantum_sim::gui {
         ImGui::BeginChild(
             "AmplitudeTableScroller",
             ImVec2{0.0F, tableHeight},
-            true
+            false
         );
+
+        pushInspectorTableStyle();
 
         if (
             ImGui::BeginTable(
                 "AmplitudeTable",
-                4,
+                3,
                 ImGuiTableFlags_RowBg |
                 ImGuiTableFlags_BordersInnerV |
+                ImGuiTableFlags_BordersInnerH |
+                ImGuiTableFlags_BordersOuter |
+                ImGuiTableFlags_PadOuterX |
                 ImGuiTableFlags_ScrollY
             )
         ) {
-            ImGui::TableSetupColumn("State");
-            ImGui::TableSetupColumn("p");
-            ImGui::TableSetupColumn("Real");
-            ImGui::TableSetupColumn("Imaginary");
+            ImGui::TableSetupColumn(
+                "State",
+                ImGuiTableColumnFlags_WidthFixed,
+                76.0F
+            );
+            ImGui::TableSetupColumn(
+                "P",
+                ImGuiTableColumnFlags_WidthFixed,
+                72.0F
+            );
+            ImGui::TableSetupColumn(
+                "\xCF\x88 amplitude",
+                ImGuiTableColumnFlags_WidthStretch
+            );
             ImGui::TableHeadersRow();
 
             for (std::size_t index = 0; index < visibleCount; ++index) {
@@ -1066,21 +1030,40 @@ namespace quantum_sim::gui {
                 ImGui::Text("%.5f", stateInfo.probability);
 
                 ImGui::TableSetColumnIndex(2);
+                const double real =
+                        stateInfo.amplitude.real();
+
+                const double imaginary =
+                        stateInfo.amplitude.imaginary();
+
+                const double magnitude =
+                        std::hypot(real, imaginary);
+
+                const double phase =
+                        magnitude <= 1e-12
+                            ? 0.0
+                            : std::atan2(imaginary, real);
+
                 ImGui::Text(
-                    "%.4f",
-                    stateInfo.amplitude.real()
+                    "%.5f e^(i %.5f)",
+                    magnitude,
+                    phase
                 );
 
-                ImGui::TableSetColumnIndex(3);
-                ImGui::Text(
-                    "%.4f",
-                    stateInfo.amplitude.imaginary()
-                );
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("Re(\xCF\x88)   %.8f", real);
+                    ImGui::Text("Im(\xCF\x88)   %.8f", imaginary);
+                    ImGui::Text("|\xCF\x88|     %.8f", magnitude);
+                    ImGui::Text("phase  %.6f rad", phase);
+                    ImGui::EndTooltip();
+                }
             }
 
             ImGui::EndTable();
         }
 
+        popInspectorTableStyle();
         ImGui::EndChild();
     }
 
@@ -1165,7 +1148,7 @@ namespace quantum_sim::gui {
         );
 
         ImGui::Text(
-            "theta %.4f   phi %.4f   purity %.3f",
+            "\xCE\xB8 %.4f   \xCF\x86 %.4f   purity %.3f",
             theta,
             phi,
             std::clamp(purity, 0.0, 1.0)

@@ -103,16 +103,36 @@ namespace quantum_sim::gui {
 
         ImGuiIO &io = ImGui::GetIO();
 
+        static constexpr ImWchar jetBrainsMonoGlyphRanges[]{
+            0x0020, 0x00FF,
+            0x03B8, 0x03B8,
+            0x03C0, 0x03C1,
+            0x03C6, 0x03C6,
+            0x03C8, 0x03C8,
+            0x2020, 0x2020,
+            0x207F, 0x207F,
+            0x2190, 0x2192,
+            0x2212, 0x2212,
+            0x221A, 0x221A,
+            0x2220, 0x2220,
+            0x27E9, 0x27E9,
+            0
+        };
+
         jetBrainsMonoFont_ =
                 io.Fonts->AddFontFromFileTTF(
                     "assets/fonts/JetBrainsMono-Regular.ttf",
-                    16.0F
+                    16.0F,
+                    nullptr,
+                    jetBrainsMonoGlyphRanges
                 );
 
         jetBrainsMonoHeadingFont_ =
                 io.Fonts->AddFontFromFileTTF(
                     "assets/fonts/JetBrainsMono-Regular.ttf",
-                    20.0F
+                    20.0F,
+                    nullptr,
+                    jetBrainsMonoGlyphRanges
                 );
 
         if (jetBrainsMonoFont_ == nullptr) {
@@ -148,6 +168,7 @@ namespace quantum_sim::gui {
             // Keep the regular JetBrains Mono face active for the complete UI pass.
             pushApplicationFont();
 
+            handleGlobalShortcuts();
             applyQueuedPreset();
             applyQueuedCircuitEdits();
 
@@ -463,19 +484,14 @@ namespace quantum_sim::gui {
             );
 
             ImGui::Begin("Inspector");
-            const bool jumpToInstruction =
-                    inspectorPanel_.draw(
-                        session_,
-                        snapshot,
-                        circuit_,
-                        selectedInstructionIndex,
-                        densityVolumeStack_,
-                        selectedDensityLayer_,
-                        jetBrainsMonoHeadingFont_
-                    );
-            if (jumpToInstruction) {
-                circuitRenderer_.clearSelection();
-            }
+            inspectorPanel_.draw(
+                session_,
+                snapshot,
+                selectedInstructionIndex,
+                densityVolumeStack_,
+                selectedDensityLayer_,
+                jetBrainsMonoHeadingFont_
+            );
 
             ImGui::End();
 
@@ -616,6 +632,37 @@ namespace quantum_sim::gui {
     void GuiApplication::popApplicationFont() const {
         if (jetBrainsMonoFont_ != nullptr) {
             ImGui::PopFont();
+        }
+    }
+
+    void GuiApplication::handleGlobalShortcuts() {
+        const ImGuiIO &io =
+                ImGui::GetIO();
+
+        if (io.WantTextInput) {
+            return;
+        }
+
+        if (
+            ImGui::IsKeyPressed(ImGuiKey_Escape, false) &&
+            (
+                pendingGate_.has_value() ||
+                circuitRenderer_.hasPendingControlQubit()
+            )
+        ) {
+            pendingGate_.reset();
+            pendingRotationAngleRadians_.reset();
+            gateLibraryPanel_.clearSelection();
+            circuitRenderer_.cancelPlacement();
+            return;
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+            playbackPaused_ =
+                    !playbackPaused_;
+
+            nextAutoStepAt_ =
+                    ImGui::GetTime() + 0.45;
         }
     }
 
@@ -888,11 +935,11 @@ namespace quantum_sim::gui {
                 cell.column,
                 layer.bins[cell.column].label.c_str()
             );
-            ImGui::Text("|rho|       %.8f", cell.magnitude);
+            ImGui::Text("|\xCF\x81|       %.8f", cell.magnitude);
             ImGui::Text("intensity   %.8f", cell.intensity);
             ImGui::Text("phase       %.6f rad", cell.phaseRadians);
-            ImGui::Text("Re(rho)     %.8f", cell.real);
-            ImGui::Text("Im(rho)     %.8f", cell.imaginary);
+            ImGui::Text("Re(\xCF\x81)     %.8f", cell.real);
+            ImGui::Text("Im(\xCF\x81)     %.8f", cell.imaginary);
             ImGui::EndTooltip();
 
             if (
@@ -913,7 +960,7 @@ namespace quantum_sim::gui {
                     : densityVolumeStack_.layers[selectedDensityLayer_].dimension;
 
         ImGui::TextDisabled(
-            "%s | LAYER %zu/%zu | rho %zux%zu | opaque indexed voxels",
+            "%s | LAYER %zu/%zu | \xCF\x81 %zux%zu | opaque indexed voxels",
             canvasMode_ == CanvasMode::FloorField
                 ? "FLOOR FIELD"
                 : "LAYER STACK",
@@ -1039,7 +1086,7 @@ namespace quantum_sim::gui {
             ImGui::PushFont(jetBrainsMonoHeadingFont_);
         }
 
-        ImGui::TextUnformatted("rho(t)");
+        ImGui::TextUnformatted("\xCF\x81(t)");
 
         if (jetBrainsMonoHeadingFont_ != nullptr) {
             ImGui::PopFont();
@@ -1239,13 +1286,13 @@ namespace quantum_sim::gui {
             "|+>^n",
             CircuitPreset::PlusRegister,
             "Creates a uniform superposition across the selected register.",
-            false
+            true
             );
         scriptButton(
             "GHZ",
             CircuitPreset::Ghz,
             "Entangles the complete selected register.",
-            true
+            false
         );
         scriptButton(
             "QFT",

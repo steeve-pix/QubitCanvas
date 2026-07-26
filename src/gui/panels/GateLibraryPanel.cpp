@@ -203,7 +203,7 @@ namespace {
                imaginaryText;
     }
 
-    [[nodiscard]] std::vector<std::string> formattedMatrixRows(
+    [[nodiscard]] std::vector<std::vector<std::string> > formattedMatrixCells(
         const quantum_sim::math::ComplexMatrix &matrix,
         const double displayMultiplier
     ) {
@@ -212,9 +212,6 @@ namespace {
             std::vector<std::string>(matrix.columns())
         );
 
-        std::size_t widestCell =
-                1U;
-
         for (std::size_t row = 0; row < matrix.rows(); ++row) {
             for (std::size_t column = 0; column < matrix.columns(); ++column) {
                 cells[row][column] =
@@ -222,46 +219,31 @@ namespace {
                             matrix.at(row, column),
                             displayMultiplier
                         );
-
-                widestCell =
-                        std::max(
-                            widestCell,
-                            cells[row][column].size()
-                        );
             }
         }
 
-        std::vector<std::string> rows;
-        rows.reserve(matrix.rows());
+        return cells;
+    }
 
-        for (const auto &rowCells: cells) {
-            std::string rowText =
-                    "[ ";
+    [[nodiscard]] bool isZero(
+        const quantum_sim::math::Complex &value
+    ) noexcept {
+        return std::abs(value.real()) < 1e-9 &&
+               std::abs(value.imaginary()) < 1e-9;
+    }
 
-            for (std::size_t column = 0; column < rowCells.size(); ++column) {
-                rowText.append(
-                    widestCell - rowCells[column].size(),
-                    ' '
-                );
-
-                rowText +=
-                        rowCells[column];
-
-                if (column + 1U < rowCells.size()) {
-                    rowText +=
-                            "  ";
-                }
-            }
-
-            rowText +=
-                    " ]";
-
-            rows.push_back(
-                std::move(rowText)
-            );
+    [[nodiscard]] const char *gateDisplayName(
+        const std::string_view gateName
+    ) noexcept {
+        if (gateName == "Sdg") {
+            return "S\xE2\x80\xA0";
         }
 
-        return rows;
+        if (gateName == "Tdg") {
+            return "T\xE2\x80\xA0";
+        }
+
+        return gateName.data();
     }
 }
 
@@ -289,7 +271,7 @@ namespace quantum_sim::gui {
         },
         {
             "Sdg",
-            "Inverse S gate: rotates the |1> phase by -pi/2 radians. "
+            "Inverse S gate: rotates the |1> phase by -\xCF\x80/2 radians. "
             "It cancels the S gate."
         },
         {
@@ -298,7 +280,7 @@ namespace quantum_sim::gui {
         },
         {
             "Tdg",
-            "Inverse T gate: rotates the |1> phase by -pi/4 radians. "
+            "Inverse T gate: rotates the |1> phase by -\xCF\x80/4 radians. "
             "It cancels T and is used in decompositions such as Toffoli."
         }
     };
@@ -393,7 +375,7 @@ namespace quantum_sim::gui {
 
         const bool clicked =
                 ImGui::Button(
-                    gate.name,
+                    gateDisplayName(gate.name),
                     ImVec2{
                         style_.gateButtonSize,
                         style_.gateButtonSize
@@ -435,8 +417,8 @@ namespace quantum_sim::gui {
                     ? std::numbers::sqrt2
                     : 1.0;
 
-        const std::vector<std::string> matrixRows =
-                formattedMatrixRows(
+        const std::vector<std::vector<std::string> > matrixCells =
+                formattedMatrixCells(
                     matrix,
                     displayMultiplier
                 );
@@ -524,22 +506,95 @@ namespace quantum_sim::gui {
 
         if (isRotationGate(gateName)) {
             ImGui::TextDisabled(
-                "theta %.3f rad",
+                "\xCE\xB8 %.3f rad",
                 rotationAngleRadians_
             );
         }
 
         if (hadamard) {
-            ImGui::TextDisabled("factor 1/sqrt(2)");
+            ImGui::TextDisabled("factor 1/\xE2\x88\x9A""2");
         }
 
         ImGui::Spacing();
 
-        for (const std::string &row: matrixRows) {
-            ImGui::TextUnformatted(
-                row.c_str()
-            );
+        float widestCell = 0.0F;
+
+        for (const auto &row : matrixCells) {
+            for (const std::string &cell : row) {
+                widestCell =
+                        std::max(
+                            widestCell,
+                            ImGui::CalcTextSize(cell.c_str()).x
+                        );
+            }
         }
+
+        const float cellWidth =
+                std::max(42.0F, widestCell + 14.0F);
+
+        const float rowHeight =
+                ImGui::GetTextLineHeightWithSpacing();
+
+        const ImVec2 matrixOrigin =
+                ImGui::GetCursorScreenPos();
+
+        const ImVec4 zeroColor{
+            0.31F,
+            0.36F,
+            0.44F,
+            1.0F
+        };
+
+        for (std::size_t row = 0; row < matrix.rows(); ++row) {
+            const float rowY =
+                    matrixOrigin.y +
+                    static_cast<float>(row) * rowHeight;
+
+            ImGui::SetCursorScreenPos(
+                ImVec2{matrixOrigin.x, rowY}
+            );
+            ImGui::TextDisabled("[");
+
+            for (std::size_t column = 0; column < matrix.columns(); ++column) {
+                ImGui::SetCursorScreenPos(
+                    ImVec2{
+                        matrixOrigin.x + 20.0F +
+                        static_cast<float>(column) * cellWidth,
+                        rowY
+                    }
+                );
+
+                const std::string &cell =
+                        matrixCells[row][column];
+
+                if (isZero(matrix.at(row, column))) {
+                    ImGui::TextColored(
+                        zeroColor,
+                        "%s",
+                        cell.c_str()
+                    );
+                } else {
+                    ImGui::TextUnformatted(cell.c_str());
+                }
+            }
+
+            ImGui::SetCursorScreenPos(
+                ImVec2{
+                    matrixOrigin.x + 20.0F +
+                    static_cast<float>(matrix.columns()) * cellWidth,
+                    rowY
+                }
+            );
+            ImGui::TextDisabled("]");
+        }
+
+        ImGui::SetCursorScreenPos(
+            ImVec2{
+                matrixOrigin.x,
+                matrixOrigin.y +
+                static_cast<float>(matrix.rows()) * rowHeight
+            }
+        );
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -607,8 +662,10 @@ namespace quantum_sim::gui {
             return;
         }
 
-        ImGui::Text("Selected gate: %s",
-                    selectedGate_->c_str());
+        ImGui::Text(
+            "Selected gate: %s",
+            gateDisplayName(selectedGate_.value())
+        );
 
         const bool rotationSelected =
                 selectedGate_.value() == "Rx" ||
@@ -674,21 +731,21 @@ namespace quantum_sim::gui {
         const float shortcutWidth =
                 (availableWidth - spacing * 2.0F) / 3.0F;
 
-        if (ImGui::Button("pi/4", ImVec2{shortcutWidth, 0.0F})) {
+        if (ImGui::Button("\xCF\x80/4", ImVec2{shortcutWidth, 0.0F})) {
             rotationAngleRadians_ =
                     std::numbers::pi_v<float> / 4.0F;
         }
 
         ImGui::SameLine();
 
-        if (ImGui::Button("pi/2", ImVec2{shortcutWidth, 0.0F})) {
+        if (ImGui::Button("\xCF\x80/2", ImVec2{shortcutWidth, 0.0F})) {
             rotationAngleRadians_ =
                     std::numbers::pi_v<float> / 2.0F;
         }
 
         ImGui::SameLine();
 
-        if (ImGui::Button("pi", ImVec2{shortcutWidth, 0.0F})) {
+        if (ImGui::Button("\xCF\x80", ImVec2{shortcutWidth, 0.0F})) {
             rotationAngleRadians_ =
                     std::numbers::pi_v<float>;
         }
