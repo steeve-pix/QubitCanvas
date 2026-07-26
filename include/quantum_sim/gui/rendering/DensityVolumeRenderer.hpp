@@ -2,20 +2,19 @@
 
 #include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
-#include "quantum_sim/gui/rendering/DensityVolumeMeshBuilder.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeScene.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <vector>
 
 namespace quantum_sim::gui::density_volume {
     /**
-     * Raw OpenGL renderer for the interactive Density Volume density-matrix history.
+     * Instanced OpenGL renderer for the interactive density-matrix history.
      *
-     * The renderer owns the scene VAO/VBO/EBO, geometry and post-process
-     * shaders, HDR scene/bloom textures, integer picking texture, depth buffer,
-     * blur targets, and the final framebuffer displayed by Dear ImGui.
+     * A shared rounded cube is drawn once per compact VoxelInstance. The scene
+     * is rendered into HDR, integer-picking, and emissive attachments before
+     * bloom and tone mapping produce the texture displayed by Dear ImGui.
      */
     class Renderer {
     public:
@@ -28,21 +27,26 @@ namespace quantum_sim::gui::density_volume {
         Renderer &operator=(Renderer &&) = delete;
 
         /**
-         * Creates shader, mesh-buffer, framebuffer, and texture objects.
+         * Creates shaders, shared geometry, instance buffers, and framebuffers.
          *
-         * A current OpenGL 3.3 Core context and initialized GLAD loader are required.
+         * A current OpenGL 3.3 Core context and initialized GLAD loader are
+         * required.
          *
-         * @throws std::runtime_error when shader or OpenGL object creation fails.
+         * @throws std::runtime_error when an OpenGL resource cannot be created.
          */
         void initialize();
 
         /**
-         * Rebuilds and uploads geometry when the density history changes.
+         * Converts changed density data and uploads compact voxel instances.
+         *
+         * Layer-stack playback uploads the complete history only when its
+         * fingerprint changes. Moving between debugger steps then changes only
+         * the number of instances submitted to glDrawElementsInstanced().
          *
          * @param stack Shared density history.
-         * @param selectedLayer Last historical layer or selected floor.
-         * @param mode Spatial presentation to upload.
-         * @return true when a new mesh was uploaded.
+         * @param selectedLayer Debugger layer visible to the user.
+         * @param mode Spatial presentation to render.
+         * @return true when scene bounds or visible contents changed.
          */
         bool updateScene(
             const DensityStack &stack,
@@ -51,11 +55,11 @@ namespace quantum_sim::gui::density_volume {
         );
 
         /**
-         * Renders the uploaded stack into the off-screen framebuffer.
+         * Renders the current instance range into the final display texture.
          *
          * @param width Framebuffer width in physical pixels.
          * @param height Framebuffer height in physical pixels.
-         * @param selectedLayer Layer highlighted by both Density Volume views.
+         * @param selectedLayer Layer emphasized by the synchronized views.
          * @param camera Camera supplying view and projection matrices.
          */
         void render(
@@ -66,11 +70,11 @@ namespace quantum_sim::gui::density_volume {
         );
 
         /**
-         * Reads one integer pick ID from the picking attachment.
+         * Reads one stable cell ID from the integer picking attachment.
          *
          * @param x Pixel coordinate from the framebuffer's left edge.
          * @param y Pixel coordinate from the framebuffer's bottom edge.
-         * @return Selected density cell, or std::nullopt for empty background.
+         * @return Picked matrix cell, or std::nullopt for the background.
          */
         [[nodiscard]] std::optional<Selection> pick(int x, int y) const;
 
@@ -80,17 +84,17 @@ namespace quantum_sim::gui::density_volume {
         void shutdown() noexcept;
 
         /**
-         * Returns the OpenGL color texture displayed by ImGui::Image().
+         * Returns the tone-mapped OpenGL texture displayed by ImGui::Image().
          */
         [[nodiscard]] unsigned int colorTexture() const noexcept;
 
         /**
-         * Returns the uploaded scene's camera target.
+         * Returns the stable full-scene camera target.
          */
         [[nodiscard]] Vector3 sceneCenter() const noexcept;
 
         /**
-         * Returns the uploaded scene's bounding-sphere radius.
+         * Returns the stable full-scene bounding-sphere radius.
          */
         [[nodiscard]] float sceneRadius() const noexcept;
 
@@ -100,10 +104,15 @@ namespace quantum_sim::gui::density_volume {
         [[nodiscard]] bool isInitialized() const noexcept;
 
     private:
-        unsigned int vertexArray_{};
-        unsigned int vertexBuffer_{};
-        unsigned int indexBuffer_{};
-        unsigned int shaderProgram_{};
+        unsigned int voxelVertexArray_{};
+        unsigned int voxelVertexBuffer_{};
+        unsigned int voxelIndexBuffer_{};
+        unsigned int instanceBuffer_{};
+        unsigned int gridVertexArray_{};
+        unsigned int gridVertexBuffer_{};
+        unsigned int gridIndexBuffer_{};
+        unsigned int voxelShaderProgram_{};
+        unsigned int gridShaderProgram_{};
         unsigned int blurShaderProgram_{};
         unsigned int compositeShaderProgram_{};
         unsigned int postProcessVertexArray_{};
@@ -118,99 +127,66 @@ namespace quantum_sim::gui::density_volume {
         unsigned int compositeFramebuffer_{};
         int framebufferWidth_{};
         int framebufferHeight_{};
-        int modelUniform_{-1};
-        int viewUniform_{-1};
-        int projectionUniform_{-1};
-        int selectedLayerUniform_{-1};
+        int voxelViewUniform_{-1};
+        int voxelProjectionUniform_{-1};
+        int voxelSelectedLayerUniform_{-1};
+        int gridViewUniform_{-1};
+        int gridProjectionUniform_{-1};
+        int gridCenterUniform_{-1};
+        int gridExtentUniform_{-1};
         int blurInputUniform_{-1};
         int blurHorizontalUniform_{-1};
         int compositeSceneUniform_{-1};
         int compositeBloomUniform_{-1};
-        std::size_t indexCount_{};
+        int cubeIndexCount_{};
+        int visibleInstanceCount_{};
+        std::size_t instanceCapacity_{};
         std::uint64_t sceneFingerprint_{};
-        std::optional<std::size_t> sceneVisibleThroughLayer_;
+        std::optional<std::size_t> sceneSelectedLayer_;
         std::optional<VisualizationMode> sceneMode_;
+        InstanceScene scene_;
+        VoxelGeometry voxelGeometry_;
         Vector3 sceneCenter_{};
         float sceneRadius_{1.0F};
-        Mesh sceneMesh_;
-        std::vector<std::size_t> layerIndexCounts_;
-        std::vector<Vector3> layerSceneCenters_;
-        std::vector<float> layerSceneRadii_;
-        std::optional<std::size_t> builtThroughLayer_;
-        std::size_t vertexCapacity_{};
-        std::size_t indexCapacity_{};
         bool initialized_{false};
 
         /**
-         * Compiles and links the Density Volume scene, picking, and bright-pass
-         * shader program.
+         * Compiles the instanced material and procedural-grid programs.
          */
-        void createShaderProgram();
+        void createScenePrograms();
 
         /**
-         * Compiles the separable blur and final tone-mapping shader programs.
+         * Compiles bloom blur and HDR tone-mapping programs.
          */
         void createPostProcessPrograms();
 
         /**
-         * Creates the VAO, VBO, EBO, and interleaved vertex attributes.
+         * Uploads the shared rounded cube and defines per-instance attributes.
          */
-        void createMeshBuffers();
+        void createVoxelBuffers();
 
         /**
-         * Creates the empty core-profile VAO used by full-screen triangle passes.
+         * Creates the normalized quad used by the procedural ground grid.
+         */
+        void createGridBuffers();
+
+        /**
+         * Creates the empty core-profile VAO for full-screen triangle passes.
          */
         void createPostProcessVertexArray();
 
         /**
-         * Uploads one generated scene mesh to the existing VBO and EBO.
+         * Uploads all compact records while retaining reusable GPU capacity.
          */
-        void uploadMesh(const Mesh &mesh);
+        void uploadInstances();
 
         /**
-         * Allocates GPU storage for an incrementally generated layer stack.
-         *
-         * Storage grows geometrically as visible playback history expands,
-         * avoiding an up-front allocation for every future circuit layer.
-         *
-         * @param vertexCapacity Number of MeshVertex elements to reserve.
-         * @param indexCapacity Number of uint32 indices to reserve.
-         */
-        void allocateMeshStorage(
-            std::size_t vertexCapacity,
-            std::size_t indexCapacity
-        );
-
-        /**
-         * Uploads the suffix appended since the previous playback step.
-         *
-         * When the new suffix exceeds current GPU capacity, storage grows and
-         * the complete mesh is uploaded once into the replacement buffers.
-         *
-         * @param mesh Complete CPU-side scene mesh.
-         * @param firstVertex First newly appended vertex.
-         * @param firstIndex First newly appended index.
-         */
-        void uploadMeshSuffix(
-            const Mesh &mesh,
-            std::size_t firstVertex,
-            std::size_t firstIndex
-        );
-
-        /**
-         * Allocates HDR scene, emissive, picking, blur, final-color, and depth
-         * attachments for a viewport size.
+         * Allocates HDR, bloom, picking, final-color, and depth attachments.
          */
         void resizeFramebuffer(int width, int height);
 
         /**
-         * Blurs the emissive attachment and composites it with the HDR scene.
-         *
-         * The final tone-mapped result is written to colorTexture_ for display
-         * through ImGui::Image().
-         *
-         * @param width Current framebuffer width.
-         * @param height Current framebuffer height.
+         * Blurs emissive highlights and tone maps the final scene texture.
          */
         void renderPostProcess(int width, int height);
     };

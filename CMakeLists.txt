@@ -94,8 +94,7 @@ add_library(qubit_canvas_gui STATIC
         src/gui/rendering/DensityVolumeMath.cpp
         src/gui/rendering/DensityVolumeModel.cpp
         src/gui/rendering/DensityVolumeColorMap.cpp
-        src/gui/rendering/DensityVolumeLayout.cpp
-        src/gui/rendering/DensityVolumeMeshBuilder.cpp
+        src/gui/rendering/DensityVolumeScene.cpp
         src/gui/rendering/DensityVolumeCameraController.cpp
         src/gui/rendering/DensityVolumeRenderer.cpp
         src/gui/panels/GateLibraryPanel.cpp
