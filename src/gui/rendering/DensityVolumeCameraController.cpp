@@ -15,24 +15,42 @@ namespace quantum_sim::gui::density_volume {
 
     void CameraController::frameScene(
         const Vector3 &center,
-        const float radius
+        const float radius,
+        const bool floorField
     ) {
-        updateSceneBounds(center, radius);
+        updateSceneBounds(
+            center,
+            radius,
+            floorField
+        );
         reset();
         framed_ = true;
     }
 
     void CameraController::updateSceneBounds(
         const Vector3 &center,
-        const float radius
+        const float radius,
+        const bool floorField
     ) noexcept {
         sceneRadius_ =
                 std::max(radius, 1.0F);
 
-        launchYawDegrees_ = -40.0F;
-        launchPitchDegrees_ = 20.0F;
+        launchYawDegrees_ =
+                floorField
+                    ? 42.0F
+                    : 110.0F;
+
+        launchPitchDegrees_ =
+                floorField
+                    ? 46.0F
+                    : 25.0F;
+
         launchDistance_ =
-                std::max(sceneRadius_ * 1.72F, 2.8F);
+                std::max(
+                    sceneRadius_ *
+                    (floorField ? 2.05F : 1.90F),
+                    3.2F
+                );
 
         // Playback only refreshes clipping and the reset composition. The live
         // camera follows untouched playback, but never overwrites a pose the
