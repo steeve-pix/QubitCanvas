@@ -8,8 +8,7 @@
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
-#include "quantum_sim/gui/rendering/DensityVolumeLayout.hpp"
-#include "quantum_sim/gui/rendering/DensityVolumeMeshBuilder.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeScene.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
 
 #include <algorithm>
@@ -353,119 +352,136 @@ int main() {
         "Density Volume density cells preserve phase in radians and complex components"
     );
 
-    const quantum_sim::gui::density_volume::SceneLayout floorFieldLayout =
-            quantum_sim::gui::density_volume::LayerStackLayout::build(
+    const quantum_sim::gui::density_volume::InstanceScene floorFieldScene =
+            quantum_sim::gui::density_volume::SceneBuilder::build(
                 densityStack,
                 1U,
                 quantum_sim::gui::density_volume::VisualizationMode::FloorField
             );
 
     check(
-        floorFieldLayout.voxels.size() == 8U &&
+        floorFieldScene.voxels.size() == 4U &&
+        floorFieldScene.pickRecords.size() == 4U &&
         std::all_of(
-            floorFieldLayout.voxels.begin(),
-            floorFieldLayout.voxels.end(),
-            [](const quantum_sim::gui::density_volume::PlacedVoxel &voxel) {
-                return voxel.layer == 1U;
+            floorFieldScene.pickRecords.begin(),
+            floorFieldScene.pickRecords.end(),
+            [](const quantum_sim::gui::density_volume::Selection &selection) {
+                return selection.layer == 1U;
             }
         ),
-        "Density Volume floor field contains only the complete selected density matrix"
+        "Density Volume floor field creates one pickable instance per selected matrix cell"
     );
 
-    const quantum_sim::gui::density_volume::SceneLayout historyLayout =
-            quantum_sim::gui::density_volume::LayerStackLayout::build(
+    const quantum_sim::gui::density_volume::InstanceScene historyScene =
+            quantum_sim::gui::density_volume::SceneBuilder::build(
                 densityStack,
                 1U,
                 quantum_sim::gui::density_volume::VisualizationMode::LayerStack
             );
 
-    const auto initialPeak =
-            std::find_if(
-                historyLayout.voxels.begin(),
-                historyLayout.voxels.end(),
-                [](const quantum_sim::gui::density_volume::PlacedVoxel &voxel) {
-                    return voxel.layer == 0U &&
-                           voxel.row == 0U &&
-                           voxel.column == 0U &&
-                           voxel.magnitudeVoxel;
+    const auto findVoxel =
+            [](
+                const quantum_sim::gui::density_volume::InstanceScene &scene,
+                const std::size_t layer,
+                const std::size_t row,
+                const std::size_t column
+            ) -> const quantum_sim::gui::density_volume::VoxelInstance * {
+                for (std::size_t index = 0U; index < scene.pickRecords.size(); ++index) {
+                    const auto &selection =
+                            scene.pickRecords[index];
+
+                    if (
+                        selection.layer == layer &&
+                        selection.row == row &&
+                        selection.column == column
+                    ) {
+                        return &scene.voxels[index];
+                    }
                 }
-            );
 
-    const auto hadamardPeak =
-            std::find_if(
-                historyLayout.voxels.begin(),
-                historyLayout.voxels.end(),
-                [](const quantum_sim::gui::density_volume::PlacedVoxel &voxel) {
-                    return voxel.layer == 1U &&
-                           voxel.row == 0U &&
-                           voxel.column == 0U &&
-                           voxel.magnitudeVoxel;
-                }
+                return nullptr;
+            };
+
+    const auto *initialPeak =
+            findVoxel(historyScene, 0U, 0U, 0U);
+
+    const auto *hadamardPeak =
+            findVoxel(historyScene, 1U, 0U, 0U);
+
+    const auto *dormantCell =
+            findVoxel(historyScene, 0U, 1U, 1U);
+
+    const auto *nextLayerPeak =
+            findVoxel(historyScene, 1U, 0U, 0U);
+
+    check(
+        historyScene.voxels.size() ==
+            densityStack.layers.size() * 4U &&
+        historyScene.pickRecords.size() ==
+            historyScene.voxels.size() &&
+        historyScene.layerEndInstanceCounts.size() ==
+            densityStack.layers.size() &&
+        historyScene.layerEndInstanceCounts.at(1U) == 8U,
+        "Density Volume history keeps every matrix complete and reveals it by instance count"
+    );
+
+    check(
+        initialPeak != nullptr &&
+        hadamardPeak != nullptr &&
+        dormantCell != nullptr &&
+        nextLayerPeak != nullptr &&
+        initialPeak->center.x < hadamardPeak->center.x &&
+        approximatelyEqual(initialPeak->center.z, hadamardPeak->center.z) &&
+        nextLayerPeak->center.x - initialPeak->center.x >
+            (nextLayerPeak->size.x + initialPeak->size.x) * 0.5F &&
+        initialPeak->emissive > dormantCell->emissive &&
+        initialPeak->size.x > 0.0F &&
+        initialPeak->size.y > 0.0F &&
+        initialPeak->size.z > 0.0F,
+        "Density Volume layers advance on X with solid magnitude-lit cube instances"
+    );
+
+    const quantum_sim::gui::density_volume::VoxelGeometry roundedCube =
+            quantum_sim::gui::density_volume::VoxelGeometryBuilder::buildRoundedCube();
+
+    check(
+        roundedCube.vertices.size() == 54U &&
+        roundedCube.indices.size() == 144U &&
+        std::all_of(
+            roundedCube.vertices.begin(),
+            roundedCube.vertices.end(),
+            [](const quantum_sim::gui::density_volume::VoxelVertex &vertex) {
+                const float normalLength =
+                        std::sqrt(
+                            vertex.normal[0] * vertex.normal[0] +
+                            vertex.normal[1] * vertex.normal[1] +
+                            vertex.normal[2] * vertex.normal[2]
+                        );
+
+                return approximatelyEqual(
+                    normalLength,
+                    1.0,
+                    0.0001
+                );
+            }
+        ),
+        "Density Volume reuses one indexed rounded cube with normalized lighting normals"
+    );
+
+    const quantum_sim::gui::density_volume::InstanceScene largeHistoryScene =
+            quantum_sim::gui::density_volume::SceneBuilder::build(
+                largeDensityStack,
+                105U,
+                quantum_sim::gui::density_volume::VisualizationMode::LayerStack
             );
 
     check(
-        initialPeak != historyLayout.voxels.end() &&
-        hadamardPeak != historyLayout.voxels.end() &&
-        initialPeak->size.y > hadamardPeak->size.y,
-        "Density Volume voxel height preserves absolute density magnitude across layers"
-    );
-
-    check(
-        initialPeak != historyLayout.voxels.end() &&
-        hadamardPeak != historyLayout.voxels.end() &&
-        initialPeak->size.y >= initialPeak->size.x &&
-        hadamardPeak->size.y >= hadamardPeak->size.x * 0.80F,
-        "Visible density voxels retain a block-like silhouette"
-    );
-
-    const quantum_sim::gui::density_volume::Mesh beveledFloorMesh =
-            quantum_sim::gui::density_volume::MeshBuilder::build(
-                floorFieldLayout
-            );
-
-    check(
-        beveledFloorMesh.vertices.size() ==
-            floorFieldLayout.voxels.size() *
-            quantum_sim::gui::density_volume::MeshBuilder::verticesPerVoxel &&
-        beveledFloorMesh.indices.size() ==
-            floorFieldLayout.voxels.size() *
-            quantum_sim::gui::density_volume::MeshBuilder::indicesPerBeveledVoxel &&
-        beveledFloorMesh.pickRecords.size() ==
-            floorFieldLayout.voxels.size(),
-        "Density Volume uses indexed bevel faces while preserving voxel picking"
-    );
-
-    quantum_sim::gui::density_volume::Mesh incrementalHistoryMesh;
-
-    quantum_sim::gui::density_volume::MeshBuilder::append(
-        incrementalHistoryMesh,
-        quantum_sim::gui::density_volume::LayerStackLayout::buildLayer(
-            densityStack.layers.at(0),
-            quantum_sim::gui::density_volume::VisualizationMode::LayerStack
-        )
-    );
-
-    quantum_sim::gui::density_volume::MeshBuilder::append(
-        incrementalHistoryMesh,
-        quantum_sim::gui::density_volume::LayerStackLayout::buildLayer(
-            densityStack.layers.at(1),
-            quantum_sim::gui::density_volume::VisualizationMode::LayerStack
-        )
-    );
-
-    const quantum_sim::gui::density_volume::Mesh completeHistoryMesh =
-            quantum_sim::gui::density_volume::MeshBuilder::build(
-                historyLayout
-            );
-
-    check(
-        incrementalHistoryMesh.vertices.size() ==
-            completeHistoryMesh.vertices.size() &&
-        incrementalHistoryMesh.indices ==
-            completeHistoryMesh.indices &&
-        incrementalHistoryMesh.pickRecords.size() ==
-            completeHistoryMesh.pickRecords.size(),
-        "Density Volume incremental layers match a complete history mesh"
+        largeHistoryScene.voxels.size() ==
+            largeDensityStack.layers.size() * 256U &&
+        largeHistoryScene.layerEndInstanceCounts.at(105U) ==
+            106U * 256U &&
+        roundedCube.vertices.size() < 100U,
+        "Ten-qubit history stays compact as instances of one shared cube"
     );
 
     const QuantumRegister qftSourceState =
@@ -804,6 +820,34 @@ int main() {
             }
         ),
         "Density camera reset uses the latest scene bounds"
+    );
+
+    quantum_sim::gui::density_volume::CameraController automaticCamera;
+    automaticCamera.frameScene(
+        quantum_sim::gui::density_volume::Vector3{0.0F, 0.0F, 0.0F},
+        4.0F
+    );
+
+    const auto initialAutomaticView =
+            automaticCamera.viewMatrix();
+
+    automaticCamera.updateSceneBounds(
+        quantum_sim::gui::density_volume::Vector3{5.0F, 0.0F, 0.0F},
+        9.0F
+    );
+
+    automaticCamera.update(0.1F);
+
+    check(
+        !std::equal(
+            initialAutomaticView.begin(),
+            initialAutomaticView.end(),
+            automaticCamera.viewMatrix().begin(),
+            [](const float left, const float right) {
+                return approximatelyEqual(left, right, 1e-6);
+            }
+        ),
+        "Untouched playback camera follows expanding scene bounds"
     );
 
     if (failures == 0) {
