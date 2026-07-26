@@ -1465,6 +1465,10 @@ namespace quantum_sim::gui {
             return gates::sGate();
         }
 
+        if (gateName == "Sdg") {
+            return gates::sDaggerGate();
+        }
+
         if (gateName == "T") {
             return gates::tGate();
         }
