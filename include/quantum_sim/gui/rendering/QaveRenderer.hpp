@@ -39,12 +39,14 @@ namespace quantum_sim::gui::qave {
          * Rebuilds and uploads geometry when the density history changes.
          *
          * @param stack Shared density history.
-         * @param visibleThroughLayer Last historical layer to upload.
+         * @param selectedLayer Last historical layer or selected floor.
+         * @param mode Spatial presentation to upload.
          * @return true when a new mesh was uploaded.
          */
         bool updateScene(
             const DensityStack &stack,
-            std::size_t visibleThroughLayer
+            std::size_t selectedLayer,
+            VisualizationMode mode
         );
 
         /**
@@ -114,6 +116,7 @@ namespace quantum_sim::gui::qave {
         std::size_t indexCount_{};
         std::uint64_t sceneFingerprint_{};
         std::optional<std::size_t> sceneVisibleThroughLayer_;
+        std::optional<VisualizationMode> sceneMode_;
         Vector3 sceneCenter_{};
         float sceneRadius_{1.0F};
         std::vector<Selection> pickRecords_;

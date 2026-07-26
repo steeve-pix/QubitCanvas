@@ -9,6 +9,14 @@
 
 namespace quantum_sim::gui::qave {
     /**
+     * Spatial presentation used for the shared density-matrix data.
+     */
+    enum class VisualizationMode {
+        LayerStack,
+        FloorField
+    };
+
+    /**
      * One cuboid placed in the 3D density-history scene.
      */
     struct PlacedVoxel {
@@ -31,23 +39,26 @@ namespace quantum_sim::gui::qave {
     };
 
     /**
-     * Places density matrices into a separated vertical history stack.
+     * Places density matrices into the history-stack or selected-floor view.
      */
     class LayerStackLayout {
     public:
         /**
          * Converts numerical cells into base tiles and magnitude-height voxels.
          *
-         * Every density layer remains a complete square X-Z grid. Near-zero
-         * magnitudes keep only their thin base tile, avoiding noisy tiny boxes.
+         * Layer-stack mode includes every matrix through the selected layer.
+         * Floor-field mode includes only the selected matrix at ground level.
+         * Both modes preserve the absolute [0, 1] density magnitude for height.
          *
          * @param stack Shared density history.
-         * @param visibleThroughLayer Last layer included in the built history.
+         * @param selectedLayer Last visible history layer or selected floor.
+         * @param mode Spatial presentation to build.
          * @return Positioned scene with stable bounds for camera framing.
          */
         [[nodiscard]] static SceneLayout build(
             const DensityStack &stack,
-            std::size_t visibleThroughLayer
+            std::size_t selectedLayer,
+            VisualizationMode mode
         );
     };
 }

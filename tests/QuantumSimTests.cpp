@@ -8,7 +8,9 @@
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/gui/rendering/QaveDensityModel.hpp"
+#include "quantum_sim/gui/rendering/QaveLayerStackLayout.hpp"
 
+#include <algorithm>
 #include <sstream>
 #include <iostream>
 #include <cmath>
@@ -163,6 +165,63 @@ int main() {
         ) &&
         approximatelyEqual(phaseCoherence.imaginary, -0.5),
         "QAVE density cells preserve phase in radians and complex components"
+    );
+
+    const quantum_sim::gui::qave::SceneLayout floorFieldLayout =
+            quantum_sim::gui::qave::LayerStackLayout::build(
+                densityStack,
+                1U,
+                quantum_sim::gui::qave::VisualizationMode::FloorField
+            );
+
+    check(
+        floorFieldLayout.voxels.size() == 8U &&
+        std::all_of(
+            floorFieldLayout.voxels.begin(),
+            floorFieldLayout.voxels.end(),
+            [](const quantum_sim::gui::qave::PlacedVoxel &voxel) {
+                return voxel.layer == 1U;
+            }
+        ),
+        "QAVE floor field contains only the complete selected density matrix"
+    );
+
+    const quantum_sim::gui::qave::SceneLayout historyLayout =
+            quantum_sim::gui::qave::LayerStackLayout::build(
+                densityStack,
+                1U,
+                quantum_sim::gui::qave::VisualizationMode::LayerStack
+            );
+
+    const auto initialPeak =
+            std::find_if(
+                historyLayout.voxels.begin(),
+                historyLayout.voxels.end(),
+                [](const quantum_sim::gui::qave::PlacedVoxel &voxel) {
+                    return voxel.layer == 0U &&
+                           voxel.row == 0U &&
+                           voxel.column == 0U &&
+                           voxel.magnitudeVoxel;
+                }
+            );
+
+    const auto hadamardPeak =
+            std::find_if(
+                historyLayout.voxels.begin(),
+                historyLayout.voxels.end(),
+                [](const quantum_sim::gui::qave::PlacedVoxel &voxel) {
+                    return voxel.layer == 1U &&
+                           voxel.row == 0U &&
+                           voxel.column == 0U &&
+                           voxel.magnitudeVoxel;
+                }
+            );
+
+    check(
+        initialPeak != historyLayout.voxels.end() &&
+        hadamardPeak != historyLayout.voxels.end() &&
+        initialPeak->size.y > hadamardPeak->size.y,
+        "QAVE voxel height preserves absolute density magnitude across layers"
     );
 
     const QuantumRegister qftSourceState =
