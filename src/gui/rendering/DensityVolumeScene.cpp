@@ -8,8 +8,10 @@
 
 namespace quantum_sim::gui::density_volume {
     namespace {
-        constexpr float cellPitch = 0.72F;
-        constexpr float cubeSide = cellPitch * 0.79F;
+        constexpr float cellPitch = 1.0F;
+        constexpr float cubeSide = 0.82F;
+        constexpr float maximumFloorHeight = 4.4F;
+        constexpr float solidVisibilityThreshold = 1.0e-4F;
         constexpr float roundedRadius = 0.14F;
         constexpr std::size_t roundedSegments = 2U;
 
@@ -17,105 +19,68 @@ namespace quantum_sim::gui::density_volume {
             return std::clamp(value, 0.0F, 1.0F);
         }
 
-        [[nodiscard]] float smoothStep(
-            const float low,
-            const float high,
-            const float value
+        [[nodiscard]] float srgbToLinear(
+            const float component
         ) noexcept {
-            const float normalized =
-                    clamp01((value - low) / (high - low));
+            const float safeComponent =
+                    std::max(component, 0.0F);
 
-            return normalized * normalized * (3.0F - 2.0F * normalized);
+            if (safeComponent <= 0.04045F) {
+                return safeComponent / 12.92F;
+            }
+
+            return std::pow(
+                (safeComponent + 0.055F) / 1.055F,
+                2.4F
+            );
         }
 
-        [[nodiscard]] Color mixColor(
-            const Color &left,
-            const Color &right,
-            const float amount
+        [[nodiscard]] Color linearColor(
+            const Color &srgb
         ) noexcept {
-            const float safeAmount =
-                    clamp01(amount);
-
             return Color{
-                left.red + (right.red - left.red) * safeAmount,
-                left.green + (right.green - left.green) * safeAmount,
-                left.blue + (right.blue - left.blue) * safeAmount
+                srgbToLinear(srgb.red),
+                srgbToLinear(srgb.green),
+                srgbToLinear(srgb.blue)
             };
         }
 
         [[nodiscard]] Color voxelColor(
-            const DensityCell &cell,
-            const std::size_t layer
-        ) noexcept {
-            constexpr Color dormant{0.028F, 0.020F, 0.078F};
-            constexpr Color ember{0.66F, 0.060F, 0.105F};
-            constexpr Color orange{1.00F, 0.285F, 0.055F};
-            constexpr Color gold{1.00F, 0.760F, 0.235F};
-            constexpr Color whiteHot{1.00F, 0.965F, 0.720F};
-
-            const float magnitude =
-                    clamp01(static_cast<float>(cell.magnitude));
-
-            const float response =
-                    std::pow(magnitude, 0.38F);
-
-            Color color{};
-
-            if (response < 0.34F) {
-                color = mixColor(dormant, ember, response / 0.34F);
-            } else if (response < 0.68F) {
-                color = mixColor(
-                    ember,
-                    orange,
-                    (response - 0.34F) / 0.34F
-                );
-            } else if (response < 0.92F) {
-                color = mixColor(
-                    orange,
-                    gold,
-                    (response - 0.68F) / 0.24F
-                );
-            } else {
-                color = mixColor(
-                    gold,
-                    whiteHot,
-                    (response - 0.92F) / 0.08F
-                );
-            }
-
-            // Phase remains visible as a restrained warm/cool variation while
-            // magnitude owns the dominant inferno-style brightness ramp.
-            const float phaseSin =
-                    static_cast<float>(std::sin(cell.phaseRadians));
-
-            const float phaseCos =
-                    static_cast<float>(std::cos(cell.phaseRadians));
-
-            color.red += phaseCos * 0.030F * response;
-            color.green += phaseSin * 0.018F * response;
-            color.blue += -phaseCos * 0.024F * response;
-
-            const float layerVariation =
-                    0.965F +
-                    0.035F *
-                    std::sin(static_cast<float>(layer) * 0.71F);
-
-            return Color{
-                clamp01(color.red * layerVariation),
-                clamp01(color.green * layerVariation),
-                clamp01(color.blue * layerVariation)
-            };
-        }
-
-        [[nodiscard]] float voxelEmissive(
             const DensityCell &cell
         ) noexcept {
             const float magnitude =
-                    clamp01(static_cast<float>(cell.magnitude));
+                    clamp01(
+                        static_cast<float>(cell.magnitude)
+                    );
 
-            return
-                    smoothStep(0.025F, 0.82F, magnitude) *
-                    (0.42F + 1.35F * std::sqrt(magnitude));
+            const Color base =
+                    linearColor(
+                        magnitudeColor(magnitude)
+                    );
+
+            // The reference applies this gain after sRGB-to-linear conversion,
+            // preserving the Inferno hue while giving bright cells HDR energy.
+            const float glowGain =
+                    1.0F + 1.9F * magnitude;
+
+            return Color{
+                base.red * glowGain,
+                base.green * glowGain,
+                base.blue * glowGain
+            };
+        }
+
+        [[nodiscard]] Color ghostColor() noexcept {
+            const Color base =
+                    linearColor(
+                        magnitudeColor(0.001)
+                    );
+
+            return Color{
+                base.red * 0.82F,
+                base.green * 0.82F,
+                base.blue * 0.82F
+            };
         }
 
         [[nodiscard]] float matrixSpan(
@@ -132,17 +97,19 @@ namespace quantum_sim::gui::density_volume {
         }
 
         [[nodiscard]] constexpr float stackLayerGap() noexcept {
-            // Fixed separation is architectural: even very long histories
-            // must never compress neighboring matrix slabs into each other.
-            return cubeSide * 1.23F;
+            return 1.15F;
         }
 
-        void appendVoxel(
+        void appendInstance(
             InstanceScene &scene,
+            std::vector<VoxelInstance> &instances,
             const DensityCell &cell,
             const std::size_t layer,
             const Vector3 center,
-            const Vector3 size
+            const Vector3 size,
+            const Color color,
+            const float emissive,
+            const bool magnitudeVoxel
         ) {
             if (
                 scene.pickRecords.size() >=
@@ -158,22 +125,62 @@ namespace quantum_sim::gui::density_volume {
                     .layer = layer,
                     .row = cell.row,
                     .column = cell.column,
-                    .magnitudeVoxel = true
+                    .magnitudeVoxel = magnitudeVoxel
                 }
             );
 
-            scene.voxels.push_back(
+            instances.push_back(
                 VoxelInstance{
                     .center = center,
                     .size = size,
-                    .color = voxelColor(cell, layer),
-                    .emissive = voxelEmissive(cell),
+                    .color = color,
+                    .emissive = emissive,
                     .magnitude =
                         clamp01(static_cast<float>(cell.magnitude)),
                     .layer = static_cast<float>(layer),
                     .pickId =
                         static_cast<float>(scene.pickRecords.size())
                 }
+            );
+        }
+
+        void appendSolidVoxel(
+            InstanceScene &scene,
+            const DensityCell &cell,
+            const std::size_t layer,
+            const Vector3 center,
+            const Vector3 size
+        ) {
+            appendInstance(
+                scene,
+                scene.voxels,
+                cell,
+                layer,
+                center,
+                size,
+                voxelColor(cell),
+                clamp01(static_cast<float>(cell.magnitude)),
+                true
+            );
+        }
+
+        void appendGhostVoxel(
+            InstanceScene &scene,
+            const DensityCell &cell,
+            const std::size_t layer,
+            const Vector3 center,
+            const Vector3 size
+        ) {
+            appendInstance(
+                scene,
+                scene.ghostVoxels,
+                cell,
+                layer,
+                center,
+                size,
+                ghostColor(),
+                0.0F,
+                false
             );
         }
 
@@ -202,8 +209,10 @@ namespace quantum_sim::gui::density_volume {
             }
 
             scene.voxels.reserve(voxelCount);
+            scene.ghostVoxels.reserve(voxelCount);
             scene.pickRecords.reserve(voxelCount);
             scene.layerEndInstanceCounts.reserve(stack.layers.size());
+            scene.layerEndGhostCounts.reserve(stack.layers.size());
 
             const float span =
                     matrixSpan(stack.layers.back().dimension);
@@ -223,44 +232,57 @@ namespace quantum_sim::gui::density_volume {
                         static_cast<float>(layer.index) *
                         layerGap;
 
+                const bool showGhosts =
+                        !layer.bucketed &&
+                        layer.dimension <= 16U;
+
                 for (const DensityCell &cell : layer.cells) {
                     const float magnitude =
                             clamp01(
                                 static_cast<float>(cell.magnitude)
                             );
 
-                    const float response =
-                            std::pow(magnitude, 0.38F);
+                    const Vector3 center{
+                        layerX,
+                        halfMatrix -
+                            static_cast<float>(cell.row) *
+                            cellPitch,
+                        static_cast<float>(cell.column) *
+                            cellPitch -
+                            halfMatrix
+                    };
 
-                    const float crossSection =
-                            cubeSide * (0.82F + response * 0.18F);
+                    constexpr Vector3 size{
+                        cubeSide,
+                        cubeSide,
+                        cubeSide
+                    };
 
-                    const float depth =
-                            cubeSide * (0.72F + response * 0.26F);
-
-                    appendVoxel(
-                        scene,
-                        cell,
-                        layer.index,
-                        Vector3{
-                            layerX,
-                            halfMatrix -
-                                static_cast<float>(cell.row) *
-                                cellPitch,
-                            static_cast<float>(cell.column) *
-                                cellPitch -
-                                halfMatrix
-                        },
-                        Vector3{
-                            depth,
-                            crossSection,
-                            crossSection
-                        }
-                    );
+                    if (magnitude >= solidVisibilityThreshold) {
+                        appendSolidVoxel(
+                            scene,
+                            cell,
+                            layer.index,
+                            center,
+                            size
+                        );
+                    } else if (showGhosts) {
+                        appendGhostVoxel(
+                            scene,
+                            cell,
+                            layer.index,
+                            center,
+                            size
+                        );
+                    }
                 }
 
                 scene.layerEndInstanceCounts.push_back(
                     scene.voxels.size()
+                );
+
+                scene.layerEndGhostCounts.push_back(
+                    scene.ghostVoxels.size()
                 );
             }
 
@@ -274,6 +296,10 @@ namespace quantum_sim::gui::density_volume {
                 0.0F,
                 0.0F
             };
+
+            scene.matrixSpan = span;
+            scene.layerSpacing = layerGap;
+            scene.voxelSide = cubeSide;
 
             scene.radius =
                     std::sqrt(
@@ -301,8 +327,13 @@ namespace quantum_sim::gui::density_volume {
         ) {
             InstanceScene scene;
             scene.voxels.reserve(layer.cells.size());
+            scene.ghostVoxels.reserve(layer.cells.size());
             scene.pickRecords.reserve(layer.cells.size());
             scene.layerEndInstanceCounts.assign(
+                layer.index + 1U,
+                0U
+            );
+            scene.layerEndGhostCounts.assign(
                 layer.index + 1U,
                 0U
             );
@@ -318,6 +349,10 @@ namespace quantum_sim::gui::density_volume {
             float maximumHeight =
                     0.08F;
 
+            const bool showGhosts =
+                    !layer.bucketed &&
+                    layer.dimension <= 16U;
+
             for (const DensityCell &cell : layer.cells) {
                 const float magnitude =
                         clamp01(
@@ -325,42 +360,70 @@ namespace quantum_sim::gui::density_volume {
                         );
 
                 const float height =
-                        0.065F +
-                        std::pow(magnitude, 0.52F) *
-                        3.25F;
+                        std::max(
+                            0.012F,
+                            magnitude * maximumFloorHeight
+                        );
 
                 maximumHeight =
                         std::max(maximumHeight, height);
 
-                appendVoxel(
-                    scene,
-                    cell,
-                    layer.index,
-                    Vector3{
-                        static_cast<float>(cell.column) *
-                            cellPitch -
-                            halfMatrix,
-                        height * 0.5F,
-                        static_cast<float>(cell.row) *
-                            cellPitch -
-                            halfMatrix
-                    },
-                    Vector3{
-                        cubeSide,
-                        height,
-                        cubeSide
-                    }
-                );
+                const Vector3 center{
+                    static_cast<float>(cell.column) *
+                        cellPitch -
+                        halfMatrix,
+                    height * 0.5F,
+                    static_cast<float>(cell.row) *
+                        cellPitch -
+                        halfMatrix
+                };
+
+                if (magnitude >= solidVisibilityThreshold) {
+                    appendSolidVoxel(
+                        scene,
+                        cell,
+                        layer.index,
+                        center,
+                        Vector3{
+                            cubeSide,
+                            height,
+                            cubeSide
+                        }
+                    );
+                } else if (showGhosts) {
+                    appendGhostVoxel(
+                        scene,
+                        cell,
+                        layer.index,
+                        Vector3{
+                            center.x,
+                            0.03F,
+                            center.z
+                        },
+                        Vector3{
+                            cubeSide,
+                            0.06F,
+                            cubeSide
+                        }
+                    );
+                }
             }
 
             scene.layerEndInstanceCounts[layer.index] =
                     scene.voxels.size();
+
+            scene.layerEndGhostCounts[layer.index] =
+                    scene.ghostVoxels.size();
 
             scene.center = Vector3{
                 0.0F,
                 maximumHeight * 0.32F,
                 0.0F
             };
+
+            scene.matrixSpan = span;
+            scene.layerSpacing = stackLayerGap();
+            scene.voxelSide = cubeSide;
 
             scene.radius =
                     std::sqrt(

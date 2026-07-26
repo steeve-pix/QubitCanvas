@@ -788,7 +788,9 @@ namespace quantum_sim::gui {
         ) {
             densityVolumeCamera_.frameScene(
                 densityVolumeRenderer_.sceneCenter(),
-                densityVolumeRenderer_.sceneRadius()
+                densityVolumeRenderer_.sceneRadius(),
+                visualizationMode ==
+                    density_volume::VisualizationMode::FloorField
             );
             densityVolumeCameraFramePending_ = false;
         } else if (sceneChanged) {
@@ -796,7 +798,9 @@ namespace quantum_sim::gui {
             // must not overwrite the camera pose chosen by the user.
             densityVolumeCamera_.updateSceneBounds(
                 densityVolumeRenderer_.sceneCenter(),
-                densityVolumeRenderer_.sceneRadius()
+                densityVolumeRenderer_.sceneRadius(),
+                visualizationMode ==
+                    density_volume::VisualizationMode::FloorField
             );
         }
 
@@ -806,6 +810,7 @@ namespace quantum_sim::gui {
             framebufferWidth,
             framebufferHeight,
             selectedDensityLayer_,
+            heatAmount_,
             densityVolumeCamera_
         );
 
@@ -1016,7 +1021,7 @@ namespace quantum_sim::gui {
                     : densityVolumeStack_.layers[selectedDensityLayer_].dimension;
 
         ImGui::TextDisabled(
-            "%s | LAYER %zu/%zu | \xCF\x81 %zux%zu | instanced rounded voxels",
+            "%s | LAYER %zu/%zu | \xCF\x81 %zux%zu | fixed rounded voxels",
             canvasMode_ == CanvasMode::FloorField
                 ? "FLOOR FIELD"
                 : "LAYER STACK",

@@ -403,23 +403,34 @@ int main() {
                 quantum_sim::gui::density_volume::VisualizationMode::LayerStack
             );
 
-    const auto findVoxel =
+    const auto findInstance =
             [](
                 const quantum_sim::gui::density_volume::InstanceScene &scene,
+                const std::vector<
+                    quantum_sim::gui::density_volume::VoxelInstance
+                > &instances,
                 const std::size_t layer,
                 const std::size_t row,
                 const std::size_t column
             ) -> const quantum_sim::gui::density_volume::VoxelInstance * {
-                for (std::size_t index = 0U; index < scene.pickRecords.size(); ++index) {
+                for (
+                    const auto &instance : instances
+                ) {
+                    const std::size_t pickIndex =
+                            static_cast<std::size_t>(
+                                instance.pickId
+                            ) -
+                            1U;
+
                     const auto &selection =
-                            scene.pickRecords[index];
+                            scene.pickRecords.at(pickIndex);
 
                     if (
                         selection.layer == layer &&
                         selection.row == row &&
                         selection.column == column
                     ) {
-                        return &scene.voxels[index];
+                        return &instance;
                     }
                 }
 
@@ -427,26 +438,54 @@ int main() {
             };
 
     const auto *initialPeak =
-            findVoxel(historyScene, 0U, 0U, 0U);
+            findInstance(
+                historyScene,
+                historyScene.voxels,
+                0U,
+                0U,
+                0U
+            );
 
     const auto *hadamardPeak =
-            findVoxel(historyScene, 1U, 0U, 0U);
+            findInstance(
+                historyScene,
+                historyScene.voxels,
+                1U,
+                0U,
+                0U
+            );
 
     const auto *dormantCell =
-            findVoxel(historyScene, 0U, 1U, 1U);
+            findInstance(
+                historyScene,
+                historyScene.ghostVoxels,
+                0U,
+                1U,
+                1U
+            );
 
     const auto *nextLayerPeak =
-            findVoxel(historyScene, 1U, 0U, 0U);
+            findInstance(
+                historyScene,
+                historyScene.voxels,
+                1U,
+                0U,
+                0U
+            );
 
     check(
-        historyScene.voxels.size() ==
-            densityStack.layers.size() * 4U &&
+        historyScene.voxels.size() == 9U &&
+        historyScene.ghostVoxels.size() == 3U &&
         historyScene.pickRecords.size() ==
-            historyScene.voxels.size() &&
+            historyScene.voxels.size() +
+            historyScene.ghostVoxels.size() &&
         historyScene.layerEndInstanceCounts.size() ==
             densityStack.layers.size() &&
-        historyScene.layerEndInstanceCounts.at(1U) == 8U,
-        "Density Volume history keeps every matrix complete and reveals it by instance count"
+        historyScene.layerEndGhostCounts.size() ==
+            densityStack.layers.size() &&
+        historyScene.layerEndInstanceCounts.at(1U) == 5U &&
+        historyScene.layerEndGhostCounts.at(1U) == 3U,
+        "Density Volume history separates solid values from small-matrix edge ghosts"
     );
 
     check(
@@ -459,10 +498,19 @@ int main() {
         nextLayerPeak->center.x - initialPeak->center.x >
             (nextLayerPeak->size.x + initialPeak->size.x) * 0.5F &&
         initialPeak->emissive > dormantCell->emissive &&
-        initialPeak->size.x > 0.0F &&
-        initialPeak->size.y > 0.0F &&
-        initialPeak->size.z > 0.0F,
-        "Density Volume layers advance on X with solid magnitude-lit cube instances"
+        approximatelyEqual(
+            initialPeak->size.x,
+            initialPeak->size.y
+        ) &&
+        approximatelyEqual(
+            initialPeak->size.y,
+            initialPeak->size.z
+        ) &&
+        approximatelyEqual(
+            initialPeak->size.x,
+            nextLayerPeak->size.x
+        ),
+        "Density Volume layers advance on X with separated fixed-size cubes"
     );
 
     const quantum_sim::gui::density_volume::VoxelGeometry roundedCube =
@@ -500,12 +548,14 @@ int main() {
             );
 
     check(
-        largeHistoryScene.voxels.size() ==
+        !largeHistoryScene.voxels.empty() &&
+        largeHistoryScene.voxels.size() <=
             largeDensityStack.layers.size() * 256U &&
-        largeHistoryScene.layerEndInstanceCounts.at(105U) ==
+        largeHistoryScene.ghostVoxels.empty() &&
+        largeHistoryScene.layerEndInstanceCounts.at(105U) <=
             106U * 256U &&
         roundedCube.vertices.size() < 100U,
-        "Ten-qubit history stays compact as instances of one shared cube"
+        "Ten-qubit history omits zero geometry and reuses one shared cube"
     );
 
     const QuantumRegister qftSourceState =
