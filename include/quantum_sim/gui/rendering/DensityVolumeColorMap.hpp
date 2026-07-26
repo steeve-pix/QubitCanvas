@@ -1,8 +1,8 @@
 #pragma once
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     /**
-     * Linear RGB color used by QAVE mesh vertices.
+     * Linear RGB color used by Density Volume mesh vertices.
      */
     struct Color {
         float red{};

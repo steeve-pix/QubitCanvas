@@ -1,5 +1,5 @@
 #include "quantum_sim/gui/panels/InspectorPanel.hpp"
-#include "quantum_sim/gui/rendering/QaveColorMap.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
 
 #include "imgui.h"
 
@@ -109,8 +109,8 @@ namespace {
         const double normalizedMagnitude,
         const double phase
     ) {
-        const quantum_sim::gui::qave::Color color =
-                quantum_sim::gui::qave::phaseColor(
+        const quantum_sim::gui::density_volume::Color color =
+                quantum_sim::gui::density_volume::phaseColor(
                     normalizedMagnitude,
                     phase
                 );
@@ -130,7 +130,7 @@ namespace quantum_sim::gui {
         const debug::DebuggerSnapshot &snapshot,
         const circuit::QuantumCircuit &circuit,
         std::optional<std::size_t> selectedInstructionIndex,
-        const qave::DensityStack &densityStack,
+        const density_volume::DensityStack &densityStack,
         std::size_t &selectedDensityLayer,
         ImFont *headingFont
     ) {
@@ -462,7 +462,7 @@ namespace quantum_sim::gui {
 
     void InspectorPanel::drawQuantumState(
         debug::DebuggerSession &session,
-        const qave::DensityStack &densityStack,
+        const density_volume::DensityStack &densityStack,
         std::size_t &selectedDensityLayer
     ) {
         ImGui::Spacing();
@@ -546,7 +546,7 @@ namespace quantum_sim::gui {
 
     void InspectorPanel::drawLayerStack(
         debug::DebuggerSession &session,
-        const qave::DensityStack &densityStack,
+        const density_volume::DensityStack &densityStack,
         std::size_t &selectedDensityLayer
     ) {
         ImGui::Spacing();
@@ -627,7 +627,7 @@ namespace quantum_sim::gui {
             }
         }
 
-        const qave::DensityLayer &densityLayer =
+        const density_volume::DensityLayer &densityLayer =
                 densityStack.layers[selectedDensityLayer];
 
         const float availableWidth =
@@ -638,7 +638,7 @@ namespace quantum_sim::gui {
 
         double layerMaximumMagnitude{};
 
-        for (const qave::DensityCell &cell : densityLayer.cells) {
+        for (const density_volume::DensityCell &cell : densityLayer.cells) {
             layerMaximumMagnitude =
                     std::max(
                         layerMaximumMagnitude,
@@ -762,7 +762,7 @@ namespace quantum_sim::gui {
 
         for (std::size_t row = 0; row < gridDimension; ++row) {
             for (std::size_t column = 0; column < gridDimension; ++column) {
-                const qave::DensityCell &cell =
+                const density_volume::DensityCell &cell =
                         densityLayer.cellAt(row, column);
 
                 const double normalizedMagnitude =
@@ -909,13 +909,13 @@ namespace quantum_sim::gui {
                             )
                         );
 
-                const qave::DensityCell &cell =
+                const density_volume::DensityCell &cell =
                         densityLayer.cellAt(row, column);
 
-                const qave::DensityBin &rowBin =
+                const density_volume::DensityBin &rowBin =
                         densityLayer.bins[row];
 
-                const qave::DensityBin &columnBin =
+                const density_volume::DensityBin &columnBin =
                         densityLayer.bins[column];
 
                 ImGui::BeginTooltip();

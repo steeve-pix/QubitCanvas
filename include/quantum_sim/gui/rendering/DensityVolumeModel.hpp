@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     /**
      * One row/column bucket used when a register is larger than the render grid.
      */
@@ -81,7 +81,7 @@ namespace quantum_sim::gui::qave {
          *
          * @param session Debugger trace whose initial and post-step states are converted.
          * @param maximumDimension Largest square matrix dimension to generate.
-         * @return Shared numerical model for both 3D and 2D QAVE views.
+         * @return Shared numerical model for both 3D and 2D Density Volume views.
          */
         [[nodiscard]] static DensityStack build(
             const debug::DebuggerSession &session,

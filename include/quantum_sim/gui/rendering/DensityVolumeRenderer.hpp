@@ -1,17 +1,17 @@
 #pragma once
 
-#include "quantum_sim/gui/rendering/QaveCameraController.hpp"
-#include "quantum_sim/gui/rendering/QaveDensityModel.hpp"
-#include "quantum_sim/gui/rendering/QaveMeshBuilder.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeMeshBuilder.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <vector>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     /**
-     * Raw OpenGL renderer for the interactive QAVE density-matrix history.
+     * Raw OpenGL renderer for the interactive Density Volume density-matrix history.
      *
      * The renderer owns the scene VAO/VBO/EBO, shader program, color texture,
      * integer picking texture, depth buffer, and framebuffer.
@@ -54,7 +54,7 @@ namespace quantum_sim::gui::qave {
          *
          * @param width Framebuffer width in physical pixels.
          * @param height Framebuffer height in physical pixels.
-         * @param selectedLayer Layer highlighted by both QAVE views.
+         * @param selectedLayer Layer highlighted by both Density Volume views.
          * @param camera Camera supplying view and projection matrices.
          */
         void render(
@@ -123,7 +123,7 @@ namespace quantum_sim::gui::qave {
         bool initialized_{false};
 
         /**
-         * Compiles and links the QAVE color/picking shader program.
+         * Compiles and links the Density Volume color/picking shader program.
          */
         void createShaderProgram();
 

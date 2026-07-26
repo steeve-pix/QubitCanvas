@@ -91,13 +91,13 @@ add_library(qubit_canvas_gui STATIC
         src/gui/panels/InspectorPanel.cpp
         src/gui/rendering/CircuitRenderer.cpp
         src/gui/rendering/BlochSphereRenderer.cpp
-        src/gui/rendering/QaveMath.cpp
-        src/gui/rendering/QaveDensityModel.cpp
-        src/gui/rendering/QaveColorMap.cpp
-        src/gui/rendering/QaveLayerStackLayout.cpp
-        src/gui/rendering/QaveMeshBuilder.cpp
-        src/gui/rendering/QaveCameraController.cpp
-        src/gui/rendering/QaveRenderer.cpp
+        src/gui/rendering/DensityVolumeMath.cpp
+        src/gui/rendering/DensityVolumeModel.cpp
+        src/gui/rendering/DensityVolumeColorMap.cpp
+        src/gui/rendering/DensityVolumeLayout.cpp
+        src/gui/rendering/DensityVolumeMeshBuilder.cpp
+        src/gui/rendering/DensityVolumeCameraController.cpp
+        src/gui/rendering/DensityVolumeRenderer.cpp
         src/gui/panels/GateLibraryPanel.cpp
 )
 
