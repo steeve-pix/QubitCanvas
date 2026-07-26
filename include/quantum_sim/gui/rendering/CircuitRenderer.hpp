@@ -72,7 +72,8 @@ namespace quantum_sim::gui {
         /**
          * Returns and clears a debugger-step jump requested by double-clicking.
          *
-         * @return Zero-based circuit instruction index, or nullopt when no
+         * @return Displayed step number, where zero is the initial state and
+         *         1..N correspond to circuit instructions, or nullopt when no
          *         double-click navigation request is pending.
          */
         [[nodiscard]] std::optional<std::size_t> consumeStepJumpRequest() noexcept;
@@ -132,14 +133,14 @@ namespace quantum_sim::gui {
                       bool hovered, bool selected, bool placementPreview);
 
         std::optional<std::size_t> selectedInstructionIndex_;
-        std::optional<std::size_t> requestedStepJumpIndex_;
+        std::optional<std::size_t> requestedStepJumpNumber_;
         CircuitStyle style_;
         std::optional<std::size_t> pendingControlQubit_;
         std::optional<std::size_t> pendingTargetQubit_;
         std::optional<SingleQubitPlacement> completedSingleQubitPlacement_;
         std::optional<std::size_t> pendingInsertionIndex_;
         std::optional<std::string> pendingControlledGateName_;
-        std::optional<std::size_t> lastFocusedStepIndex_;
+        std::optional<std::size_t> lastFocusedStepNumber_;
         std::size_t lastFocusedInstructionCount_{0};
     };
 }
