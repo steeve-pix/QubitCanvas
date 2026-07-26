@@ -1292,11 +1292,73 @@ namespace quantum_sim::gui {
                 ImGui::BeginDisabled();
             }
 
+            const bool drawRaisedRegisterPower =
+                    preset == CircuitPreset::PlusRegister;
+
+            const ImVec2 buttonMinimum =
+                    ImGui::GetCursorScreenPos();
+
             const bool clicked =
                     ImGui::Button(
-                        label,
+                        drawRaisedRegisterPower
+                            ? "##plus-register"
+                            : label,
                         ImVec2{buttonWidth, 42.0F}
                     );
+
+            if (drawRaisedRegisterPower) {
+                constexpr float superscriptScale =
+                        0.72F;
+
+                const ImVec2 buttonMaximum =
+                        ImGui::GetItemRectMax();
+
+                const ImVec2 ketSize =
+                        ImGui::CalcTextSize("|+>");
+
+                const ImVec2 exponentSize =
+                        ImGui::CalcTextSize("n");
+
+                const float groupWidth =
+                        ketSize.x +
+                        exponentSize.x * superscriptScale;
+
+                const ImVec2 ketPosition{
+                    buttonMinimum.x +
+                        (buttonMaximum.x -
+                         buttonMinimum.x -
+                         groupWidth) *
+                        0.5F,
+                    buttonMinimum.y +
+                        (buttonMaximum.y -
+                         buttonMinimum.y -
+                         ketSize.y) *
+                        0.5F
+                };
+
+                const unsigned int textColor =
+                        ImGui::GetColorU32(ImGuiCol_Text);
+
+                ImDrawList *drawList =
+                        ImGui::GetWindowDrawList();
+
+                drawList->AddText(
+                    ketPosition,
+                    textColor,
+                    "|+>"
+                );
+
+                drawList->AddText(
+                    ImGui::GetFont(),
+                    ImGui::GetFontSize() * superscriptScale,
+                    ImVec2{
+                        ketPosition.x + ketSize.x,
+                        ketPosition.y - 1.5F
+                    },
+                    textColor,
+                    "n"
+                );
+            }
 
             if (!canLoad) {
                 ImGui::EndDisabled();
@@ -1346,7 +1408,7 @@ namespace quantum_sim::gui {
             false
         );
         scriptButton(
-            "|+>^n",
+            "Plus register",
             CircuitPreset::PlusRegister,
             "Creates a uniform superposition across the selected register.",
             true

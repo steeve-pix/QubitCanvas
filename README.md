@@ -84,7 +84,7 @@ text field is not accepting input.
 
 - Bell state
 - GHZ state
-- Register-wide `|+>` state
+- Register-wide `|+⟩ⁿ` state
 - Quantum Fourier Transform
 - Inverse Quantum Fourier Transform
 - Grover search
