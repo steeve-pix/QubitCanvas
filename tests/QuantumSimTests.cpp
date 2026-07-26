@@ -9,6 +9,7 @@
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeLayout.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeMeshBuilder.hpp"
 
 #include <algorithm>
 #include <sstream>
@@ -265,6 +266,29 @@ int main() {
         hadamardPeak != historyLayout.voxels.end() &&
         initialPeak->size.y > hadamardPeak->size.y,
         "Density Volume voxel height preserves absolute density magnitude across layers"
+    );
+
+    check(
+        initialPeak != historyLayout.voxels.end() &&
+        hadamardPeak != historyLayout.voxels.end() &&
+        initialPeak->size.y >= initialPeak->size.x &&
+        hadamardPeak->size.y >= hadamardPeak->size.x * 0.80F,
+        "Visible density voxels retain a block-like silhouette"
+    );
+
+    const quantum_sim::gui::density_volume::Mesh beveledFloorMesh =
+            quantum_sim::gui::density_volume::MeshBuilder::build(
+                floorFieldLayout
+            );
+
+    check(
+        beveledFloorMesh.vertices.size() ==
+            floorFieldLayout.voxels.size() * 24U &&
+        beveledFloorMesh.indices.size() ==
+            floorFieldLayout.voxels.size() * 132U &&
+        beveledFloorMesh.pickRecords.size() ==
+            floorFieldLayout.voxels.size(),
+        "Density Volume uses indexed bevel faces while preserving voxel picking"
     );
 
     const QuantumRegister qftSourceState =
