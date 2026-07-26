@@ -538,19 +538,6 @@ namespace quantum_sim::gui {
         const std::size_t gridDimension =
                 densityLayer.dimension;
 
-        double layerMaximumMagnitude{};
-
-        for (const density_volume::DensityCell &cell : densityLayer.cells) {
-            layerMaximumMagnitude =
-                    std::max(
-                        layerMaximumMagnitude,
-                        cell.magnitude
-                    );
-        }
-
-        layerMaximumMagnitude =
-                std::max(layerMaximumMagnitude, 1e-12);
-
         const float panelWidth =
                 std::clamp(
                     availableWidth,
@@ -703,9 +690,12 @@ namespace quantum_sim::gui {
                 const density_volume::DensityCell &cell =
                         densityLayer.cellAt(row, column);
 
-                const double normalizedMagnitude =
-                        cell.magnitude /
-                        layerMaximumMagnitude;
+                const double displayMagnitude =
+                        std::clamp(
+                            cell.magnitude,
+                            0.0,
+                            1.0
+                        );
 
                 const ImVec2 minimum{
                     gridOrigin.x + static_cast<float>(column) * cellSize + cellInset * 0.5F,
@@ -720,10 +710,10 @@ namespace quantum_sim::gui {
                 drawList->AddRectFilled(
                     minimum,
                     maximum,
-                    normalizedMagnitude <= 0.002
+                    displayMagnitude <= 0.002
                         ? IM_COL32(22, 19, 47, 255)
                         : densityColor(
-                            normalizedMagnitude
+                            displayMagnitude
                         ),
                     gridDimension <= 32U ? 1.5F : 0.7F
                 );

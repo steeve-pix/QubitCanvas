@@ -1,5 +1,6 @@
 #include "quantum_sim/gui/GuiApplication.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
+#include "quantum_sim/gui/panels/DensityStepInspector.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 
@@ -486,7 +487,8 @@ namespace quantum_sim::gui {
                 ImVec2{
                     circuitPanelWidth,
                     densityVolumePanelHeight
-                }
+                },
+                snapshot
             );
 
             ImGui::SetNextWindowPos(
@@ -724,7 +726,8 @@ namespace quantum_sim::gui {
 
     void GuiApplication::drawDensityVolumeViewport(
         const ImVec2 &position,
-        const ImVec2 &size
+        const ImVec2 &size,
+        const debug::DebuggerSnapshot &snapshot
     ) {
         ImGui::SetNextWindowPos(position, ImGuiCond_Always);
         ImGui::SetNextWindowSize(size, ImGuiCond_Always);
@@ -1011,6 +1014,12 @@ namespace quantum_sim::gui {
                 selectDensityLayer(hoveredCell->layer);
             }
         }
+
+        DensityStepInspector::draw(
+            snapshot,
+            imageOrigin,
+            imageSize
+        );
 
         const std::size_t layerCount =
                 densityVolumeStack_.layers.size();
