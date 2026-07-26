@@ -1193,8 +1193,17 @@ namespace quantum_sim::gui {
             }
 
             if (clicked) {
+                if (!queuedPreset_.has_value()) {
+                    queuedPresetShouldResumePlayback_ =
+                            !playbackPaused_;
+                }
+
                 queuedPreset_ =
                         preset;
+
+                // Stop the old trace immediately. The queued preset resumes
+                // from its first step when this click happened during playback.
+                playbackPaused_ = true;
             }
 
             if (
@@ -1227,16 +1236,16 @@ namespace quantum_sim::gui {
             false
         );
         scriptButton(
-            "GHZ",
-            CircuitPreset::Ghz,
-            "Entangles the complete selected register.",
-            true
-        );
-        scriptButton(
             "|+>^n",
             CircuitPreset::PlusRegister,
             "Creates a uniform superposition across the selected register.",
             false
+            );
+        scriptButton(
+            "GHZ",
+            CircuitPreset::Ghz,
+            "Entangles the complete selected register.",
+            true
         );
         scriptButton(
             "QFT",
@@ -1261,23 +1270,23 @@ namespace quantum_sim::gui {
             CircuitPreset::DeutschJozsa,
             "Uses n-1 inputs and one ancilla for a balanced parity oracle.",
             false
-        );
-        scriptButton(
-            "Bernstein",
-            CircuitPreset::BernsteinVazirani,
-            "Recovers an alternating hidden string across n-1 inputs.",
-            true
-        );
+            );scriptButton(
+                "Kickback",
+                CircuitPreset::Kickback,
+                "Uses q0/q1 to expose phase kickback; extra qubits remain in |0>.",
+                true
+                );
         scriptButton(
             "Toffoli",
             CircuitPreset::Toffoli,
             "Runs a decomposed CCX on q0-q2; extra qubits remain in |0>.",
             false
         );
+
         scriptButton(
-            "Kickback",
-            CircuitPreset::Kickback,
-            "Uses q0/q1 to expose phase kickback; extra qubits remain in |0>.",
+            "Bernstein",
+            CircuitPreset::BernsteinVazirani,
+            "Recovers an alternating hidden string across n-1 inputs.",
             true
         );
         scriptButton(
@@ -1354,7 +1363,10 @@ namespace quantum_sim::gui {
         nextAutoStepAt_ = now + 0.72;
     }
 
-    void GuiApplication::loadPreset(CircuitPreset preset) {
+    void GuiApplication::loadPreset(
+        const CircuitPreset preset,
+        const bool settlePreview
+    ) {
         circuit_ =
                 createPresetCircuit(preset);
 
@@ -1380,7 +1392,10 @@ namespace quantum_sim::gui {
         playbackPaused_ = true;
 
         rebuildDebuggerAfterCircuitEdit();
-        settleDebuggerPreview();
+
+        if (settlePreview) {
+            settleDebuggerPreview();
+        }
     }
 
     void GuiApplication::applyQueuedPreset() {
@@ -1391,8 +1406,17 @@ namespace quantum_sim::gui {
         const CircuitPreset preset =
                 queuedPreset_.value();
 
+        const bool resumePlayback =
+                queuedPresetShouldResumePlayback_;
+
         queuedPreset_.reset();
-        loadPreset(preset);
+        queuedPresetShouldResumePlayback_ = false;
+        loadPreset(preset, !resumePlayback);
+
+        if (resumePlayback) {
+            playbackPaused_ = false;
+            nextAutoStepAt_ = ImGui::GetTime() + 0.45;
+        }
     }
 
     circuit::QuantumCircuit GuiApplication::createPresetCircuit(CircuitPreset preset) const {

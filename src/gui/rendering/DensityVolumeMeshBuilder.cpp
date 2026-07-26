@@ -6,9 +6,6 @@
 
 namespace quantum_sim::gui::density_volume {
     namespace {
-        constexpr std::size_t verticesPerVoxel = 24U;
-        constexpr std::size_t indicesPerBeveledVoxel = 132U;
-
         [[nodiscard]] float component(
             const Vector3 &value,
             const std::size_t axis
@@ -142,7 +139,10 @@ namespace quantum_sim::gui::density_volume {
                 halfSize.z - bevel
             };
 
-            std::array<std::uint32_t, verticesPerVoxel> faceVertices{};
+            std::array<
+                std::uint32_t,
+                MeshBuilder::verticesPerVoxel
+            > faceVertices{};
 
             for (std::size_t axis = 0U; axis < 3U; ++axis) {
                 for (std::size_t xSign = 0U; xSign < 2U; ++xSign) {
@@ -349,6 +349,14 @@ namespace quantum_sim::gui::density_volume {
         );
         mesh.pickRecords.reserve(layout.voxels.size());
 
+        append(mesh, layout);
+        return mesh;
+    }
+
+    void MeshBuilder::append(
+        Mesh &mesh,
+        const SceneLayout &layout
+    ) {
         for (const PlacedVoxel &voxel : layout.voxels) {
             mesh.pickRecords.push_back(
                 Selection{
@@ -365,7 +373,5 @@ namespace quantum_sim::gui::density_volume {
                 static_cast<std::uint32_t>(mesh.pickRecords.size())
             );
         }
-
-        return mesh;
     }
 }

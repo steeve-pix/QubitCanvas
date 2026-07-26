@@ -284,12 +284,47 @@ int main() {
 
     check(
         beveledFloorMesh.vertices.size() ==
-            floorFieldLayout.voxels.size() * 24U &&
+            floorFieldLayout.voxels.size() *
+            quantum_sim::gui::density_volume::MeshBuilder::verticesPerVoxel &&
         beveledFloorMesh.indices.size() ==
-            floorFieldLayout.voxels.size() * 132U &&
+            floorFieldLayout.voxels.size() *
+            quantum_sim::gui::density_volume::MeshBuilder::indicesPerBeveledVoxel &&
         beveledFloorMesh.pickRecords.size() ==
             floorFieldLayout.voxels.size(),
         "Density Volume uses indexed bevel faces while preserving voxel picking"
+    );
+
+    quantum_sim::gui::density_volume::Mesh incrementalHistoryMesh;
+
+    quantum_sim::gui::density_volume::MeshBuilder::append(
+        incrementalHistoryMesh,
+        quantum_sim::gui::density_volume::LayerStackLayout::buildLayer(
+            densityStack.layers.at(0),
+            quantum_sim::gui::density_volume::VisualizationMode::LayerStack
+        )
+    );
+
+    quantum_sim::gui::density_volume::MeshBuilder::append(
+        incrementalHistoryMesh,
+        quantum_sim::gui::density_volume::LayerStackLayout::buildLayer(
+            densityStack.layers.at(1),
+            quantum_sim::gui::density_volume::VisualizationMode::LayerStack
+        )
+    );
+
+    const quantum_sim::gui::density_volume::Mesh completeHistoryMesh =
+            quantum_sim::gui::density_volume::MeshBuilder::build(
+                historyLayout
+            );
+
+    check(
+        incrementalHistoryMesh.vertices.size() ==
+            completeHistoryMesh.vertices.size() &&
+        incrementalHistoryMesh.indices ==
+            completeHistoryMesh.indices &&
+        incrementalHistoryMesh.pickRecords.size() ==
+            completeHistoryMesh.pickRecords.size(),
+        "Density Volume incremental layers match a complete history mesh"
     );
 
     const QuantumRegister qftSourceState =
