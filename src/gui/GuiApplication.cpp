@@ -691,10 +691,16 @@ namespace quantum_sim::gui {
                     )
                 );
 
+        const qave::VisualizationMode visualizationMode =
+                canvasMode_ == CanvasMode::FloorField
+                    ? qave::VisualizationMode::FloorField
+                    : qave::VisualizationMode::LayerStack;
+
         const bool sceneChanged =
                 qaveRenderer_.updateScene(
                     qaveDensityStack_,
-                    selectedQaveLayer_
+                    selectedQaveLayer_,
+                    visualizationMode
                 );
 
         if (sceneChanged || !qaveCamera_.isFramed()) {
@@ -886,7 +892,10 @@ namespace quantum_sim::gui {
                     : qaveDensityStack_.layers[selectedQaveLayer_].dimension;
 
         ImGui::TextDisabled(
-            "LAYER %zu/%zu | rho %zux%zu | opaque indexed voxels",
+            "%s | LAYER %zu/%zu | rho %zux%zu | opaque indexed voxels",
+            canvasMode_ == CanvasMode::FloorField
+                ? "FLOOR FIELD"
+                : "LAYER STACK",
             selectedQaveLayer_,
             layerCount == 0U ? 0U : layerCount - 1U,
             dimension,
@@ -1028,20 +1037,43 @@ namespace quantum_sim::gui {
             playbackPaused_ ? "settle" : "running"
         );
 
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 650.0F);
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 690.0F);
 
-        if (ImGui::Button(
-            canvasMode_ == CanvasMode::LayerStack
-                ? "Layer Stack"
-                : "Floor Field",
-            ImVec2{142.0F, 0.0F}
-        )) {
-            // Toggle between the two main state-field renderings.
-            canvasMode_ =
-                    canvasMode_ == CanvasMode::LayerStack
-                        ? CanvasMode::FloorField
-                        : CanvasMode::LayerStack;
-        }
+        const auto modeButton =
+                [&](const char *label, const CanvasMode mode) {
+            const bool selected =
+                    canvasMode_ == mode;
+
+            if (selected) {
+                ImGui::PushStyleColor(
+                    ImGuiCol_Button,
+                    ImVec4{0.08F, 0.20F, 0.29F, 1.0F}
+                );
+                ImGui::PushStyleColor(
+                    ImGuiCol_ButtonHovered,
+                    ImVec4{0.10F, 0.28F, 0.39F, 1.0F}
+                );
+                ImGui::PushStyleColor(
+                    ImGuiCol_ButtonActive,
+                    ImVec4{0.12F, 0.34F, 0.46F, 1.0F}
+                );
+            }
+
+            const bool pressed =
+                    ImGui::Button(label, ImVec2{102.0F, 0.0F});
+
+            if (selected) {
+                ImGui::PopStyleColor(3);
+            }
+
+            if (pressed) {
+                canvasMode_ = mode;
+            }
+        };
+
+        modeButton("Layer Stack", CanvasMode::LayerStack);
+        ImGui::SameLine();
+        modeButton("Floor Field", CanvasMode::FloorField);
 
         ImGui::SameLine();
 
@@ -1200,16 +1232,18 @@ namespace quantum_sim::gui {
         ImGui::Spacing();
         ImGui::SeparatorText("P Coloring");
 
-        if (ImGui::Button(
-            canvasMode_ == CanvasMode::FloorField
-                ? "Floor Field"
-                : "Layer Stack",
-            ImVec2{-1.0F, 0.0F}
-        )) {
-            canvasMode_ =
-                    canvasMode_ == CanvasMode::FloorField
-                        ? CanvasMode::LayerStack
-                        : CanvasMode::FloorField;
+        const float modeWidth =
+                (ImGui::GetContentRegionAvail().x -
+                 ImGui::GetStyle().ItemSpacing.x) * 0.5F;
+
+        if (ImGui::Button("Layer Stack", ImVec2{modeWidth, 0.0F})) {
+            canvasMode_ = CanvasMode::LayerStack;
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Floor Field", ImVec2{modeWidth, 0.0F})) {
+            canvasMode_ = CanvasMode::FloorField;
         }
 
         ImGui::TextDisabled("Heat");
