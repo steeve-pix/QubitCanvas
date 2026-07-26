@@ -123,6 +123,7 @@ namespace quantum_sim::gui {
         std::optional<double> queuedSingleQubitRotationAngleRadians_;
         std::optional<std::size_t> queuedInstructionDeletion_;
         std::optional<CircuitPreset> queuedPreset_;
+        bool queuedPresetShouldResumePlayback_{false};
         std::vector<circuit::QuantumCircuit> undoHistory_;
         std::vector<circuit::QuantumCircuit> redoHistory_;
         std::mt19937 randomEngine_{std::random_device{}()};
@@ -231,8 +232,9 @@ namespace quantum_sim::gui {
          * Replaces the editable circuit with one of the built-in presets.
          *
          * @param preset Preset to load.
+         * @param settlePreview True to open a paused mid-history preview.
          */
-        void loadPreset(CircuitPreset preset);
+        void loadPreset(CircuitPreset preset, bool settlePreview);
 
         /**
          * Applies a preset queued by the previous frame before snapshots are created.

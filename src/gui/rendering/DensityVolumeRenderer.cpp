@@ -75,34 +75,210 @@ namespace quantum_sim::gui::density_volume {
             throw std::runtime_error{"Density Volume renderer is not initialized."};
         }
 
-        if (
-            sceneFingerprint_ == stack.fingerprint &&
+        const bool historyChanged =
+                sceneFingerprint_ != stack.fingerprint ||
+                !sceneMode_.has_value() ||
+                sceneMode_.value() != mode;
+
+        if (stack.layers.empty()) {
+            const bool sceneChanged =
+                    historyChanged ||
+                    sceneVisibleThroughLayer_.has_value() ||
+                    indexCount_ > 0U;
+
+            if (!sceneChanged) {
+                return false;
+            }
+
+            sceneMesh_ = Mesh{};
+            uploadMesh(sceneMesh_);
+            layerIndexCounts_.clear();
+            layerSceneCenters_.clear();
+            layerSceneRadii_.clear();
+            builtThroughLayer_.reset();
+            sceneFingerprint_ = stack.fingerprint;
+            sceneVisibleThroughLayer_.reset();
+            sceneMode_ = mode;
+            sceneCenter_ = Vector3{};
+            sceneRadius_ = 1.0F;
+            return true;
+        }
+
+        const std::size_t safeSelectedLayer =
+                std::min(
+                    selectedLayer,
+                    stack.layers.size() - 1U
+                );
+
+        if (mode == VisualizationMode::FloorField) {
+            if (
+                !historyChanged &&
+                sceneVisibleThroughLayer_.has_value() &&
+                sceneVisibleThroughLayer_.value() == safeSelectedLayer &&
+                indexCount_ > 0U
+            ) {
+                return false;
+            }
+
+            const SceneLayout layout =
+                    LayerStackLayout::buildLayer(
+                        stack.layers[safeSelectedLayer],
+                        mode
+                    );
+
+            sceneMesh_ =
+                    MeshBuilder::build(layout);
+
+            uploadMesh(sceneMesh_);
+            layerIndexCounts_.clear();
+            layerSceneCenters_.clear();
+            layerSceneRadii_.clear();
+            builtThroughLayer_.reset();
+            sceneCenter_ = layout.center;
+            sceneRadius_ = layout.radius;
+            sceneFingerprint_ = stack.fingerprint;
+            sceneVisibleThroughLayer_ = safeSelectedLayer;
+            sceneMode_ = mode;
+            return true;
+        }
+
+        if (historyChanged) {
+            std::size_t maximumVoxelCount{};
+
+            for (const DensityLayer &layer : stack.layers) {
+                if (
+                    layer.cells.size() >
+                    (
+                        std::numeric_limits<std::size_t>::max() -
+                        maximumVoxelCount
+                    ) / 2U
+                ) {
+                    throw std::runtime_error{
+                        "Density Volume layer stack exceeds mesh capacity limits."
+                    };
+                }
+
+                maximumVoxelCount +=
+                        layer.cells.size() * 2U;
+            }
+
+            if (
+                maximumVoxelCount >
+                std::numeric_limits<std::size_t>::max() /
+                MeshBuilder::verticesPerVoxel ||
+                maximumVoxelCount >
+                std::numeric_limits<std::size_t>::max() /
+                MeshBuilder::indicesPerBeveledVoxel
+            ) {
+                throw std::runtime_error{
+                    "Density Volume layer stack exceeds mesh capacity limits."
+                };
+            }
+
+            const std::size_t maximumVertexCount =
+                    maximumVoxelCount *
+                    MeshBuilder::verticesPerVoxel;
+
+            const std::size_t maximumIndexCount =
+                    maximumVoxelCount *
+                    MeshBuilder::indicesPerBeveledVoxel;
+
+            if (
+                maximumIndexCount >
+                static_cast<std::size_t>(
+                    std::numeric_limits<int>::max()
+                )
+            ) {
+                throw std::runtime_error{
+                    "Density Volume mesh exceeds OpenGL draw-index limits."
+                };
+            }
+
+            sceneMesh_ = Mesh{};
+            sceneMesh_.vertices.reserve(maximumVertexCount);
+            sceneMesh_.indices.reserve(maximumIndexCount);
+            sceneMesh_.pickRecords.reserve(maximumVoxelCount);
+
+            allocateMeshStorage(
+                maximumVertexCount,
+                maximumIndexCount
+            );
+
+            layerIndexCounts_.assign(stack.layers.size(), 0U);
+            layerSceneCenters_.assign(
+                stack.layers.size(),
+                Vector3{}
+            );
+            layerSceneRadii_.assign(stack.layers.size(), 1.0F);
+            builtThroughLayer_.reset();
+            sceneFingerprint_ = stack.fingerprint;
+            sceneVisibleThroughLayer_.reset();
+            sceneMode_ = mode;
+        } else if (
             sceneVisibleThroughLayer_.has_value() &&
-            sceneVisibleThroughLayer_.value() == selectedLayer &&
-            sceneMode_.has_value() &&
-            sceneMode_.value() == mode &&
+            sceneVisibleThroughLayer_.value() == safeSelectedLayer &&
             indexCount_ > 0U
         ) {
             return false;
         }
 
-        const SceneLayout layout =
-                LayerStackLayout::build(
-                    stack,
-                    selectedLayer,
-                    mode
-                );
+        if (
+            !builtThroughLayer_.has_value() ||
+            safeSelectedLayer > builtThroughLayer_.value()
+        ) {
+            const std::size_t firstNewLayer =
+                    builtThroughLayer_.has_value()
+                        ? builtThroughLayer_.value() + 1U
+                        : 0U;
 
-        const Mesh mesh =
-                MeshBuilder::build(layout);
+            const std::size_t firstNewVertex =
+                    sceneMesh_.vertices.size();
 
-        uploadMesh(mesh);
-        pickRecords_ = mesh.pickRecords;
-        sceneCenter_ = layout.center;
-        sceneRadius_ = layout.radius;
-        sceneFingerprint_ = stack.fingerprint;
-        sceneVisibleThroughLayer_ = selectedLayer;
-        sceneMode_ = mode;
+            const std::size_t firstNewIndex =
+                    sceneMesh_.indices.size();
+
+            for (
+                std::size_t layerIndex = firstNewLayer;
+                layerIndex <= safeSelectedLayer;
+                ++layerIndex
+            ) {
+                const SceneLayout layerLayout =
+                        LayerStackLayout::buildLayer(
+                            stack.layers[layerIndex],
+                            VisualizationMode::LayerStack
+                        );
+
+                MeshBuilder::append(sceneMesh_, layerLayout);
+                layerIndexCounts_[layerIndex] =
+                        sceneMesh_.indices.size();
+                layerSceneCenters_[layerIndex] =
+                        layerLayout.center;
+                layerSceneRadii_[layerIndex] =
+                        layerLayout.radius;
+            }
+
+            uploadMeshSuffix(
+                sceneMesh_,
+                firstNewVertex,
+                firstNewIndex
+            );
+
+            builtThroughLayer_ =
+                    safeSelectedLayer;
+        }
+
+        indexCount_ =
+                layerIndexCounts_[safeSelectedLayer];
+
+        sceneCenter_ =
+                layerSceneCenters_[safeSelectedLayer];
+
+        sceneRadius_ =
+                layerSceneRadii_[safeSelectedLayer];
+
+        sceneVisibleThroughLayer_ =
+                safeSelectedLayer;
+
         return true;
     }
 
@@ -272,12 +448,12 @@ namespace quantum_sim::gui::density_volume {
 
         if (
             pickId == 0U ||
-            pickId > pickRecords_.size()
+            pickId > sceneMesh_.pickRecords.size()
         ) {
             return std::nullopt;
         }
 
-        return pickRecords_[pickId - 1U];
+        return sceneMesh_.pickRecords[pickId - 1U];
     }
 
     void Renderer::shutdown() noexcept {
@@ -333,7 +509,13 @@ namespace quantum_sim::gui::density_volume {
         sceneMode_.reset();
         sceneCenter_ = Vector3{};
         sceneRadius_ = 1.0F;
-        pickRecords_.clear();
+        sceneMesh_ = Mesh{};
+        layerIndexCounts_.clear();
+        layerSceneCenters_.clear();
+        layerSceneRadii_.clear();
+        builtThroughLayer_.reset();
+        vertexCapacity_ = 0U;
+        indexCapacity_ = 0U;
         initialized_ = false;
     }
 
@@ -627,7 +809,7 @@ void main() {
                 mesh.vertices.size() * sizeof(MeshVertex)
             ),
             mesh.vertices.data(),
-            GL_STATIC_DRAW
+            GL_DYNAMIC_DRAW
         );
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
@@ -637,11 +819,100 @@ void main() {
                 mesh.indices.size() * sizeof(std::uint32_t)
             ),
             mesh.indices.data(),
-            GL_STATIC_DRAW
+            GL_DYNAMIC_DRAW
         );
 
         glBindVertexArray(0);
+        vertexCapacity_ = mesh.vertices.size();
+        indexCapacity_ = mesh.indices.size();
         indexCount_ = mesh.indices.size();
+    }
+
+    void Renderer::allocateMeshStorage(
+        const std::size_t vertexCapacity,
+        const std::size_t indexCapacity
+    ) {
+        glBindVertexArray(vertexArray_);
+
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(
+                vertexCapacity * sizeof(MeshVertex)
+            ),
+            nullptr,
+            GL_DYNAMIC_DRAW
+        );
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
+        glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(
+                indexCapacity * sizeof(std::uint32_t)
+            ),
+            nullptr,
+            GL_DYNAMIC_DRAW
+        );
+
+        glBindVertexArray(0);
+        vertexCapacity_ = vertexCapacity;
+        indexCapacity_ = indexCapacity;
+        indexCount_ = 0U;
+    }
+
+    void Renderer::uploadMeshSuffix(
+        const Mesh &mesh,
+        const std::size_t firstVertex,
+        const std::size_t firstIndex
+    ) {
+        if (
+            firstVertex > mesh.vertices.size() ||
+            firstIndex > mesh.indices.size() ||
+            mesh.vertices.size() > vertexCapacity_ ||
+            mesh.indices.size() > indexCapacity_
+        ) {
+            throw std::runtime_error{
+                "Density Volume incremental mesh exceeds allocated GPU storage."
+            };
+        }
+
+        glBindVertexArray(vertexArray_);
+
+        if (firstVertex < mesh.vertices.size()) {
+            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
+            glBufferSubData(
+                GL_ARRAY_BUFFER,
+                static_cast<GLintptr>(
+                    firstVertex * sizeof(MeshVertex)
+                ),
+                static_cast<GLsizeiptr>(
+                    (
+                        mesh.vertices.size() -
+                        firstVertex
+                    ) * sizeof(MeshVertex)
+                ),
+                mesh.vertices.data() + firstVertex
+            );
+        }
+
+        if (firstIndex < mesh.indices.size()) {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
+            glBufferSubData(
+                GL_ELEMENT_ARRAY_BUFFER,
+                static_cast<GLintptr>(
+                    firstIndex * sizeof(std::uint32_t)
+                ),
+                static_cast<GLsizeiptr>(
+                    (
+                        mesh.indices.size() -
+                        firstIndex
+                    ) * sizeof(std::uint32_t)
+                ),
+                mesh.indices.data() + firstIndex
+            );
+        }
+
+        glBindVertexArray(0);
     }
 
     void Renderer::resizeFramebuffer(
