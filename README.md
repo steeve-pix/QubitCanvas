@@ -25,6 +25,8 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 The Density Volume panel converts each debugger state into
 `rho = |psi><psi|` and renders every visible matrix cell as an opaque indexed
 OpenGL cuboid. Magnitude controls voxel height and phase controls color.
+Dimension-aware spacing keeps full-strength cells cube-like at every matrix
+size, while indexed bevel faces and smooth lighting soften their silhouettes.
 
 Two synchronized layouts are available:
 

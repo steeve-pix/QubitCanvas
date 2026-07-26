@@ -23,7 +23,7 @@ namespace quantum_sim::gui::density_volume {
         launchYawDegrees_ = -40.0F;
         launchPitchDegrees_ = 25.0F;
         launchDistance_ =
-                std::max(sceneRadius_ * 1.90F, 7.0F);
+                std::max(sceneRadius_ * 2.05F, 2.8F);
 
         launchTarget_ =
                 center;

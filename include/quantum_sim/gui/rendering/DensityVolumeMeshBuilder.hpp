@@ -39,12 +39,14 @@ namespace quantum_sim::gui::density_volume {
     };
 
     /**
-     * Expands placed voxels into indexed, flat-shaded cuboid geometry.
+     * Expands placed voxels into indexed, softly beveled cuboid geometry.
      */
     class MeshBuilder {
     public:
         /**
-         * Creates 24 face vertices and 36 triangle indices per placed cuboid.
+         * Creates 24 shared face vertices plus indexed face, edge, and corner
+         * triangles for each beveled cuboid. Face-aligned normals blend across
+         * the bevel geometry to produce soft highlights without fake sprites.
          *
          * @param layout Positioned density voxels.
          * @return Upload-ready mesh and one-based GPU pick mapping.
