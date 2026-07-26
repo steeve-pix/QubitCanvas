@@ -89,6 +89,7 @@ enable_project_warnings(qubit_canvas_core)
 add_library(qubit_canvas_gui STATIC
         src/gui/QuantumNotation.cpp
         src/gui/GuiApplication.cpp
+        src/gui/panels/DensityStepInspector.cpp
         src/gui/panels/InspectorPanel.cpp
         src/gui/rendering/CircuitRenderer.cpp
         src/gui/rendering/BlochSphereRenderer.cpp
