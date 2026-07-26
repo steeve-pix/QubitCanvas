@@ -367,7 +367,8 @@ uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
-out vec3 vNormal;
+out vec3 vViewPosition;
+out vec3 vViewNormal;
 out vec3 vColor;
 flat out float vLayer;
 flat out float vPickId;
@@ -375,18 +376,21 @@ flat out float vMagnitudeVoxel;
 
 void main() {
     vec4 worldPosition = uModel * vec4(aPosition, 1.0);
-    vNormal = normalize(mat3(uModel) * aNormal);
+    vec4 viewPosition = uView * worldPosition;
+    vViewPosition = viewPosition.xyz;
+    vViewNormal = normalize(mat3(uView * uModel) * aNormal);
     vColor = aColor;
     vLayer = aLayer;
     vPickId = aPickId;
     vMagnitudeVoxel = aMagnitudeVoxel;
-    gl_Position = uProjection * uView * worldPosition;
+    gl_Position = uProjection * viewPosition;
 }
 )glsl";
 
         constexpr const char *fragmentShaderSource = R"glsl(
 #version 330 core
-in vec3 vNormal;
+in vec3 vViewPosition;
+in vec3 vViewNormal;
 in vec3 vColor;
 flat in float vLayer;
 flat in float vPickId;
@@ -398,23 +402,55 @@ layout (location = 0) out vec4 fragmentColor;
 layout (location = 1) out uint pickOutput;
 
 void main() {
-    vec3 normal = normalize(vNormal);
-    vec3 lightDirection = normalize(vec3(-0.55, 0.90, 0.62));
-    float diffuse = max(dot(normal, lightDirection), 0.0);
-    float topFace = max(normal.y, 0.0);
-    float sideContrast = 0.68 + 0.32 * max(normal.z, 0.0);
+    vec3 normal = normalize(vViewNormal);
+    vec3 viewDirection = normalize(-vViewPosition);
+    vec3 keyDirection = normalize(vec3(-0.48, 0.76, 0.54));
+    vec3 fillDirection = normalize(vec3(0.72, 0.28, 0.46));
+    vec3 halfDirection = normalize(keyDirection + viewDirection);
+
+    float keyDiffuse = max(dot(normal, keyDirection), 0.0);
+    float wrappedDiffuse = clamp(
+        (dot(normal, keyDirection) + 0.22) / 1.22,
+        0.0,
+        1.0
+    );
+    float fillDiffuse = max(dot(normal, fillDirection), 0.0);
+    float hemisphere = normal.y * 0.5 + 0.5;
+    float specular = pow(max(dot(normal, halfDirection), 0.0), 34.0);
+    float rim = pow(
+        1.0 - max(dot(normal, viewDirection), 0.0),
+        3.0
+    );
+
     float selected = abs(vLayer - float(uSelectedLayer)) < 0.25 ? 1.0 : 0.0;
     float selectedValue = selected * vMagnitudeVoxel;
     float emissive = pow(max(max(vColor.r, vColor.g), vColor.b), 2.0);
 
-    vec3 color = vColor * (0.30 + 0.70 * diffuse) * sideContrast;
-    color += vColor * topFace * 0.18;
-    color += vColor * emissive * 0.35 * vMagnitudeVoxel;
+    float ambient = mix(0.16, 0.30, hemisphere);
+    vec3 color = vColor * (
+        ambient +
+        0.58 * wrappedDiffuse +
+        0.24 * keyDiffuse +
+        0.12 * fillDiffuse
+    );
+
+    color += mix(
+        vec3(0.014, 0.020, 0.040),
+        vColor,
+        0.42
+    ) * rim * (0.10 + 0.16 * vMagnitudeVoxel);
+
+    color += vec3(1.00, 0.82, 0.58) *
+             specular *
+             (0.08 + 0.30 * vMagnitudeVoxel);
+
+    color += vColor * emissive * 0.24 * vMagnitudeVoxel;
     color = mix(
         color,
-        color * 1.10 + vec3(0.10, 0.045, 0.008),
+        color * 1.08 + vec3(0.085, 0.040, 0.010),
         selectedValue
     );
+    color = pow(max(color, vec3(0.0)), vec3(0.92));
 
     fragmentColor = vec4(color, 1.0);
     pickOutput = uint(vPickId + 0.5);

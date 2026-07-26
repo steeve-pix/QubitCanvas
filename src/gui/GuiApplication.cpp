@@ -148,6 +148,7 @@ namespace quantum_sim::gui {
             // Keep the regular JetBrains Mono face active for the complete UI pass.
             pushApplicationFont();
 
+            applyQueuedPreset();
             applyQueuedCircuitEdits();
 
             debug::DebuggerSnapshot snapshot =
@@ -1177,7 +1178,8 @@ namespace quantum_sim::gui {
             }
 
             if (clicked) {
-                loadPreset(preset);
+                queuedPreset_ =
+                        preset;
             }
 
             if (
@@ -1358,6 +1360,18 @@ namespace quantum_sim::gui {
 
         rebuildDebuggerAfterCircuitEdit();
         settleDebuggerPreview();
+    }
+
+    void GuiApplication::applyQueuedPreset() {
+        if (!queuedPreset_.has_value()) {
+            return;
+        }
+
+        const CircuitPreset preset =
+                queuedPreset_.value();
+
+        queuedPreset_.reset();
+        loadPreset(preset);
     }
 
     circuit::QuantumCircuit GuiApplication::createPresetCircuit(CircuitPreset preset) const {

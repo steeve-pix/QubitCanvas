@@ -5,16 +5,23 @@
 
 namespace quantum_sim::gui::density_volume {
     namespace {
-        constexpr float matrixSide = 10.5F;
-        constexpr float stackBaseThickness = 0.020F;
-        constexpr float stackMaximumVoxelHeight = 0.24F;
-        constexpr float stackMinimumVisibleHeight = 0.030F;
-        constexpr float stackLayerSpacing = 0.285F;
-        constexpr float floorBaseThickness = 0.055F;
-        constexpr float floorMaximumVoxelHeight = 2.80F;
-        constexpr float floorMinimumVisibleHeight = 0.050F;
+        constexpr float cellPitch = 0.70F;
+        constexpr float stackBaseThickness = 0.025F;
+        constexpr float stackMaximumVoxelHeight = 0.58F;
+        constexpr float stackMinimumVisibleHeight = 0.42F;
+        constexpr float stackLayerSpacing = 0.70F;
+        constexpr float floorBaseThickness = 0.035F;
+        constexpr float floorMaximumVoxelHeight = 0.64F;
+        constexpr float floorMinimumVisibleHeight = 0.42F;
         constexpr double visibleMagnitudeThreshold = 0.006;
-        constexpr Color baseTileColor{0.110F, 0.018F, 0.240F};
+        constexpr Color baseTileColor{0.018F, 0.026F, 0.055F};
+
+        [[nodiscard]] float matrixSide(
+            const DensityLayer &layer
+        ) noexcept {
+            return cellPitch *
+                   static_cast<float>(layer.dimension);
+        }
 
         void appendDensityLayer(
             SceneLayout &layout,
@@ -28,25 +35,25 @@ namespace quantum_sim::gui::density_volume {
                 return;
             }
 
-            const float cellPitch =
-                    matrixSide / static_cast<float>(layer.dimension);
+            const float layerSide =
+                    matrixSide(layer);
 
             const float tileSide =
                     cellPitch * 0.90F;
 
             const float voxelSide =
-                    cellPitch * 0.78F;
+                    cellPitch * 0.74F;
 
             for (const DensityCell &cell : layer.cells) {
                 const float x =
                         (
                             static_cast<float>(cell.column) + 0.5F
-                        ) * cellPitch - matrixSide * 0.5F;
+                        ) * cellPitch - layerSide * 0.5F;
 
                 const float z =
                         (
                             static_cast<float>(cell.row) + 0.5F
-                        ) * cellPitch - matrixSide * 0.5F;
+                        ) * cellPitch - layerSide * 0.5F;
 
                 layout.voxels.push_back(
                     PlacedVoxel{
@@ -129,6 +136,9 @@ namespace quantum_sim::gui::density_volume {
             const float totalHeight =
                     floorBaseThickness + floorMaximumVoxelHeight;
 
+            const float layerSide =
+                    matrixSide(layer);
+
             layout.center = Vector3{
                 0.0F,
                 totalHeight * 0.5F,
@@ -137,7 +147,7 @@ namespace quantum_sim::gui::density_volume {
 
             layout.radius =
                     std::sqrt(
-                        std::pow(matrixSide * 0.5F, 2.0F) * 2.0F +
+                        std::pow(layerSide * 0.5F, 2.0F) * 2.0F +
                         std::pow(totalHeight * 0.5F, 2.0F)
                     );
 
@@ -175,6 +185,9 @@ namespace quantum_sim::gui::density_volume {
                     stackBaseThickness +
                     stackMaximumVoxelHeight;
 
+            const float layerSide =
+                    matrixSide(stack.layers[lastLayer]);
+
             layout.center = Vector3{
                 0.0F,
                 historyHeight * 0.5F,
@@ -183,7 +196,7 @@ namespace quantum_sim::gui::density_volume {
 
             layout.radius =
                     std::sqrt(
-                        std::pow(matrixSide * 0.5F, 2.0F) * 2.0F +
+                        std::pow(layerSide * 0.5F, 2.0F) * 2.0F +
                         std::pow(historyHeight * 0.5F, 2.0F)
                     );
 
