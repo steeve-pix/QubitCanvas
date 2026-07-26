@@ -24,7 +24,9 @@ namespace quantum_sim::gui {
     GuiApplication::GuiApplication(circuit::QuantumCircuit &circuit,
                                    const quantum::QuantumRegister &initialState)
         : circuit_{circuit}, initialState_{initialState}, session_{circuit_, initialState_} {
+        rebuildQaveDensityStack();
         settleDebuggerPreview();
+        synchronizeQaveLayer(session_.snapshot());
     }
 
     void GuiApplication::run() {
@@ -44,6 +46,9 @@ namespace quantum_sim::gui {
             throw std::runtime_error{"Failed to create the QubitCanvas window."};
         }
 
+        // QubitCanvas uses three dense technical work areas; maximize the
+        // initial window so display scaling cannot hide the inspector.
+        glfwMaximizeWindow(window);
         glfwMakeContextCurrent(window);
 
         const int loadedOpenGlVersion =
@@ -74,7 +79,7 @@ namespace quantum_sim::gui {
         }
 
         try {
-            qaveCubeRenderer_.initialize();
+            qaveRenderer_.initialize();
         } catch (...) {
             glfwDestroyWindow(window);
             glfwTerminate();
@@ -142,9 +147,12 @@ namespace quantum_sim::gui {
             // Playback can mutate the session, so refresh the snapshot afterward.
             applyPlayback(session_, snapshot);
             snapshot = session_.snapshot();
+            synchronizeQaveLayer(snapshot);
 
             drawBackdrop();
             drawTopBar(session_, snapshot);
+            snapshot = session_.snapshot();
+            synchronizeQaveLayer(snapshot);
 
             const ImGuiViewport *viewport =
                     ImGui::GetMainViewport();
@@ -429,8 +437,16 @@ namespace quantum_sim::gui {
             );
 
             ImGui::Begin("Inspector");
-            const bool jumpToInstruction = inspectorPanel_.draw(session_, snapshot, circuit_, selectedInstructionIndex,
-                                                                jetBrainsMonoHeadingFont_);
+            const bool jumpToInstruction =
+                    inspectorPanel_.draw(
+                        session_,
+                        snapshot,
+                        circuit_,
+                        selectedInstructionIndex,
+                        qaveDensityStack_,
+                        selectedQaveLayer_,
+                        jetBrainsMonoHeadingFont_
+                    );
             if (jumpToInstruction) {
                 circuitRenderer_.clearSelection();
             }
@@ -515,7 +531,7 @@ namespace quantum_sim::gui {
             glfwSwapBuffers(window);
         }
 
-        qaveCubeRenderer_.shutdown();
+        qaveRenderer_.shutdown();
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -629,7 +645,7 @@ namespace quantum_sim::gui {
                 ImGui::GetContentRegionAvail();
 
         const float footerHeight =
-                ImGui::GetTextLineHeightWithSpacing();
+                ImGui::GetTextLineHeightWithSpacing() * 2.0F;
 
         const ImVec2 imageSize{
             std::max(1.0F, available.x),
@@ -659,11 +675,34 @@ namespace quantum_sim::gui {
                     )
                 );
 
-        qaveCubeRenderer_.render(framebufferWidth, framebufferHeight);
+        const bool sceneChanged =
+                qaveRenderer_.updateScene(
+                    qaveDensityStack_,
+                    selectedQaveLayer_
+                );
+
+        if (sceneChanged || !qaveCamera_.isFramed()) {
+            qaveCamera_.frameScene(
+                qaveRenderer_.sceneCenter(),
+                qaveRenderer_.sceneRadius()
+            );
+        }
+
+        qaveCamera_.update(ImGui::GetIO().DeltaTime);
+
+        qaveRenderer_.render(
+            framebufferWidth,
+            framebufferHeight,
+            selectedQaveLayer_,
+            qaveCamera_
+        );
 
         const ImTextureRef qaveTexture{
-            static_cast<ImTextureID>(qaveCubeRenderer_.colorTexture())
+            static_cast<ImTextureID>(qaveRenderer_.colorTexture())
         };
+
+        const ImVec2 imageOrigin =
+                ImGui::GetCursorScreenPos();
 
         // OpenGL framebuffer textures have a bottom-left origin, so the image
         // UVs are vertically flipped for Dear ImGui's top-left coordinate space.
@@ -674,8 +713,172 @@ namespace quantum_sim::gui {
             ImVec2{1.0F, 0.0F}
         );
 
+        // The invisible input surface keeps all camera gestures scoped to QAVE.
+        ImGui::SetCursorScreenPos(imageOrigin);
+        ImGui::InvisibleButton(
+            "##QaveViewportInput",
+            imageSize,
+            ImGuiButtonFlags_MouseButtonLeft |
+            ImGuiButtonFlags_MouseButtonRight
+        );
+
+        ImGuiIO &io =
+                ImGui::GetIO();
+
+        const bool viewportHovered =
+                ImGui::IsItemHovered();
+
+        const bool viewportActive =
+                ImGui::IsItemActive();
+
+        if (
+            viewportHovered &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+        ) {
+            qavePointerDragged_ = false;
+        }
+
+        if (
+            viewportActive &&
+            ImGui::IsMouseDragging(ImGuiMouseButton_Left, 3.0F)
+        ) {
+            qavePointerDragged_ = true;
+
+            if (io.KeyShift) {
+                qaveCamera_.pan(io.MouseDelta.x, io.MouseDelta.y);
+            } else {
+                qaveCamera_.orbit(io.MouseDelta.x, io.MouseDelta.y);
+            }
+        }
+
+        if (
+            viewportActive &&
+            ImGui::IsMouseDragging(ImGuiMouseButton_Right, 3.0F)
+        ) {
+            qavePointerDragged_ = true;
+            qaveCamera_.pan(io.MouseDelta.x, io.MouseDelta.y);
+        }
+
+        if (viewportHovered && std::abs(io.MouseWheel) > 0.0F) {
+            qaveCamera_.zoom(io.MouseWheel);
+        }
+
+        if (
+            viewportHovered &&
+            !io.WantTextInput &&
+            ImGui::IsKeyPressed(ImGuiKey_R)
+        ) {
+            qaveCamera_.reset();
+        }
+
+        std::optional<qave::Selection> hoveredCell;
+
+        if (viewportHovered) {
+            const ImVec2 pointer =
+                    ImGui::GetMousePos();
+
+            const float localX =
+                    std::clamp(
+                        pointer.x - imageOrigin.x,
+                        0.0F,
+                        imageSize.x - 1.0F
+                    );
+
+            const float localY =
+                    std::clamp(
+                        pointer.y - imageOrigin.y,
+                        0.0F,
+                        imageSize.y - 1.0F
+                    );
+
+            const int pickX =
+                    std::clamp(
+                        static_cast<int>(
+                            localX / imageSize.x *
+                            static_cast<float>(framebufferWidth)
+                        ),
+                        0,
+                        framebufferWidth - 1
+                    );
+
+            const int pickY =
+                    std::clamp(
+                        static_cast<int>(
+                            (1.0F - localY / imageSize.y) *
+                            static_cast<float>(framebufferHeight)
+                        ),
+                        0,
+                        framebufferHeight - 1
+                    );
+
+            hoveredCell =
+                    qaveRenderer_.pick(pickX, pickY);
+        }
+
+        if (
+            hoveredCell.has_value() &&
+            hoveredCell->layer < qaveDensityStack_.layers.size()
+        ) {
+            const qave::DensityLayer &layer =
+                    qaveDensityStack_.layers[hoveredCell->layer];
+
+            const qave::DensityCell &cell =
+                    layer.cellAt(
+                        hoveredCell->row,
+                        hoveredCell->column
+                    );
+
+            ImGui::BeginTooltip();
+            ImGui::Text(
+                "LAYER %zu / %zu",
+                hoveredCell->layer,
+                qaveDensityStack_.layers.size() - 1U
+            );
+            ImGui::Separator();
+            ImGui::Text(
+                "row %zu  %s",
+                cell.row,
+                layer.bins[cell.row].label.c_str()
+            );
+            ImGui::Text(
+                "col %zu  %s",
+                cell.column,
+                layer.bins[cell.column].label.c_str()
+            );
+            ImGui::Text("|rho|       %.8f", cell.magnitude);
+            ImGui::Text("intensity   %.8f", cell.intensity);
+            ImGui::Text("phase       %.6f rad", cell.phaseRadians);
+            ImGui::Text("Re(rho)     %.8f", cell.real);
+            ImGui::Text("Im(rho)     %.8f", cell.imaginary);
+            ImGui::EndTooltip();
+
+            if (
+                viewportHovered &&
+                ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+                !qavePointerDragged_
+            ) {
+                selectQaveLayer(hoveredCell->layer);
+            }
+        }
+
+        const std::size_t layerCount =
+                qaveDensityStack_.layers.size();
+
+        const std::size_t dimension =
+                layerCount == 0U
+                    ? 0U
+                    : qaveDensityStack_.layers[selectedQaveLayer_].dimension;
+
         ImGui::TextDisabled(
-            "OPENGL 3.3 CORE | VAO/VBO/EBO | 36 INDICES | DEPTH TEST"
+            "LAYER %zu/%zu | rho %zux%zu | opaque indexed voxels",
+            selectedQaveLayer_,
+            layerCount == 0U ? 0U : layerCount - 1U,
+            dimension,
+            dimension
+        );
+
+        ImGui::TextDisabled(
+            "LMB orbit | RMB / Shift+LMB pan | wheel zoom | R reset"
         );
 
         ImGui::End();
@@ -696,6 +899,68 @@ namespace quantum_sim::gui {
                 session_.stepCount() * 2U / 5U
             )
         );
+    }
+
+    void GuiApplication::rebuildQaveDensityStack() {
+        qaveDensityStack_ =
+                qave::DensityModel::build(session_, 16U);
+
+        if (qaveDensityStack_.layers.empty()) {
+            selectedQaveLayer_ = 0U;
+        } else {
+            selectedQaveLayer_ =
+                    std::min(
+                        selectedQaveLayer_,
+                        qaveDensityStack_.layers.size() - 1U
+                    );
+        }
+
+        lastQaveDebuggerStep_.reset();
+    }
+
+    void GuiApplication::synchronizeQaveLayer(
+        const debug::DebuggerSnapshot &snapshot
+    ) {
+        if (qaveDensityStack_.layers.empty()) {
+            selectedQaveLayer_ = 0U;
+            return;
+        }
+
+        if (
+            lastQaveDebuggerStep_.has_value() &&
+            lastQaveDebuggerStep_.value() == snapshot.currentStepIndex
+        ) {
+            return;
+        }
+
+        selectedQaveLayer_ =
+                std::min(
+                    snapshot.currentStepIndex + 1U,
+                    qaveDensityStack_.layers.size() - 1U
+                );
+
+        lastQaveDebuggerStep_ =
+                snapshot.currentStepIndex;
+    }
+
+    void GuiApplication::selectQaveLayer(
+        const std::size_t layerIndex
+    ) {
+        if (qaveDensityStack_.layers.empty()) {
+            selectedQaveLayer_ = 0U;
+            return;
+        }
+
+        selectedQaveLayer_ =
+                std::min(
+                    layerIndex,
+                    qaveDensityStack_.layers.size() - 1U
+                );
+
+        if (selectedQaveLayer_ > 0U && session_.hasSteps()) {
+            session_.moveToStep(selectedQaveLayer_ - 1U);
+            lastQaveDebuggerStep_ = session_.currentStepIndex();
+        }
     }
 
     void GuiApplication::drawTopBar(
@@ -1380,6 +1645,7 @@ namespace quantum_sim::gui {
 
     void GuiApplication::rebuildDebuggerAfterCircuitEdit() {
         session_.rebuild(circuit_, initialState_);
+        rebuildQaveDensityStack();
         circuitRenderer_.clearSelection();
     }
 
