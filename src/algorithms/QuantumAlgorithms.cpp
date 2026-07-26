@@ -6,13 +6,36 @@
 #include <numbers>
 #include <stdexcept>
 
+namespace {
+    void requireMinimumQubitCount(
+        const std::size_t qubitCount,
+        const std::size_t minimum,
+        const char *errorMessage
+    ) {
+        if (qubitCount < minimum) {
+            throw std::invalid_argument{errorMessage};
+        }
+    }
+}
+
 namespace quantum_sim::algorithms {
-    circuit::QuantumCircuit bellStateCircuit() {
-        circuit::QuantumCircuit circuit{2};
+    circuit::QuantumCircuit bellStateCircuit(const std::size_t qubitCount) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "A Bell-state circuit requires at least two qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
 
         // H creates superposition; CX entangles q1 with q0.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
-        circuit.addControlledGate("CX", gates::cxGate(), 0, 1);
+        circuit.addControlledGate(
+            "CX",
+            gates::cxGate(qubitCount, 0, 1),
+            0,
+            1
+        );
 
         return circuit;
     }
@@ -221,47 +244,63 @@ namespace quantum_sim::algorithms {
         return circuit;
     }
 
-    circuit::QuantumCircuit ghzStateCircuit() {
-        circuit::QuantumCircuit circuit{3};
+    circuit::QuantumCircuit ghzStateCircuit(const std::size_t qubitCount) {
+        circuit::QuantumCircuit circuit{qubitCount};
 
-        // GHZ chains two CX gates from a superposed first qubit.
+        // A Hadamard seed followed by a CX chain entangles the full register.
         circuit.addSingleQubitGate(
             "H",
             gates::hadamardGate(),
             0
         );
 
-        circuit.addControlledGate(
-            "CX",
-            gates::cxGate(3, 0, 1),
-            0,
-            1
-        );
+        for (std::size_t target = 1U; target < qubitCount; ++target) {
+            const std::size_t control =
+                    target - 1U;
 
-        circuit.addControlledGate(
-            "CX",
-            gates::cxGate(3, 1, 2),
-            1,
-            2
-        );
+            circuit.addControlledGate(
+                "CX",
+                gates::cxGate(qubitCount, control, target),
+                control,
+                target
+            );
+        }
 
         return circuit;
     }
 
-    circuit::QuantumCircuit groverSearchCircuit() {
-        circuit::QuantumCircuit circuit{2};
+    circuit::QuantumCircuit groverSearchCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "The Grover demonstration requires at least two qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
 
         // Uniform preparation followed by a CZ oracle that marks |11>.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
-        circuit.addControlledGate("CZ", gates::czGate(), 0, 1);
+        circuit.addControlledGate(
+            "CZ",
+            gates::czGate(qubitCount, 0, 1),
+            0,
+            1
+        );
 
         // H-X-CZ-X-H is the two-qubit inversion-about-the-mean operator.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
         circuit.addSingleQubitGate("X", gates::xGate(), 0);
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
-        circuit.addControlledGate("CZ", gates::czGate(), 0, 1);
+        circuit.addControlledGate(
+            "CZ",
+            gates::czGate(qubitCount, 0, 1),
+            0,
+            1
+        );
         circuit.addSingleQubitGate("X", gates::xGate(), 0);
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
@@ -270,14 +309,24 @@ namespace quantum_sim::algorithms {
         return circuit;
     }
 
-    circuit::QuantumCircuit deutschJozsaCircuit() {
-        circuit::QuantumCircuit circuit{3};
-        constexpr std::size_t ancilla = 2U;
+    circuit::QuantumCircuit deutschJozsaCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "Deutsch-Jozsa requires at least one input qubit and one ancilla."
+        );
 
-        // Prepare |00>|1>, then place all three qubits into the oracle basis.
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        const std::size_t ancilla =
+                qubitCount - 1U;
+
+        // Prepare the ancilla in |1>, then move the full register into the oracle basis.
         circuit.addSingleQubitGate("X", gates::xGate(), ancilla);
 
-        for (std::size_t qubit = 0; qubit < 3U; ++qubit) {
+        for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
             circuit.addSingleQubitGate(
                 "H",
                 gates::hadamardGate(),
@@ -285,23 +334,23 @@ namespace quantum_sim::algorithms {
             );
         }
 
-        // These two controls implement the balanced function x0 XOR x1.
-        circuit.addControlledGate(
-            "CX",
-            gates::cxGate(3, 0, ancilla),
-            0,
-            ancilla
-        );
+        // One oracle control per input computes the balanced parity function.
+        for (std::size_t input = 0; input < ancilla; ++input) {
+            circuit.addControlledGate(
+                "CX",
+                gates::cxGate(qubitCount, input, ancilla),
+                input,
+                ancilla
+            );
+        }
 
-        circuit.addControlledGate(
-            "CX",
-            gates::cxGate(3, 1, ancilla),
-            1,
-            ancilla
-        );
-
-        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
-        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
+        for (std::size_t input = 0; input < ancilla; ++input) {
+            circuit.addSingleQubitGate(
+                "H",
+                gates::hadamardGate(),
+                input
+            );
+        }
 
         return circuit;
     }
@@ -373,59 +422,88 @@ namespace quantum_sim::algorithms {
         return circuit;
     }
 
-    circuit::QuantumCircuit toffoliDemoCircuit() {
-        circuit::QuantumCircuit circuit{3};
+    circuit::QuantumCircuit toffoliDemoCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            3U,
+            "The Toffoli demonstration requires at least three qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
 
         // Start both controls in |1> so the decomposition visibly flips q2.
         circuit.addSingleQubitGate("X", gates::xGate(), 0);
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 2);
-        circuit.addControlledGate("CX", gates::cxGate(3, 1, 2), 1, 2);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 1, 2), 1, 2);
         circuit.addSingleQubitGate(
             "Tdg",
             gates::tDaggerGate(),
             2
         );
-        circuit.addControlledGate("CX", gates::cxGate(3, 0, 2), 0, 2);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 2), 0, 2);
         circuit.addSingleQubitGate("T", gates::tGate(), 2);
-        circuit.addControlledGate("CX", gates::cxGate(3, 1, 2), 1, 2);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 1, 2), 1, 2);
         circuit.addSingleQubitGate(
             "Tdg",
             gates::tDaggerGate(),
             2
         );
-        circuit.addControlledGate("CX", gates::cxGate(3, 0, 2), 0, 2);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 2), 0, 2);
         circuit.addSingleQubitGate("T", gates::tGate(), 1);
         circuit.addSingleQubitGate("T", gates::tGate(), 2);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 2);
-        circuit.addControlledGate("CX", gates::cxGate(3, 0, 1), 0, 1);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 1), 0, 1);
         circuit.addSingleQubitGate("T", gates::tGate(), 0);
         circuit.addSingleQubitGate(
             "Tdg",
             gates::tDaggerGate(),
             1
         );
-        circuit.addControlledGate("CX", gates::cxGate(3, 0, 1), 0, 1);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 1), 0, 1);
 
         return circuit;
     }
 
-    circuit::QuantumCircuit phaseKickbackCircuit() {
-        circuit::QuantumCircuit circuit{2};
+    circuit::QuantumCircuit phaseKickbackCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "The phase-kickback demonstration requires at least two qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
 
         // The target |-> is a -1 eigenstate of X, so CX kicks phase to q0.
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
-        circuit.addControlledGate("CX", gates::cxGate(), 0, 1);
+        circuit.addControlledGate(
+            "CX",
+            gates::cxGate(qubitCount, 0, 1),
+            0,
+            1
+        );
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
 
         return circuit;
     }
 
-    circuit::QuantumCircuit teleportationCircuit() {
-        circuit::QuantumCircuit circuit{3};
+    circuit::QuantumCircuit teleportationCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            3U,
+            "The teleportation demonstration requires at least three qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
 
         constexpr double inputTheta =
                 std::numbers::pi / 3.0;
@@ -450,15 +528,15 @@ namespace quantum_sim::algorithms {
 
         // Create the Bell resource between q1 and q2.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
-        circuit.addControlledGate("CX", gates::cxGate(3, 1, 2), 1, 2);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 1, 2), 1, 2);
 
         // Bell-basis transform of the source and sender resource qubit.
-        circuit.addControlledGate("CX", gates::cxGate(3, 0, 1), 0, 1);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 1), 0, 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
 
         // Coherent controls model the classical X/Z corrections without measurement.
-        circuit.addControlledGate("CX", gates::cxGate(3, 1, 2), 1, 2);
-        circuit.addControlledGate("CZ", gates::czGate(3, 0, 2), 0, 2);
+        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 1, 2), 1, 2);
+        circuit.addControlledGate("CZ", gates::czGate(qubitCount, 0, 2), 0, 2);
 
         return circuit;
     }

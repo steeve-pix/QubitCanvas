@@ -24,6 +24,15 @@ namespace quantum_sim::gui {
     GuiApplication::GuiApplication(circuit::QuantumCircuit &circuit,
                                    const quantum::QuantumRegister &initialState)
         : circuit_{circuit}, initialState_{initialState}, session_{circuit_, initialState_} {
+        presetQubitCount_ =
+                static_cast<int>(
+                    std::clamp(
+                        circuit_.qubitCount(),
+                        std::size_t{1},
+                        std::size_t{10}
+                    )
+                );
+
         rebuildDensityVolume();
         settleDebuggerPreview();
         synchronizeDensityLayer(session_.snapshot());
@@ -1147,85 +1156,123 @@ namespace quantum_sim::gui {
                 ImGui::SameLine();
             }
 
-            if (ImGui::Button(label, ImVec2{buttonWidth, 42.0F})) {
+            const int minimum =
+                    minimumQubitCount(preset);
+
+            const bool canLoad =
+                    presetQubitCount_ >= minimum;
+
+            if (!canLoad) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool clicked =
+                    ImGui::Button(
+                        label,
+                        ImVec2{buttonWidth, 42.0F}
+                    );
+
+            if (!canLoad) {
+                ImGui::EndDisabled();
+            }
+
+            if (clicked) {
                 loadPreset(preset);
             }
 
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-                ImGui::SetTooltip("%s", description);
+            if (
+                ImGui::IsItemHovered(
+                    ImGuiHoveredFlags_DelayShort |
+                    ImGuiHoveredFlags_AllowWhenDisabled
+                )
+            ) {
+                if (canLoad) {
+                    ImGui::SetTooltip(
+                        "%s\nRegister: %d qubits",
+                        description,
+                        presetQubitCount_
+                    );
+                } else {
+                    ImGui::SetTooltip(
+                        "%s\nRequires at least %d qubits; selected: %d.",
+                        description,
+                        minimum,
+                        presetQubitCount_
+                    );
+                }
             }
         };
 
         scriptButton(
             "Bell",
             CircuitPreset::Bell,
-            "2 qubits - maximally entangled Bell pair",
+            "Entangles q0 and q1; extra qubits remain in |0>.",
             false
         );
         scriptButton(
             "GHZ",
             CircuitPreset::Ghz,
-            "3 qubits - GHZ entanglement chain",
+            "Entangles the complete selected register.",
             true
         );
         scriptButton(
             "|+>^n",
             CircuitPreset::PlusRegister,
-            "Selected register size - uniform superposition",
+            "Creates a uniform superposition across the selected register.",
             false
         );
         scriptButton(
             "QFT",
             CircuitPreset::Qft,
-            "Selected register size - Fourier phase history",
+            "Builds a Fourier phase history across the selected register.",
             true
         );
         scriptButton(
             "iQFT",
             CircuitPreset::InverseQft,
-            "Selected register size - exact inverse QFT history",
+            "Builds the exact inverse QFT across the selected register.",
             false
         );
         scriptButton(
             "Grover",
             CircuitPreset::Grover,
-            "2 qubits - searches for marked state |11>",
+            "Searches |11> on q0/q1; extra qubits remain in |0>.",
             true
         );
         scriptButton(
             "Deutsch-J",
             CircuitPreset::DeutschJozsa,
-            "3 qubits - balanced f(x) = x0 XOR x1",
+            "Uses n-1 inputs and one ancilla for a balanced parity oracle.",
             false
         );
         scriptButton(
             "Bernstein",
             CircuitPreset::BernsteinVazirani,
-            "4 qubits - recovers hidden string 101",
+            "Recovers an alternating hidden string across n-1 inputs.",
             true
         );
         scriptButton(
             "Toffoli",
             CircuitPreset::Toffoli,
-            "3 qubits - decomposed controlled-controlled X",
+            "Runs a decomposed CCX on q0-q2; extra qubits remain in |0>.",
             false
         );
         scriptButton(
             "Kickback",
             CircuitPreset::Kickback,
-            "2 qubits - exposes controlled phase kickback",
+            "Uses q0/q1 to expose phase kickback; extra qubits remain in |0>.",
             true
         );
         scriptButton(
             "Teleport",
             CircuitPreset::Teleportation,
-            "3 qubits - coherent state teleportation to q2",
+            "Teleports from q0 to q2; extra qubits remain in |0>.",
             false
         );
         scriptButton(
             "Scramble",
             CircuitPreset::Scramble,
-            "Selected register size - mixed-gate visualization stress test",
+            "Applies a mixed-gate stress test to the selected register.",
             true
         );
 
@@ -1319,12 +1366,23 @@ namespace quantum_sim::gui {
                     std::clamp(presetQubitCount_, 1, 10)
                 );
 
+        if (
+            qubitCount <
+            static_cast<std::size_t>(
+                minimumQubitCount(preset)
+            )
+        ) {
+            throw std::invalid_argument{
+                "The selected register is too small for this algorithm."
+            };
+        }
+
         if (preset == CircuitPreset::Bell) {
-            return algorithms::bellStateCircuit();
+            return algorithms::bellStateCircuit(qubitCount);
         }
 
         if (preset == CircuitPreset::Ghz) {
-            return algorithms::ghzStateCircuit();
+            return algorithms::ghzStateCircuit(qubitCount);
         }
 
         if (preset == CircuitPreset::PlusRegister) {
@@ -1340,27 +1398,44 @@ namespace quantum_sim::gui {
         }
 
         if (preset == CircuitPreset::Grover) {
-            return algorithms::groverSearchCircuit();
+            return algorithms::groverSearchCircuit(qubitCount);
         }
 
         if (preset == CircuitPreset::DeutschJozsa) {
-            return algorithms::deutschJozsaCircuit();
+            return algorithms::deutschJozsaCircuit(qubitCount);
         }
 
         if (preset == CircuitPreset::BernsteinVazirani) {
-            return algorithms::bernsteinVaziraniCircuit(3, 0b101);
+            const std::size_t inputQubitCount =
+                    qubitCount - 1U;
+
+            std::size_t hiddenValue{};
+
+            // Repeat 1010... so every register size gets a deterministic oracle.
+            for (std::size_t input = 0; input < inputQubitCount; ++input) {
+                hiddenValue <<= 1U;
+
+                if (input % 2U == 0U) {
+                    hiddenValue |= 1U;
+                }
+            }
+
+            return algorithms::bernsteinVaziraniCircuit(
+                inputQubitCount,
+                hiddenValue
+            );
         }
 
         if (preset == CircuitPreset::Toffoli) {
-            return algorithms::toffoliDemoCircuit();
+            return algorithms::toffoliDemoCircuit(qubitCount);
         }
 
         if (preset == CircuitPreset::Kickback) {
-            return algorithms::phaseKickbackCircuit();
+            return algorithms::phaseKickbackCircuit(qubitCount);
         }
 
         if (preset == CircuitPreset::Teleportation) {
-            return algorithms::teleportationCircuit();
+            return algorithms::teleportationCircuit(qubitCount);
         }
 
         if (preset == CircuitPreset::Scramble) {
@@ -1370,6 +1445,29 @@ namespace quantum_sim::gui {
         throw std::invalid_argument{
             "Unsupported circuit preset."
         };
+    }
+
+    int GuiApplication::minimumQubitCount(
+        const CircuitPreset preset
+    ) noexcept {
+        if (
+            preset == CircuitPreset::Bell ||
+            preset == CircuitPreset::Grover ||
+            preset == CircuitPreset::DeutschJozsa ||
+            preset == CircuitPreset::BernsteinVazirani ||
+            preset == CircuitPreset::Kickback
+        ) {
+            return 2;
+        }
+
+        if (
+            preset == CircuitPreset::Toffoli ||
+            preset == CircuitPreset::Teleportation
+        ) {
+            return 3;
+        }
+
+        return 1;
     }
 
     void GuiApplication::sampleCurrentState(const quantum::QuantumRegister &state) {
