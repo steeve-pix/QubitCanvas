@@ -19,10 +19,9 @@ namespace quantum_sim::gui::density_volume {
         /**
          * Refreshes scene-aware reset and clipping bounds without moving the camera.
          *
-         * Playback calls this when the visible layer range changes. Orbit and
-         * pan offset remain untouched, the target follows the scene-center
-         * delta, and zoom keeps the same ratio to the scene radius. A later
-         * reset uses the newest composition.
+         * Playback calls this when the visible layer range changes. Current
+         * orbit, pan, target, and zoom remain untouched. A later reset uses
+         * the newest composition.
          *
          * @param center Stable look-at target at the latest scene bounds center.
          * @param radius Bounding-sphere radius used for reset distance and clip planes.

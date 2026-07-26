@@ -168,10 +168,13 @@ namespace quantum_sim::gui::density_volume {
         void uploadMesh(const Mesh &mesh);
 
         /**
-         * Preallocates GPU storage for an incrementally generated layer stack.
+         * Allocates GPU storage for an incrementally generated layer stack.
          *
-         * @param vertexCapacity Maximum number of MeshVertex elements.
-         * @param indexCapacity Maximum number of uint32 indices.
+         * Storage grows geometrically as visible playback history expands,
+         * avoiding an up-front allocation for every future circuit layer.
+         *
+         * @param vertexCapacity Number of MeshVertex elements to reserve.
+         * @param indexCapacity Number of uint32 indices to reserve.
          */
         void allocateMeshStorage(
             std::size_t vertexCapacity,
@@ -179,7 +182,10 @@ namespace quantum_sim::gui::density_volume {
         );
 
         /**
-         * Uploads only the suffix appended since the previous playback step.
+         * Uploads the suffix appended since the previous playback step.
+         *
+         * When the new suffix exceeds current GPU capacity, storage grows and
+         * the complete mesh is uploaded once into the replacement buffers.
          *
          * @param mesh Complete CPU-side scene mesh.
          * @param firstVertex First newly appended vertex.

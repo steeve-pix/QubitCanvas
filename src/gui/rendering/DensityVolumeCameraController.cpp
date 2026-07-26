@@ -26,22 +26,6 @@ namespace quantum_sim::gui::density_volume {
         const Vector3 &center,
         const float radius
     ) noexcept {
-        const Vector3 centerDelta =
-                center - launchTarget_;
-
-        const float previousLaunchDistance =
-                std::max(launchDistance_, 0.001F);
-
-        if (framed_) {
-            // Follow the growing or wrapping history while preserving the
-            // user's orbit and pan offset relative to the scene.
-            target_ =
-                    target_ + centerDelta;
-
-            destinationTarget_ =
-                    destinationTarget_ + centerDelta;
-        }
-
         sceneRadius_ =
                 std::max(radius, 1.0F);
 
@@ -50,19 +34,8 @@ namespace quantum_sim::gui::density_volume {
         launchDistance_ =
                 std::max(sceneRadius_ * 2.05F, 2.8F);
 
-        if (framed_) {
-            // Preserve relative zoom while the history bounds grow or wrap.
-            const float distanceScale =
-                    launchDistance_ /
-                    previousLaunchDistance;
-
-            distance_ *=
-                    distanceScale;
-
-            targetDistance_ *=
-                    distanceScale;
-        }
-
+        // Playback only refreshes clipping and the reset composition. The live
+        // camera stays exactly where the user placed it until an explicit reset.
         launchTarget_ =
                 center;
     }
