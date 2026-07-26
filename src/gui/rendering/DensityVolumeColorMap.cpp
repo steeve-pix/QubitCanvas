@@ -7,6 +7,9 @@
 
 namespace quantum_sim::gui::density_volume {
     namespace {
+        constexpr float infernoToneExponent =
+                0.60F;
+
         [[nodiscard]] float clamp01(const float value) noexcept {
             return std::clamp(value, 0.0F, 1.0F);
         }
@@ -47,8 +50,15 @@ namespace quantum_sim::gui::density_volume {
                     static_cast<float>(normalizedMagnitude)
                 );
 
+        // Keep weak and medium density values in Inferno's violet and crimson
+        // bands. A smaller exponent promotes nearly every non-zero value into
+        // orange, flattening the visual hierarchy between background cells
+        // and genuinely bright probability peaks.
         const float toneWeight =
-                std::pow(magnitude, 0.20F);
+                std::pow(
+                    magnitude,
+                    infernoToneExponent
+                );
 
         const float rampPosition =
                 (0.01F + 0.99F * toneWeight) *

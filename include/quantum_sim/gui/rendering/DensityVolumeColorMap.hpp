@@ -13,8 +13,10 @@ namespace quantum_sim::gui::density_volume {
     /**
      * Maps density magnitude through the Stella-inspired Inferno tone curve.
      *
-     * The default curve lifts low non-zero magnitudes without changing the
-     * numerical density value. Returned components are sRGB values in [0, 1].
+     * The response preserves Inferno's violet and crimson bands for weak and
+     * medium cells while reserving gold and ivory for probability peaks. It
+     * changes only the display color, never the underlying density value.
+     * Returned components are sRGB values in [0, 1].
      *
      * @param normalizedMagnitude Density magnitude normalized to [0, 1].
      * @return Tone-shaped Inferno color in sRGB space.

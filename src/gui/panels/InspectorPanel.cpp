@@ -107,13 +107,11 @@ namespace {
     }
 
     [[nodiscard]] ImU32 densityColor(
-        const double normalizedMagnitude,
-        const double phase
+        const double normalizedMagnitude
     ) {
         const quantum_sim::gui::density_volume::Color color =
-                quantum_sim::gui::density_volume::phaseColor(
-                    normalizedMagnitude,
-                    phase
+                quantum_sim::gui::density_volume::magnitudeColor(
+                    normalizedMagnitude
                 );
 
         return IM_COL32(
@@ -725,8 +723,7 @@ namespace quantum_sim::gui {
                     normalizedMagnitude <= 0.002
                         ? IM_COL32(22, 19, 47, 255)
                         : densityColor(
-                            normalizedMagnitude,
-                            cell.phaseRadians
+                            normalizedMagnitude
                         ),
                     gridDimension <= 32U ? 1.5F : 0.7F
                 );
@@ -833,16 +830,14 @@ namespace quantum_sim::gui {
                 minimum,
                 maximum,
                 densityColor(
-                    1.0,
-                    -3.141592653589793 +
-                    6.283185307179586 * static_cast<double>(t)
+                    static_cast<double>(t)
                 ),
                 0.0F
             );
         }
 
         const char *legendLabel =
-                "phase -\xCF\x80..+\xCF\x80";
+                "|\xCF\x81| low-high";
 
         const ImVec2 legendLabelSize =
                 ImGui::CalcTextSize(legendLabel);
