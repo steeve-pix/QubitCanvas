@@ -5,6 +5,7 @@
 #include "quantum_sim/gui/GuiApplication.hpp"
 
 #include <cstddef>
+#include <filesystem>
 #include <iostream>
 #include <numbers>
 #include <random>
@@ -55,24 +56,44 @@ quantum_sim::quantum::QuantumRegister createRotationInitialState(const int choic
     }
 }
 
-int main() {
+int main(const int argumentCount, char *arguments[]) {
     using quantum_sim::circuit::QuantumCircuit;
     using quantum_sim::quantum::QuantumRegister;
 
-    // Start the GUI with a visually interesting circuit instead of prompting
-    // through the console. Users can switch presets inside the app.
-    QuantumCircuit circuit =
-            quantum_sim::algorithms::qftCircuit(4);
+    try {
+        if (argumentCount > 0 && arguments[0] != nullptr) {
+            const std::filesystem::path executablePath =
+                    std::filesystem::absolute(arguments[0]);
 
-    // Presets start from |000...> so the trace is deterministic and easy to inspect.
-    const QuantumRegister initialState =
-            QuantumRegister::basisState(
-                circuit.qubitCount(),
-                0
-            );
+            if (executablePath.has_parent_path()) {
+                std::filesystem::current_path(
+                    executablePath.parent_path()
+                );
+            }
+        }
 
-    quantum_sim::gui::GuiApplication application{circuit, initialState};
-    application.run();
+        // Start the GUI with a visually interesting circuit instead of prompting
+        // through the console. Users can switch presets inside the app.
+        QuantumCircuit circuit =
+                quantum_sim::algorithms::qftCircuit(4);
+
+        // Presets start from |000...> so the trace is deterministic and easy to inspect.
+        const QuantumRegister initialState =
+                QuantumRegister::basisState(
+                    circuit.qubitCount(),
+                    0
+                );
+
+        quantum_sim::gui::GuiApplication application{circuit, initialState};
+        application.run();
+    } catch (const std::exception &error) {
+        std::cerr
+                << "QubitCanvas failed to start: "
+                << error.what()
+                << '\n';
+
+        return 1;
+    }
 
     return 0;
 }
