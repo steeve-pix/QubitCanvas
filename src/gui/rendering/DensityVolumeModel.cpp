@@ -1,11 +1,11 @@
-#include "quantum_sim/gui/rendering/QaveDensityModel.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <stdexcept>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     namespace {
         constexpr std::uint64_t fnvOffset = 1469598103934665603ULL;
         constexpr std::uint64_t fnvPrime = 1099511628211ULL;
@@ -174,7 +174,7 @@ namespace quantum_sim::gui::qave {
         const std::size_t column
     ) const {
         if (row >= dimension || column >= dimension) {
-            throw std::out_of_range{"QAVE density cell index is outside the layer."};
+            throw std::out_of_range{"Density Volume density cell index is outside the layer."};
         }
 
         return cells.at(row * dimension + column);
@@ -185,7 +185,7 @@ namespace quantum_sim::gui::qave {
         const std::size_t maximumDimension
     ) {
         if (maximumDimension < 2U) {
-            throw std::invalid_argument{"QAVE density dimension must be at least two."};
+            throw std::invalid_argument{"Density Volume density dimension must be at least two."};
         }
 
         DensityStack stack;

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "quantum_sim/gui/rendering/QaveMath.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeMath.hpp"
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     /**
      * Smoothed orbit camera matching QuantumAtom's mouse behavior.
      */

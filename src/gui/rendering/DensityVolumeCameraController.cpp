@@ -1,10 +1,10 @@
-#include "quantum_sim/gui/rendering/QaveCameraController.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <numbers>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     namespace {
         [[nodiscard]] float radians(const float degrees) noexcept {
             return degrees *

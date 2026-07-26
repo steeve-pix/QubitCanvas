@@ -7,8 +7,8 @@
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
-#include "quantum_sim/gui/rendering/QaveDensityModel.hpp"
-#include "quantum_sim/gui/rendering/QaveLayerStackLayout.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeLayout.hpp"
 
 #include <algorithm>
 #include <sstream>
@@ -120,15 +120,15 @@ int main() {
         QuantumRegister::basisState(1, 0)
     };
 
-    const quantum_sim::gui::qave::DensityStack densityStack =
-            quantum_sim::gui::qave::DensityModel::build(
+    const quantum_sim::gui::density_volume::DensityStack densityStack =
+            quantum_sim::gui::density_volume::DensityModel::build(
                 densitySession,
                 16U
             );
 
     check(
         densityStack.layers.size() == densitySession.stepCount() + 1U,
-        "QAVE density history includes the initial state and every circuit step"
+        "Density Volume density history includes the initial state and every circuit step"
     );
 
     check(
@@ -141,7 +141,7 @@ int main() {
             densityStack.layers.front().cellAt(0, 1).magnitude,
             0.0
         ),
-        "QAVE initial density layer preserves the exact basis-state matrix"
+        "Density Volume initial density layer preserves the exact basis-state matrix"
     );
 
     const auto &hadamardCoherence =
@@ -151,7 +151,7 @@ int main() {
         approximatelyEqual(hadamardCoherence.magnitude, 0.5) &&
         approximatelyEqual(hadamardCoherence.real, 0.5) &&
         approximatelyEqual(hadamardCoherence.imaginary, 0.0),
-        "QAVE density cells preserve Hadamard coherence"
+        "Density Volume density cells preserve Hadamard coherence"
     );
 
     const auto &phaseCoherence =
@@ -164,14 +164,14 @@ int main() {
             -std::numbers::pi / 2.0
         ) &&
         approximatelyEqual(phaseCoherence.imaginary, -0.5),
-        "QAVE density cells preserve phase in radians and complex components"
+        "Density Volume density cells preserve phase in radians and complex components"
     );
 
-    const quantum_sim::gui::qave::SceneLayout floorFieldLayout =
-            quantum_sim::gui::qave::LayerStackLayout::build(
+    const quantum_sim::gui::density_volume::SceneLayout floorFieldLayout =
+            quantum_sim::gui::density_volume::LayerStackLayout::build(
                 densityStack,
                 1U,
-                quantum_sim::gui::qave::VisualizationMode::FloorField
+                quantum_sim::gui::density_volume::VisualizationMode::FloorField
             );
 
     check(
@@ -179,25 +179,25 @@ int main() {
         std::all_of(
             floorFieldLayout.voxels.begin(),
             floorFieldLayout.voxels.end(),
-            [](const quantum_sim::gui::qave::PlacedVoxel &voxel) {
+            [](const quantum_sim::gui::density_volume::PlacedVoxel &voxel) {
                 return voxel.layer == 1U;
             }
         ),
-        "QAVE floor field contains only the complete selected density matrix"
+        "Density Volume floor field contains only the complete selected density matrix"
     );
 
-    const quantum_sim::gui::qave::SceneLayout historyLayout =
-            quantum_sim::gui::qave::LayerStackLayout::build(
+    const quantum_sim::gui::density_volume::SceneLayout historyLayout =
+            quantum_sim::gui::density_volume::LayerStackLayout::build(
                 densityStack,
                 1U,
-                quantum_sim::gui::qave::VisualizationMode::LayerStack
+                quantum_sim::gui::density_volume::VisualizationMode::LayerStack
             );
 
     const auto initialPeak =
             std::find_if(
                 historyLayout.voxels.begin(),
                 historyLayout.voxels.end(),
-                [](const quantum_sim::gui::qave::PlacedVoxel &voxel) {
+                [](const quantum_sim::gui::density_volume::PlacedVoxel &voxel) {
                     return voxel.layer == 0U &&
                            voxel.row == 0U &&
                            voxel.column == 0U &&
@@ -209,7 +209,7 @@ int main() {
             std::find_if(
                 historyLayout.voxels.begin(),
                 historyLayout.voxels.end(),
-                [](const quantum_sim::gui::qave::PlacedVoxel &voxel) {
+                [](const quantum_sim::gui::density_volume::PlacedVoxel &voxel) {
                     return voxel.layer == 1U &&
                            voxel.row == 0U &&
                            voxel.column == 0U &&
@@ -221,7 +221,7 @@ int main() {
         initialPeak != historyLayout.voxels.end() &&
         hadamardPeak != historyLayout.voxels.end() &&
         initialPeak->size.y > hadamardPeak->size.y,
-        "QAVE voxel height preserves absolute density magnitude across layers"
+        "Density Volume voxel height preserves absolute density magnitude across layers"
     );
 
     const QuantumRegister qftSourceState =

@@ -8,9 +8,9 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "rendering/BlochSphereRenderer.hpp"
 #include "rendering/CircuitRenderer.hpp"
-#include "rendering/QaveCameraController.hpp"
-#include "rendering/QaveDensityModel.hpp"
-#include "rendering/QaveRenderer.hpp"
+#include "rendering/DensityVolumeCameraController.hpp"
+#include "rendering/DensityVolumeModel.hpp"
+#include "rendering/DensityVolumeRenderer.hpp"
 
 #include <optional>
 #include <random>
@@ -112,9 +112,9 @@ namespace quantum_sim::gui {
         debug::DebuggerSession session_;
         InspectorPanel inspectorPanel_;
         CircuitRenderer circuitRenderer_;
-        qave::Renderer qaveRenderer_;
-        qave::CameraController qaveCamera_;
-        qave::DensityStack qaveDensityStack_;
+        density_volume::Renderer densityVolumeRenderer_;
+        density_volume::CameraController densityVolumeCamera_;
+        density_volume::DensityStack densityVolumeStack_;
         GateLibraryPanel gateLibraryPanel_;
         std::optional<std::string> pendingGate_;
         std::optional<double> pendingRotationAngleRadians_;
@@ -131,9 +131,9 @@ namespace quantum_sim::gui {
         double nextAutoStepAt_{0.0};
         float heatAmount_{0.78F};
         std::string lastSampleLabel_{"none"};
-        std::size_t selectedQaveLayer_{};
-        std::optional<std::size_t> lastQaveDebuggerStep_;
-        bool qavePointerDragged_{false};
+        std::size_t selectedDensityLayer_{};
+        std::optional<std::size_t> lastDensityDebuggerStep_;
+        bool densityVolumePointerDragged_{false};
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
@@ -143,21 +143,21 @@ namespace quantum_sim::gui {
         /**
          * Recomputes the shared 2D/3D density history after a trace rebuild.
          */
-        void rebuildQaveDensityStack();
+        void rebuildDensityVolume();
 
         /**
          * Follows debugger navigation while preserving an explicit initial-layer selection.
          *
          * @param snapshot Current debugger navigation state.
          */
-        void synchronizeQaveLayer(const debug::DebuggerSnapshot &snapshot);
+        void synchronizeDensityLayer(const debug::DebuggerSnapshot &snapshot);
 
         /**
          * Selects one density layer and synchronizes post-gate layers to the debugger.
          *
          * @param layerIndex Initial or post-gate density layer index.
          */
-        void selectQaveLayer(std::size_t layerIndex);
+        void selectDensityLayer(std::size_t layerIndex);
 
         /**
          * Stores the current circuit for undo and clears stale redo history.
@@ -185,12 +185,12 @@ namespace quantum_sim::gui {
         void drawBackdrop() const;
 
         /**
-         * Displays the OpenGL framebuffer texture in the center QAVE panel.
+         * Displays the OpenGL framebuffer texture in the center Density Volume panel.
          *
          * @param position Screen-space top-left corner of the panel.
          * @param size Screen-space width and height of the panel.
          */
-        void drawQaveViewport(const ImVec2 &position, const ImVec2 &size);
+        void drawDensityVolumeViewport(const ImVec2 &position, const ImVec2 &size);
 
         /**
          * Opens rich demo traces at a settled mid-history frame.

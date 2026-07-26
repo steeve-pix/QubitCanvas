@@ -4,7 +4,7 @@
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/debug/DebuggerSession.hpp"
 #include "quantum_sim/gui/rendering/BlochSphereRenderer.hpp"
-#include "quantum_sim/gui/rendering/QaveDensityModel.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 
 #include <array>
 #include <cstddef>
@@ -34,7 +34,7 @@ namespace quantum_sim::gui {
             const debug::DebuggerSnapshot &snapshot,
             const circuit::QuantumCircuit &circuit,
             std::optional<std::size_t> selectedInstructionIndex,
-            const qave::DensityStack &densityStack,
+            const density_volume::DensityStack &densityStack,
             std::size_t &selectedDensityLayer,
             ImFont *headingFont
         );
@@ -118,12 +118,12 @@ namespace quantum_sim::gui {
          * Draws all quantum-state inspection widgets.
          *
          * @param session Session containing every historical register state.
-         * @param densityStack Density history rendered in both QAVE views.
+         * @param densityStack Density history rendered in both Density Volume views.
          * @param selectedDensityLayer Shared selected layer.
          */
         void drawQuantumState(
             debug::DebuggerSession &session,
-            const qave::DensityStack &densityStack,
+            const density_volume::DensityStack &densityStack,
             std::size_t &selectedDensityLayer
         );
 
@@ -143,7 +143,7 @@ namespace quantum_sim::gui {
          */
         void drawLayerStack(
             debug::DebuggerSession &session,
-            const qave::DensityStack &densityStack,
+            const density_volume::DensityStack &densityStack,
             std::size_t &selectedDensityLayer
         );
 

@@ -2,9 +2,9 @@
 
 #include <array>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     /**
-     * Three-component vector used by the QAVE camera and scene layout.
+     * Three-component vector used by the Density Volume camera and scene layout.
      */
     struct Vector3 {
         float x{};

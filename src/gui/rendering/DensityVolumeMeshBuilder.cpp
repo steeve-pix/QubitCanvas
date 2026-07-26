@@ -1,8 +1,8 @@
-#include "quantum_sim/gui/rendering/QaveMeshBuilder.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeMeshBuilder.hpp"
 
 #include <array>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     namespace {
         struct UnitVertex {
             float x;
