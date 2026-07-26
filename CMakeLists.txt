@@ -91,7 +91,13 @@ add_library(qubit_canvas_gui STATIC
         src/gui/panels/InspectorPanel.cpp
         src/gui/rendering/CircuitRenderer.cpp
         src/gui/rendering/BlochSphereRenderer.cpp
-        src/gui/rendering/QaveCubeRenderer.cpp
+        src/gui/rendering/QaveMath.cpp
+        src/gui/rendering/QaveDensityModel.cpp
+        src/gui/rendering/QaveColorMap.cpp
+        src/gui/rendering/QaveLayerStackLayout.cpp
+        src/gui/rendering/QaveMeshBuilder.cpp
+        src/gui/rendering/QaveCameraController.cpp
+        src/gui/rendering/QaveRenderer.cpp
         src/gui/panels/GateLibraryPanel.cpp
 )
 
@@ -139,7 +145,7 @@ if (BUILD_TESTING)
 
     target_link_libraries(
             qubit_canvas_tests
-            PRIVATE qubit_canvas_core
+            PRIVATE qubit_canvas_gui
     )
 
     enable_project_warnings(qubit_canvas_tests)

@@ -1,5 +1,6 @@
 #include "quantum_sim/gui/panels/InspectorPanel.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/gui/rendering/QaveColorMap.hpp"
 
 #include "imgui.h"
 
@@ -7,7 +8,6 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
-#include <numbers>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,14 +16,6 @@ namespace {
     struct IndexedStateInfo {
         std::size_t index{};
         quantum_sim::quantum::StateInfo state;
-    };
-
-    struct DensityBinSample {
-        std::size_t firstState{};
-        std::size_t lastState{};
-        std::size_t strongestState{};
-        double probability{};
-        double phase{};
     };
 
     [[nodiscard]] std::string toLower(std::string value) {
@@ -114,128 +106,22 @@ namespace {
         return quantum_sim::quantum::BlochVector{x, y, z};
     }
 
-    [[nodiscard]] ImU32 probabilityColor(
-        const double probability,
+    [[nodiscard]] ImU32 densityColor(
+        const double normalizedMagnitude,
         const double phase
     ) {
-        const float intensity =
-                std::clamp(
-                    static_cast<float>(std::sqrt(probability)),
-                    0.0F,
-                    1.0F
+        const quantum_sim::gui::qave::Color color =
+                quantum_sim::gui::qave::phaseColor(
+                    normalizedMagnitude,
+                    phase
                 );
-
-        // Phase rotates color; probability controls alpha and brightness.
-        const float phaseT =
-                static_cast<float>(
-                    (phase + std::numbers::pi) /
-                    (2.0 * std::numbers::pi)
-                );
-
-        const int red =
-                static_cast<int>(42.0F + intensity * 220.0F);
-
-        const int green =
-                static_cast<int>(18.0F + std::sin(phaseT * 6.28318F) * 36.0F + intensity * 182.0F);
-
-        const int blue =
-                static_cast<int>(112.0F + (1.0F - intensity) * 86.0F + std::cos(phaseT * 6.28318F) * 42.0F);
 
         return IM_COL32(
-            std::clamp(red, 0, 255),
-            std::clamp(green, 0, 255),
-            std::clamp(blue, 0, 255),
-            static_cast<int>(92.0F + intensity * 163.0F)
+            static_cast<int>(std::clamp(color.red, 0.0F, 1.0F) * 255.0F),
+            static_cast<int>(std::clamp(color.green, 0.0F, 1.0F) * 255.0F),
+            static_cast<int>(std::clamp(color.blue, 0.0F, 1.0F) * 255.0F),
+            255
         );
-    }
-
-    [[nodiscard]] std::size_t heatmapDimension(std::size_t stateCount) {
-        // Small registers keep their true density-matrix size; huge registers are bucketed.
-        return std::clamp<std::size_t>(
-            stateCount,
-            2U,
-            64U
-        );
-    }
-
-    [[nodiscard]] DensityBinSample densityBin(
-        const quantum_sim::quantum::QuantumRegister &state,
-        const std::size_t binIndex,
-        const std::size_t binCount
-    ) {
-        const std::size_t stateCount =
-                state.stateCount();
-
-        const std::size_t firstState =
-                std::min(
-                    stateCount - 1U,
-                    binIndex * stateCount / binCount
-                );
-
-        const std::size_t lastState =
-                std::min(
-                    stateCount,
-                    std::max<std::size_t>(
-                        firstState + 1U,
-                        ((binIndex + 1U) * stateCount + binCount - 1U) /
-                        binCount
-                    )
-                );
-
-        std::size_t strongestState =
-                firstState;
-
-        double probability =
-                0.0;
-
-        double phase =
-                0.0;
-
-        for (std::size_t stateIndex = firstState; stateIndex < lastState; ++stateIndex) {
-            const double candidateProbability =
-                    state.probability(stateIndex);
-
-            if (candidateProbability >= probability) {
-                strongestState =
-                        stateIndex;
-
-                probability =
-                        candidateProbability;
-
-                const auto &amplitude =
-                        state.amplitude(stateIndex);
-
-                phase =
-                        std::atan2(
-                            amplitude.imaginary(),
-                            amplitude.real()
-                        );
-            }
-        }
-
-        return DensityBinSample{
-            firstState,
-            lastState,
-            strongestState,
-            probability,
-            phase
-        };
-    }
-
-    [[nodiscard]] std::vector<DensityBinSample> densityBins(
-        const quantum_sim::quantum::QuantumRegister &state,
-        const std::size_t binCount
-    ) {
-        std::vector<DensityBinSample> bins;
-        bins.reserve(binCount);
-
-        for (std::size_t bin = 0; bin < binCount; ++bin) {
-            bins.push_back(
-                densityBin(state, bin, binCount)
-            );
-        }
-
-        return bins;
     }
 }
 
@@ -245,6 +131,8 @@ namespace quantum_sim::gui {
         const debug::DebuggerSnapshot &snapshot,
         const circuit::QuantumCircuit &circuit,
         std::optional<std::size_t> selectedInstructionIndex,
+        const qave::DensityStack &densityStack,
+        std::size_t &selectedDensityLayer,
         ImFont *headingFont
     ) {
         drawHeader(snapshot, selectedInstructionIndex, headingFont);
@@ -252,11 +140,24 @@ namespace quantum_sim::gui {
         const bool jumpedToInstruction =
         drawInstructionSummary(session, snapshot, circuit, selectedInstructionIndex);
 
-        // A selected gate inspects its post-step state; otherwise use live debugger state.
-        const quantum::QuantumRegister &currentState =
-                resolveInspectedState(session, snapshot, selectedInstructionIndex);
+        if (
+            jumpedToInstruction &&
+            selectedInstructionIndex.has_value()
+        ) {
+            selectedDensityLayer =
+                    std::min(
+                        selectedInstructionIndex.value() + 1U,
+                        densityStack.layers.empty()
+                            ? 0U
+                            : densityStack.layers.size() - 1U
+                    );
+        }
 
-        drawQuantumState(currentState);
+        drawQuantumState(
+            session,
+            densityStack,
+            selectedDensityLayer
+        );
 
         drawDebuggerControls(session, snapshot);
 
@@ -573,14 +474,34 @@ namespace quantum_sim::gui {
         return jumpedToInstruction;
     }
 
-    void InspectorPanel::drawQuantumState(const quantum::QuantumRegister &state) {
+    void InspectorPanel::drawQuantumState(
+        debug::DebuggerSession &session,
+        const qave::DensityStack &densityStack,
+        std::size_t &selectedDensityLayer
+    ) {
         ImGui::Spacing();
         ImGui::SeparatorText("Quantum State");
 
-        drawStateHeatmap(state);
-        drawProbabilities(state);
-        drawAmplitudes(state);
-        drawBlochInformation(state);
+        drawLayerStack(
+            session,
+            densityStack,
+            selectedDensityLayer
+        );
+
+        const quantum::QuantumRegister *state =
+                &session.initialState();
+
+        if (
+            selectedDensityLayer > 0U &&
+            selectedDensityLayer - 1U < session.stepCount()
+        ) {
+            state =
+                    &session.stepAt(selectedDensityLayer - 1U).state;
+        }
+
+        drawProbabilities(*state);
+        drawAmplitudes(*state);
+        drawBlochInformation(*state);
     }
 
     void InspectorPanel::drawProbabilities(const quantum::QuantumRegister &state) {
@@ -637,21 +558,110 @@ namespace quantum_sim::gui {
         }
     }
 
-    void InspectorPanel::drawStateHeatmap(const quantum::QuantumRegister &state) {
+    void InspectorPanel::drawLayerStack(
+        debug::DebuggerSession &session,
+        const qave::DensityStack &densityStack,
+        std::size_t &selectedDensityLayer
+    ) {
         ImGui::Spacing();
-        ImGui::TextDisabled("Amplitude field");
+        ImGui::TextDisabled("Layer stack");
+
+        if (densityStack.layers.empty()) {
+            ImGui::TextDisabled("No density history is available.");
+            return;
+        }
+
+        selectedDensityLayer =
+                std::min(
+                    selectedDensityLayer,
+                    densityStack.layers.size() - 1U
+                );
+
+        int layer =
+                static_cast<int>(selectedDensityLayer);
+
+        if (layer == 0) {
+            ImGui::BeginDisabled();
+        }
+
+        if (ImGui::Button("<##PreviousDensityLayer")) {
+            --layer;
+        }
+
+        if (selectedDensityLayer == 0U) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(
+            std::max(
+                120.0F,
+                ImGui::GetContentRegionAvail().x - 36.0F
+            )
+        );
+
+        const bool sliderChanged =
+                ImGui::SliderInt(
+                    "##DensityLayer",
+                    &layer,
+                    0,
+                    static_cast<int>(densityStack.layers.size() - 1U),
+                    "layer %d"
+                );
+
+        ImGui::SameLine();
+
+        if (selectedDensityLayer + 1U >= densityStack.layers.size()) {
+            ImGui::BeginDisabled();
+        }
+
+        if (ImGui::Button(">##NextDensityLayer")) {
+            ++layer;
+        }
+
+        if (selectedDensityLayer + 1U >= densityStack.layers.size()) {
+            ImGui::EndDisabled();
+        }
+
+        if (
+            sliderChanged ||
+            layer != static_cast<int>(selectedDensityLayer)
+        ) {
+            selectedDensityLayer =
+                    static_cast<std::size_t>(
+                        std::clamp(
+                            layer,
+                            0,
+                            static_cast<int>(densityStack.layers.size() - 1U)
+                        )
+                    );
+
+            if (selectedDensityLayer > 0U && session.hasSteps()) {
+                session.moveToStep(selectedDensityLayer - 1U);
+            }
+        }
+
+        const qave::DensityLayer &densityLayer =
+                densityStack.layers[selectedDensityLayer];
 
         const float availableWidth =
                 std::max(220.0F, ImGui::GetContentRegionAvail().x);
 
-        const std::size_t stateCount =
-                state.stateCount();
-
         const std::size_t gridDimension =
-                heatmapDimension(stateCount);
+                densityLayer.dimension;
 
-        const std::vector<DensityBinSample> bins =
-                densityBins(state, gridDimension);
+        double layerMaximumMagnitude{};
+
+        for (const qave::DensityCell &cell : densityLayer.cells) {
+            layerMaximumMagnitude =
+                    std::max(
+                        layerMaximumMagnitude,
+                        cell.magnitude
+                    );
+        }
+
+        layerMaximumMagnitude =
+                std::max(layerMaximumMagnitude, 1e-12);
 
         const float panelWidth =
                 std::clamp(
@@ -661,8 +671,8 @@ namespace quantum_sim::gui {
                 );
 
         constexpr float padding = 10.0F;
-        constexpr float headerHeight = 26.0F;
-        constexpr float legendHeight = 24.0F;
+        constexpr float headerHeight = 34.0F;
+        constexpr float legendHeight = 30.0F;
 
         const float gridSide =
                 std::max(
@@ -687,7 +697,7 @@ namespace quantum_sim::gui {
                 ImGui::GetCursorScreenPos();
 
         ImGui::InvisibleButton(
-            "StateHeatmapCanvas",
+            "DensityLayerCanvas",
             canvasSize
         );
 
@@ -710,34 +720,42 @@ namespace quantum_sim::gui {
             1.0F
         );
 
-        const std::string headerPrefix =
-                "P - rho - ";
-
-        const std::string headerSize =
-                std::to_string(gridDimension) + "x" + std::to_string(gridDimension);
-
         const ImVec2 headerPosition{
             origin.x + padding,
             origin.y + 7.0F
         };
 
+        const std::string header =
+                "rho - 2D - LAYER " +
+                std::to_string(selectedDensityLayer) +
+                "/" +
+                std::to_string(densityStack.layers.size() - 1U) +
+                " - " +
+                std::to_string(gridDimension) +
+                "x" +
+                std::to_string(gridDimension);
+
         drawList->AddText(
             headerPosition,
             IM_COL32(139, 160, 193, 255),
-            headerPrefix.c_str()
+            header.c_str()
         );
 
-        const ImVec2 headerPrefixSize =
-                ImGui::CalcTextSize(headerPrefix.c_str());
+        if (densityLayer.bucketed) {
+            const std::string bucketLabel =
+                    "bucketed from " +
+                    std::to_string(densityLayer.sourceStateCount) +
+                    " states";
 
-        drawList->AddText(
-            ImVec2{
-                headerPosition.x + headerPrefixSize.x,
-                headerPosition.y
-            },
-            IM_COL32(255, 197, 53, 255),
-            headerSize.c_str()
-        );
+            drawList->AddText(
+                ImVec2{
+                    headerPosition.x,
+                    headerPosition.y + 17.0F
+                },
+                IM_COL32(95, 117, 151, 255),
+                bucketLabel.c_str()
+            );
+        }
 
         const ImVec2 gridOrigin{
             origin.x + padding,
@@ -758,20 +776,13 @@ namespace quantum_sim::gui {
 
         for (std::size_t row = 0; row < gridDimension; ++row) {
             for (std::size_t column = 0; column < gridDimension; ++column) {
-                const double magnitude =
-                        std::clamp(
-                            std::sqrt(
-                                bins[row].probability *
-                                bins[column].probability
-                            ) * std::sqrt(static_cast<double>(stateCount)),
-                            0.0,
-                            1.0
-                        );
+                const qave::DensityCell &cell =
+                        densityLayer.cellAt(row, column);
 
-                const double phase =
-                        bins[row].phase - bins[column].phase;
+                const double normalizedMagnitude =
+                        cell.magnitude /
+                        layerMaximumMagnitude;
 
-                // Each cell encodes one bucket of rho = |psi><psi| coherence.
                 const ImVec2 minimum{
                     gridOrigin.x + static_cast<float>(column) * cellSize + cellInset * 0.5F,
                     gridOrigin.y + static_cast<float>(row) * cellSize + cellInset * 0.5F
@@ -785,28 +796,15 @@ namespace quantum_sim::gui {
                 drawList->AddRectFilled(
                     minimum,
                     maximum,
-                    magnitude <= 0.002
-                        ? IM_COL32(30, 17, 69, 198)
-                        : probabilityColor(magnitude, phase),
+                    normalizedMagnitude <= 0.002
+                        ? IM_COL32(22, 19, 47, 255)
+                        : densityColor(
+                            normalizedMagnitude,
+                            cell.phaseRadians
+                        ),
                     gridDimension <= 32U ? 1.5F : 0.7F
                 );
             }
-        }
-
-        if (gridDimension < stateCount) {
-            const std::string bucketLabel =
-                    "bucketed from " +
-                    std::to_string(stateCount) +
-                    " states";
-
-            drawList->AddText(
-                ImVec2{
-                    headerPosition.x,
-                    headerPosition.y + 17.0F
-                },
-                IM_COL32(95, 117, 151, 255),
-                bucketLabel.c_str()
-            );
         }
 
         const std::size_t gridLineStride =
@@ -875,13 +873,17 @@ namespace quantum_sim::gui {
             drawList->AddRectFilled(
                 minimum,
                 maximum,
-                probabilityColor(t * t, 0.0),
+                densityColor(
+                    1.0,
+                    -3.141592653589793 +
+                    6.283185307179586 * static_cast<double>(t)
+                ),
                 0.0F
             );
         }
 
         const char *legendLabel =
-                "|P| low-high";
+                "phase -pi..+pi";
 
         const ImVec2 legendLabelSize =
                 ImGui::CalcTextSize(legendLabel);
@@ -921,56 +923,43 @@ namespace quantum_sim::gui {
                             )
                         );
 
-                const DensityBinSample &rowBin =
-                        bins[row];
+                const qave::DensityCell &cell =
+                        densityLayer.cellAt(row, column);
 
-                const DensityBinSample &columnBin =
-                        bins[column];
+                const qave::DensityBin &rowBin =
+                        densityLayer.bins[row];
 
-                if (
-                    rowBin.firstState < rowBin.lastState &&
-                    columnBin.firstState < columnBin.lastState
-                ) {
-                    const quantum::StateInfo rowInfo =
-                            state.stateInfo(rowBin.strongestState);
+                const qave::DensityBin &columnBin =
+                        densityLayer.bins[column];
 
-                    const quantum::StateInfo columnInfo =
-                            state.stateInfo(columnBin.strongestState);
+                ImGui::BeginTooltip();
+                ImGui::Text(
+                    "rho[%zu][%zu]",
+                    row,
+                    column
+                );
+                ImGui::Text("row %s", rowBin.label.c_str());
+                ImGui::Text("col %s", columnBin.label.c_str());
 
-                    const double magnitude =
-                            std::sqrt(
-                                rowBin.probability *
-                                columnBin.probability
-                            );
-
-                    ImGui::BeginTooltip();
-                    ImGui::Text("rho cell %zux%zu", column, row);
-                    ImGui::Text("row %s", rowInfo.label.c_str());
-                    ImGui::Text("col %s", columnInfo.label.c_str());
-
-                    if (rowBin.lastState - rowBin.firstState > 1U) {
-                        ImGui::Text(
-                            "row bucket %zu-%zu",
-                            rowBin.firstState,
-                            rowBin.lastState - 1U
-                        );
-                    }
-
-                    if (columnBin.lastState - columnBin.firstState > 1U) {
-                        ImGui::Text(
-                            "col bucket %zu-%zu",
-                            columnBin.firstState,
-                            columnBin.lastState - 1U
-                        );
-                    }
-
+                if (densityLayer.bucketed) {
                     ImGui::Text(
-                        "|rho| %.6f",
-                        magnitude
+                        "row states %zu-%zu",
+                        rowBin.firstState,
+                        rowBin.lastState - 1U
                     );
-
-                    ImGui::EndTooltip();
+                    ImGui::Text(
+                        "col states %zu-%zu",
+                        columnBin.firstState,
+                        columnBin.lastState - 1U
+                    );
                 }
+
+                ImGui::Text("|rho|       %.8f", cell.magnitude);
+                ImGui::Text("intensity   %.8f", cell.intensity);
+                ImGui::Text("phase       %.6f rad", cell.phaseRadians);
+                ImGui::Text("Re(rho)     %.8f", cell.real);
+                ImGui::Text("Im(rho)     %.8f", cell.imaginary);
+                ImGui::EndTooltip();
             }
         }
     }
@@ -1241,22 +1230,4 @@ namespace quantum_sim::gui {
         }
     }
 
-    const quantum::QuantumRegister &
-    InspectorPanel::resolveInspectedState(
-        const debug::DebuggerSession &session,
-        const debug::DebuggerSnapshot &snapshot,
-        std::optional<std::size_t> selectedInstructionIndex
-    ) const {
-        if (
-            selectedInstructionIndex.has_value() &&
-            selectedInstructionIndex.value() < session.stepCount()
-        ) {
-            // Renderer selection is expressed as the state after that instruction.
-            return session
-                    .stepAt(selectedInstructionIndex.value())
-                    .state;
-        }
-
-        return snapshot.afterState.get();
-    }
 }

@@ -7,6 +7,7 @@
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/gui/rendering/QaveDensityModel.hpp"
 
 #include <sstream>
 #include <iostream>
@@ -97,6 +98,70 @@ int main() {
     check(
         approximatelyEqual(totalProbability, 1.0),
         "QFT showcase preserves total probability"
+    );
+
+    QuantumCircuit densityCircuit{1};
+    densityCircuit.addSingleQubitGate(
+        "H",
+        quantum_sim::gates::hadamardGate(),
+        0
+    );
+    densityCircuit.addSingleQubitGate(
+        "S",
+        quantum_sim::gates::sGate(),
+        0
+    );
+
+    quantum_sim::debug::DebuggerSession densitySession{
+        densityCircuit,
+        QuantumRegister::basisState(1, 0)
+    };
+
+    const quantum_sim::gui::qave::DensityStack densityStack =
+            quantum_sim::gui::qave::DensityModel::build(
+                densitySession,
+                16U
+            );
+
+    check(
+        densityStack.layers.size() == densitySession.stepCount() + 1U,
+        "QAVE density history includes the initial state and every circuit step"
+    );
+
+    check(
+        densityStack.layers.front().dimension == 2U &&
+        approximatelyEqual(
+            densityStack.layers.front().cellAt(0, 0).magnitude,
+            1.0
+        ) &&
+        approximatelyEqual(
+            densityStack.layers.front().cellAt(0, 1).magnitude,
+            0.0
+        ),
+        "QAVE initial density layer preserves the exact basis-state matrix"
+    );
+
+    const auto &hadamardCoherence =
+            densityStack.layers.at(1).cellAt(0, 1);
+
+    check(
+        approximatelyEqual(hadamardCoherence.magnitude, 0.5) &&
+        approximatelyEqual(hadamardCoherence.real, 0.5) &&
+        approximatelyEqual(hadamardCoherence.imaginary, 0.0),
+        "QAVE density cells preserve Hadamard coherence"
+    );
+
+    const auto &phaseCoherence =
+            densityStack.layers.at(2).cellAt(0, 1);
+
+    check(
+        approximatelyEqual(phaseCoherence.magnitude, 0.5) &&
+        approximatelyEqual(
+            phaseCoherence.phaseRadians,
+            -std::numbers::pi / 2.0
+        ) &&
+        approximatelyEqual(phaseCoherence.imaginary, -0.5),
+        "QAVE density cells preserve phase in radians and complex components"
     );
 
     const QuantumRegister qftSourceState =
