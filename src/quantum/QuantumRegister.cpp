@@ -61,25 +61,103 @@ namespace quantum_sim::quantum {
             throw std::out_of_range{"Target qubit index is outside the register."};
         }
 
-        math::ComplexMatrix combinedGate =
-                math::ComplexMatrix::identity(1);
+        const std::size_t targetMask =
+                std::size_t{1} << (qubitCount_ - 1U - targetQubit);
 
-        // Build I tensor I tensor gate tensor I ... so the 2x2 gate acts on
-        // the requested qubit while all other qubits pass through unchanged.
-        for (std::size_t qubit{}; qubit < qubitCount_; ++qubit) {
-            math::ComplexMatrix operationForThisQubit =
-                    math::ComplexMatrix::identity(2);
+        std::vector<math::Complex> transformed(stateCount(), math::Complex{});
 
-            if (qubit == targetQubit) {
-                operationForThisQubit = gate;
+        // Each zero-bit index owns one independent |0>, |1> amplitude pair.
+        // Applying the 2x2 matrix to those pairs avoids a 2^n by 2^n expansion.
+        for (std::size_t zeroState{}; zeroState < stateCount(); ++zeroState) {
+            if ((zeroState & targetMask) != 0U) {
+                continue;
             }
-            combinedGate = combinedGate.tensorProduct(operationForThisQubit);
+
+            const std::size_t oneState =
+                    zeroState | targetMask;
+
+            const math::Complex &zeroAmplitude =
+                    amplitudes_.at(zeroState);
+
+            const math::Complex &oneAmplitude =
+                    amplitudes_.at(oneState);
+
+            transformed[zeroState] =
+                    gate.at(0U, 0U) * zeroAmplitude +
+                    gate.at(0U, 1U) * oneAmplitude;
+
+            transformed[oneState] =
+                    gate.at(1U, 0U) * zeroAmplitude +
+                    gate.at(1U, 1U) * oneAmplitude;
         }
 
-        const math::ComplexVector transformedAmplitudes =
-                combinedGate * amplitudes_;
+        return QuantumRegister{
+            qubitCount_,
+            math::ComplexVector{std::move(transformed)}
+        };
+    }
 
-        return QuantumRegister{qubitCount_, transformedAmplitudes};
+    QuantumRegister QuantumRegister::applyTwoQubitGate(
+        const math::ComplexMatrix &gate,
+        const std::size_t firstQubit,
+        const std::size_t secondQubit
+    ) const {
+        if (gate.rows() != 4U || gate.columns() != 4U) {
+            throw std::invalid_argument{"A two-qubit gate must be a 4 by 4 matrix."};
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{"A quantum gate must be unitary."};
+        }
+
+        if (firstQubit >= qubitCount_ || secondQubit >= qubitCount_) {
+            throw std::out_of_range{"Two-qubit gate index is outside the register."};
+        }
+
+        if (firstQubit == secondQubit) {
+            throw std::invalid_argument{"A two-qubit gate requires two different qubits."};
+        }
+
+        const std::size_t firstMask =
+                std::size_t{1} << (qubitCount_ - 1U - firstQubit);
+
+        const std::size_t secondMask =
+                std::size_t{1} << (qubitCount_ - 1U - secondQubit);
+
+        std::vector<math::Complex> transformed(stateCount(), math::Complex{});
+
+        // A base state with both selected bits clear identifies one independent
+        // four-amplitude block in local |00>, |01>, |10>, |11> order.
+        for (std::size_t baseState{}; baseState < stateCount(); ++baseState) {
+            if ((baseState & firstMask) != 0U ||
+                (baseState & secondMask) != 0U) {
+                continue;
+            }
+
+            const std::size_t stateIndices[4]{
+                baseState,
+                baseState | secondMask,
+                baseState | firstMask,
+                baseState | firstMask | secondMask
+            };
+
+            for (std::size_t output = 0U; output < 4U; ++output) {
+                math::Complex sum{};
+
+                for (std::size_t input = 0U; input < 4U; ++input) {
+                    sum +=
+                            gate.at(output, input) *
+                            amplitudes_.at(stateIndices[input]);
+                }
+
+                transformed[stateIndices[output]] = sum;
+            }
+        }
+
+        return QuantumRegister{
+            qubitCount_,
+            math::ComplexVector{std::move(transformed)}
+        };
     }
 
     QuantumRegister QuantumRegister::applyGate(const math::ComplexMatrix &gate) const {

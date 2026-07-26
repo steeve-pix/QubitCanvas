@@ -30,9 +30,9 @@ namespace quantum_sim::algorithms {
 
         // H creates superposition; CX entangles q1 with q0.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
-        circuit.addControlledGate(
+        circuit.addTwoQubitGate(
             "CX",
-            gates::cxGate(qubitCount, 0, 1),
+            gates::cxGate(),
             0,
             1
         );
@@ -81,9 +81,9 @@ namespace quantum_sim::algorithms {
                     halfAngleRadians
                 );
 
-                circuit.addControlledGate(
+                circuit.addTwoQubitGate(
                     "CX",
-                    gates::cxGate(qubitCount, control, target),
+                    gates::cxGate(),
                     control,
                     target
                 );
@@ -95,9 +95,9 @@ namespace quantum_sim::algorithms {
                     -halfAngleRadians
                 );
 
-                circuit.addControlledGate(
+                circuit.addTwoQubitGate(
                     "CX",
-                    gates::cxGate(qubitCount, control, target),
+                    gates::cxGate(),
                     control,
                     target
                 );
@@ -112,9 +112,9 @@ namespace quantum_sim::algorithms {
         }
 
         for (std::size_t qubit = 0; qubit < qubitCount / 2U; ++qubit) {
-            circuit.addControlledGate(
+            circuit.addTwoQubitGate(
                 "SWAP",
-                gates::swapGate(qubitCount, qubit, qubitCount - 1U - qubit),
+                gates::swapGate(),
                 qubit,
                 qubitCount - 1U - qubit
             );
@@ -175,13 +175,9 @@ namespace quantum_sim::algorithms {
 
         // SWAP is self-inverse, but the layer order must still be reversed.
         for (std::size_t swapIndex = qubitCount / 2U; swapIndex-- > 0U;) {
-            circuit.addControlledGate(
+            circuit.addTwoQubitGate(
                 "SWAP",
-                gates::swapGate(
-                    qubitCount,
-                    swapIndex,
-                    qubitCount - 1U - swapIndex
-                ),
+                gates::swapGate(),
                 swapIndex,
                 qubitCount - 1U - swapIndex
             );
@@ -205,9 +201,9 @@ namespace quantum_sim::algorithms {
                     -halfAngleRadians
                 );
 
-                circuit.addControlledGate(
+                circuit.addTwoQubitGate(
                     "CX",
-                    gates::cxGate(qubitCount, control, target),
+                    gates::cxGate(),
                     control,
                     target
                 );
@@ -219,9 +215,9 @@ namespace quantum_sim::algorithms {
                     halfAngleRadians
                 );
 
-                circuit.addControlledGate(
+                circuit.addTwoQubitGate(
                     "CX",
-                    gates::cxGate(qubitCount, control, target),
+                    gates::cxGate(),
                     control,
                     target
                 );
@@ -258,9 +254,9 @@ namespace quantum_sim::algorithms {
             const std::size_t control =
                     target - 1U;
 
-            circuit.addControlledGate(
+            circuit.addTwoQubitGate(
                 "CX",
-                gates::cxGate(qubitCount, control, target),
+                gates::cxGate(),
                 control,
                 target
             );
@@ -283,9 +279,9 @@ namespace quantum_sim::algorithms {
         // Uniform preparation followed by a CZ oracle that marks |11>.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
-        circuit.addControlledGate(
+        circuit.addTwoQubitGate(
             "CZ",
-            gates::czGate(qubitCount, 0, 1),
+            gates::czGate(),
             0,
             1
         );
@@ -295,9 +291,9 @@ namespace quantum_sim::algorithms {
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
         circuit.addSingleQubitGate("X", gates::xGate(), 0);
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
-        circuit.addControlledGate(
+        circuit.addTwoQubitGate(
             "CZ",
-            gates::czGate(qubitCount, 0, 1),
+            gates::czGate(),
             0,
             1
         );
@@ -336,9 +332,9 @@ namespace quantum_sim::algorithms {
 
         // One oracle control per input computes the balanced parity function.
         for (std::size_t input = 0; input < ancilla; ++input) {
-            circuit.addControlledGate(
+            circuit.addTwoQubitGate(
                 "CX",
-                gates::cxGate(qubitCount, input, ancilla),
+                gates::cxGate(),
                 input,
                 ancilla
             );
@@ -403,9 +399,9 @@ namespace quantum_sim::algorithms {
                 continue;
             }
 
-            circuit.addControlledGate(
+            circuit.addTwoQubitGate(
                 "CX",
-                gates::cxGate(qubitCount, qubit, ancilla),
+                gates::cxGate(),
                 qubit,
                 ancilla
             );
@@ -437,32 +433,32 @@ namespace quantum_sim::algorithms {
         circuit.addSingleQubitGate("X", gates::xGate(), 0);
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 2);
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 1, 2), 1, 2);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 1, 2);
         circuit.addSingleQubitGate(
             "Tdg",
             gates::tDaggerGate(),
             2
         );
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 2), 0, 2);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0, 2);
         circuit.addSingleQubitGate("T", gates::tGate(), 2);
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 1, 2), 1, 2);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 1, 2);
         circuit.addSingleQubitGate(
             "Tdg",
             gates::tDaggerGate(),
             2
         );
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 2), 0, 2);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0, 2);
         circuit.addSingleQubitGate("T", gates::tGate(), 1);
         circuit.addSingleQubitGate("T", gates::tGate(), 2);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 2);
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 1), 0, 1);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0, 1);
         circuit.addSingleQubitGate("T", gates::tGate(), 0);
         circuit.addSingleQubitGate(
             "Tdg",
             gates::tDaggerGate(),
             1
         );
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 1), 0, 1);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0, 1);
 
         return circuit;
     }
@@ -482,9 +478,9 @@ namespace quantum_sim::algorithms {
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
-        circuit.addControlledGate(
+        circuit.addTwoQubitGate(
             "CX",
-            gates::cxGate(qubitCount, 0, 1),
+            gates::cxGate(),
             0,
             1
         );
@@ -528,15 +524,15 @@ namespace quantum_sim::algorithms {
 
         // Create the Bell resource between q1 and q2.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 1, 2), 1, 2);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 1, 2);
 
         // Bell-basis transform of the source and sender resource qubit.
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 0, 1), 0, 1);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0, 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
 
         // Coherent controls model the classical X/Z corrections without measurement.
-        circuit.addControlledGate("CX", gates::cxGate(qubitCount, 1, 2), 1, 2);
-        circuit.addControlledGate("CZ", gates::czGate(qubitCount, 0, 2), 0, 2);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 1, 2);
+        circuit.addTwoQubitGate("CZ", gates::czGate(), 0, 2);
 
         return circuit;
     }
@@ -577,20 +573,20 @@ namespace quantum_sim::algorithms {
         }
 
         for (std::size_t qubit = 0; qubit + 1U < qubitCount; ++qubit) {
-            circuit.addControlledGate(
+            circuit.addTwoQubitGate(
                 qubit % 2U == 0U ? "CX" : "CZ",
                 qubit % 2U == 0U
-                    ? gates::cxGate(qubitCount, qubit, qubit + 1U)
-                    : gates::czGate(qubitCount, qubit, qubit + 1U),
+                    ? gates::cxGate()
+                    : gates::czGate(),
                 qubit,
                 qubit + 1U
             );
         }
 
         if (qubitCount > 2U) {
-            circuit.addControlledGate(
+            circuit.addTwoQubitGate(
                 "SWAP",
-                gates::swapGate(qubitCount, 0, qubitCount - 1U),
+                gates::swapGate(),
                 0,
                 qubitCount - 1U
             );

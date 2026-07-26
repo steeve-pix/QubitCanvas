@@ -24,6 +24,7 @@ namespace quantum_sim::circuit {
      */
     enum class CircuitInstructionKind {
         SingleQubit,
+        TwoQubit,
         FullRegister
     };
 
@@ -72,6 +73,27 @@ namespace quantum_sim::circuit {
             math::ComplexMatrix gate,
             std::size_t targetQubit,
             std::optional<double> angleRadians = std::nullopt
+        );
+
+        /**
+         * Appends a compact two-qubit instruction.
+         *
+         * The 4x4 matrix uses local |00>, |01>, |10>, |11> ordering, with
+         * firstQubit represented by the first bit. Keeping the local matrix
+         * compact prevents controlled gates from consuming O(4^n) memory.
+         *
+         * @param name Display name for the gate.
+         * @param gate 4x4 unitary matrix.
+         * @param firstQubit Control or first gate operand.
+         * @param secondQubit Target or second gate operand.
+         * @throws std::invalid_argument if the qubits match or gate is invalid.
+         * @throws std::out_of_range if either qubit is outside the circuit.
+         */
+        void addTwoQubitGate(
+            std::string name,
+            math::ComplexMatrix gate,
+            std::size_t firstQubit,
+            std::size_t secondQubit
         );
 
         /**
@@ -171,6 +193,25 @@ namespace quantum_sim::circuit {
         );
 
         /**
+         * Inserts a compact two-qubit instruction before the requested index.
+         *
+         * @param instructionIndex Insert position; values past the end append.
+         * @param name Display name for the gate.
+         * @param gate 4x4 unitary matrix in first/second local basis order.
+         * @param firstQubit Control or first gate operand.
+         * @param secondQubit Target or second gate operand.
+         * @throws std::invalid_argument if the qubits match or gate is invalid.
+         * @throws std::out_of_range if either qubit is outside the circuit.
+         */
+        void insertTwoQubitGate(
+            std::size_t instructionIndex,
+            std::string name,
+            math::ComplexMatrix gate,
+            std::size_t firstQubit,
+            std::size_t secondQubit
+        );
+
+        /**
          * Inserts a two-qubit full-register instruction before the requested index.
          *
          * @param instructionIndex Insert position; values past the end append.
@@ -192,6 +233,13 @@ namespace quantum_sim::circuit {
             std::optional<double> angleRadians;
         };
 
+        struct TwoQubitInstruction {
+            std::string name;
+            math::ComplexMatrix gate;
+            std::size_t firstQubit;
+            std::size_t secondQubit;
+        };
+
         struct FullRegisterInstruction {
             std::string name;
             math::ComplexMatrix gate;
@@ -199,7 +247,11 @@ namespace quantum_sim::circuit {
             std::optional<std::size_t> targetQubit;
         };
 
-        using Instruction = std::variant<SingleQubitInstruction, FullRegisterInstruction>;
+        using Instruction = std::variant<
+            SingleQubitInstruction,
+            TwoQubitInstruction,
+            FullRegisterInstruction
+        >;
 
         std::size_t qubitCount_;
         std::vector<Instruction> instructions_;

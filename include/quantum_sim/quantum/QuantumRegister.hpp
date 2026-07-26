@@ -79,6 +79,29 @@ namespace quantum_sim::quantum {
                                                            std::size_t targetQubit) const;
 
         /**
+         * Applies a compact 4x4 gate to any two qubits without expanding it.
+         *
+         * Local matrix basis ordering is |00>, |01>, |10>, |11>, where the
+         * first bit belongs to firstQubit and the second bit belongs to
+         * secondQubit. The operation visits each amplitude exactly once, so
+         * memory and execution scale with the state vector rather than with a
+         * stateCount() by stateCount() matrix.
+         *
+         * @param gate Two-qubit unitary matrix.
+         * @param firstQubit Qubit represented by the first local basis bit.
+         * @param secondQubit Qubit represented by the second local basis bit.
+         * @return New register after the transformation.
+         * @throws std::invalid_argument if gate is not a 4x4 unitary or the
+         * qubit indices are equal.
+         * @throws std::out_of_range if either qubit is outside the register.
+         */
+        [[nodiscard]] QuantumRegister applyTwoQubitGate(
+            const math::ComplexMatrix &gate,
+            std::size_t firstQubit,
+            std::size_t secondQubit
+        ) const;
+
+        /**
          * Applies a full-register unitary matrix.
          *
          * @param gate Matrix sized stateCount() by stateCount().

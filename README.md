@@ -125,7 +125,12 @@ be located at `build\Debug\qubit_canvas.exe`.
 ## Numerical Behavior
 
 The simulation core stores the complete state vector, so its memory and
-execution cost scale exponentially with qubit count.
+execution cost scale exponentially with qubit count. Single-qubit and
+two-qubit instructions remain compact as 2x2 and 4x4 matrices and are applied
+directly to amplitude pairs or quartets. They therefore use O(2^n) execution
+memory instead of expanding every gate into an O(4^n) full-register matrix.
+The explicit full-register gate API remains available for custom unitaries
+that genuinely require it.
 
 Density matrices with at most 16 basis states are rendered exactly. Larger
 registers are grouped into a maximum 16x16 display using
@@ -134,6 +139,10 @@ views readable without changing the simulator's underlying quantum state.
 
 Near-zero density values retain their base grid cell but do not create noisy
 tiny magnitude voxels.
+
+The OpenGL history mesh grows with the debugger layers that are currently
+visible. Loading a long circuit does not preallocate CPU and GPU geometry for
+every future playback step.
 
 ## Project Layout
 

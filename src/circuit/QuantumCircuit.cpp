@@ -47,6 +47,38 @@ namespace quantum_sim::circuit {
         );
     }
 
+    void QuantumCircuit::addTwoQubitGate(
+        std::string name,
+        math::ComplexMatrix gate,
+        const std::size_t firstQubit,
+        const std::size_t secondQubit
+    ) {
+        if (gate.rows() != 4U || gate.columns() != 4U) {
+            throw std::invalid_argument{"A two-qubit gate must be a 4 by 4 matrix."};
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{"A quantum gate must be unitary."};
+        }
+
+        if (firstQubit >= qubitCount_ || secondQubit >= qubitCount_) {
+            throw std::out_of_range{"Two-qubit gate index is outside the circuit."};
+        }
+
+        if (firstQubit == secondQubit) {
+            throw std::invalid_argument{"A two-qubit gate requires two different qubits."};
+        }
+
+        instructions_.push_back(
+            TwoQubitInstruction{
+                std::move(name),
+                std::move(gate),
+                firstQubit,
+                secondQubit
+            }
+        );
+    }
+
     void QuantumCircuit::addFullRegisterGate(std::string name, math::ComplexMatrix gate) {
         const std::size_t expectedSize =
                 std::size_t{1} << qubitCount_;
@@ -88,6 +120,13 @@ namespace quantum_sim::circuit {
                                currentState =
                                        currentState.applySingleQubitGate(
                                            actualInstruction.gate, actualInstruction.targetQubit);
+                           } else if constexpr (std::is_same_v<InstructionType, TwoQubitInstruction>) {
+                               currentState =
+                                       currentState.applyTwoQubitGate(
+                                           actualInstruction.gate,
+                                           actualInstruction.firstQubit,
+                                           actualInstruction.secondQubit
+                                       );
                            } else {
                                currentState = currentState.applyGate(actualInstruction.gate);
                            }
@@ -142,6 +181,18 @@ namespace quantum_sim::circuit {
                                 std::to_string(actualInstruction.angleRadians.value()) +
                                 " radians";
                     }
+                } else if constexpr (std::is_same_v<InstructionType, TwoQubitInstruction>) {
+                    currentState = currentState.applyTwoQubitGate(
+                        actualInstruction.gate,
+                        actualInstruction.firstQubit,
+                        actualInstruction.secondQubit
+                    );
+                    description =
+                            actualInstruction.name +
+                            " on qubits " +
+                            std::to_string(actualInstruction.firstQubit) +
+                            " and " +
+                            std::to_string(actualInstruction.secondQubit);
                 } else {
                     currentState = currentState.applyGate(actualInstruction.gate);
                     description = actualInstruction.name;
@@ -171,6 +222,15 @@ namespace quantum_sim::circuit {
                         std::nullopt,
                         std::nullopt,
                         actualInstruction.angleRadians
+                    });
+                } else if constexpr (std::is_same_v<InstructionType, TwoQubitInstruction>) {
+                    result.push_back(CircuitInstructionInfo{
+                        actualInstruction.name,
+                        CircuitInstructionKind::TwoQubit,
+                        std::nullopt,
+                        actualInstruction.firstQubit,
+                        actualInstruction.secondQubit,
+                        std::nullopt
                     });
                 } else {
                     result.push_back(CircuitInstructionInfo{
@@ -270,6 +330,43 @@ namespace quantum_sim::circuit {
                 std::move(gate),
                 targetQubit,
                 angleRadians
+            }
+        );
+    }
+
+    void QuantumCircuit::insertTwoQubitGate(
+        const std::size_t instructionIndex,
+        std::string name,
+        math::ComplexMatrix gate,
+        const std::size_t firstQubit,
+        const std::size_t secondQubit
+    ) {
+        if (gate.rows() != 4U || gate.columns() != 4U) {
+            throw std::invalid_argument{"A two-qubit gate must be a 4 by 4 matrix."};
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{"A quantum gate must be unitary."};
+        }
+
+        if (firstQubit >= qubitCount_ || secondQubit >= qubitCount_) {
+            throw std::out_of_range{"Two-qubit gate index is outside the circuit."};
+        }
+
+        if (firstQubit == secondQubit) {
+            throw std::invalid_argument{"A two-qubit gate requires two different qubits."};
+        }
+
+        const std::size_t clampedIndex =
+                std::min(instructionIndex, instructions_.size());
+
+        instructions_.insert(
+            instructions_.begin() + static_cast<ptrdiff_t>(clampedIndex),
+            TwoQubitInstruction{
+                std::move(name),
+                std::move(gate),
+                firstQubit,
+                secondQubit
             }
         );
     }
