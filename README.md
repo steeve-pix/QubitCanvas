@@ -23,17 +23,17 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 ## Density Volume
 
 The Density Volume panel converts each debugger state into
-`ρ = |ψ><ψ|` and renders every visible matrix cell as an opaque indexed
-OpenGL cuboid. Magnitude controls voxel height and phase controls color.
-Dimension-aware spacing keeps full-strength cells cube-like at every matrix
-size, while indexed bevel faces and smooth lighting soften their silhouettes.
-Emissive magnitude voxels are isolated into a bright pass, blurred, and
-tone-mapped with the HDR scene so phase colors glow without transparent cubes.
+`ρ = |ψ><ψ|` and renders every matrix cell as an opaque instance of one shared
+indexed rounded cube. A compact per-instance record supplies position, scale,
+warm amplitude color, emissive strength, layer identity, and picking identity.
+Soft ambient, warm directional key, cool fill, contact darkening, HDR bloom,
+and ACES-style tone mapping give the volume readable top and side faces without
+transparent geometry. A procedural perspective grid anchors the structure.
 
 Two synchronized layouts are available:
 
-- **Layer Stack** shows the initial density matrix and every post-gate matrix
-  through the selected debugger step.
+- **Layer Stack** places complete Y-Z density matrices along the X axis and
+  reveals their pre-uploaded instances through the selected debugger step.
 - **Floor Field** shows the selected density matrix as one square X-Z grid.
 
 The inspector heatmap always follows the selected 3D layer and outlines the
@@ -137,12 +137,14 @@ registers are grouped into a maximum 16x16 display using
 probability-preserving row and column buckets. This keeps the inspector and 3D
 views readable without changing the simulator's underlying quantum state.
 
-Near-zero density values retain their base grid cell but do not create noisy
-tiny magnitude voxels.
+Near-zero density values remain as restrained dark cubes, preserving the
+matrix architecture without producing bright visual noise.
 
-The OpenGL history mesh grows with the debugger layers that are currently
-visible. Loading a long circuit does not preallocate CPU and GPU geometry for
-every future playback step.
+Layer histories use `glDrawElementsInstanced()`: the rounded cube geometry is
+uploaded once, and a ten-qubit 16x16 visualization stores one compact instance
+per displayed cell. Playback changes the submitted instance count instead of
+rebuilding geometry, which keeps the camera stable and algorithm switching
+responsive.
 
 ## Project Layout
 

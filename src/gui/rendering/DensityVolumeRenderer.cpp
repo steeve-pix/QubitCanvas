@@ -1,14 +1,15 @@
 #include "quantum_sim/gui/rendering/DensityVolumeRenderer.hpp"
 
-#include "quantum_sim/gui/rendering/DensityVolumeLayout.hpp"
-
 #include <glad/gl.h>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 
 namespace quantum_sim::gui::density_volume {
     namespace {
@@ -38,8 +39,15 @@ namespace quantum_sim::gui::density_volume {
                 '\0'
             );
 
-            glGetShaderInfoLog(shader, logLength, nullptr, log.data());
+            glGetShaderInfoLog(
+                shader,
+                logLength,
+                nullptr,
+                log.data()
+            );
+
             glDeleteShader(shader);
+
             throw std::runtime_error{
                 std::string{"Failed to compile "} + label + ": " + log
             };
@@ -80,10 +88,16 @@ namespace quantum_sim::gui::density_volume {
 
                 if (linked != GL_TRUE) {
                     int logLength{};
-                    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logLength);
+                    glGetProgramiv(
+                        program,
+                        GL_INFO_LOG_LENGTH,
+                        &logLength
+                    );
 
                     std::string log(
-                        static_cast<std::size_t>(std::max(logLength, 1)),
+                        static_cast<std::size_t>(
+                            std::max(logLength, 1)
+                        ),
                         '\0'
                     );
 
@@ -95,7 +109,10 @@ namespace quantum_sim::gui::density_volume {
                     );
 
                     throw std::runtime_error{
-                        std::string{"Failed to link "} + label + ": " + log
+                        std::string{"Failed to link "} +
+                        label +
+                        ": " +
+                        log
                     };
                 }
             } catch (...) {
@@ -116,6 +133,20 @@ namespace quantum_sim::gui::density_volume {
             glDeleteShader(fragmentShader);
             return program;
         }
+
+        void requireUniform(
+            const int location,
+            const char *name
+        ) {
+            if (location < 0) {
+                throw std::runtime_error{
+                    std::string{
+                        "Density Volume shader uniform is unavailable: "
+                    } +
+                    name
+                };
+            }
+        }
     }
 
     void Renderer::initialize() {
@@ -124,9 +155,13 @@ namespace quantum_sim::gui::density_volume {
         }
 
         try {
-            createShaderProgram();
+            voxelGeometry_ =
+                    VoxelGeometryBuilder::buildRoundedCube();
+
+            createScenePrograms();
             createPostProcessPrograms();
-            createMeshBuffers();
+            createVoxelBuffers();
+            createGridBuffers();
             createPostProcessVertexArray();
 
             glGenFramebuffers(1, &framebuffer_);
@@ -151,7 +186,9 @@ namespace quantum_sim::gui::density_volume {
         const VisualizationMode mode
     ) {
         if (!initialized_) {
-            throw std::runtime_error{"Density Volume renderer is not initialized."};
+            throw std::runtime_error{
+                "Density Volume renderer is not initialized."
+            };
         }
 
         const bool historyChanged =
@@ -160,23 +197,20 @@ namespace quantum_sim::gui::density_volume {
                 sceneMode_.value() != mode;
 
         if (stack.layers.empty()) {
-            const bool sceneChanged =
+            const bool changed =
                     historyChanged ||
-                    sceneVisibleThroughLayer_.has_value() ||
-                    indexCount_ > 0U;
+                    !scene_.voxels.empty() ||
+                    sceneSelectedLayer_.has_value();
 
-            if (!sceneChanged) {
+            if (!changed) {
                 return false;
             }
 
-            sceneMesh_ = Mesh{};
-            uploadMesh(sceneMesh_);
-            layerIndexCounts_.clear();
-            layerSceneCenters_.clear();
-            layerSceneRadii_.clear();
-            builtThroughLayer_.reset();
+            scene_ = InstanceScene{};
+            uploadInstances();
+            visibleInstanceCount_ = 0;
             sceneFingerprint_ = stack.fingerprint;
-            sceneVisibleThroughLayer_.reset();
+            sceneSelectedLayer_.reset();
             sceneMode_ = mode;
             sceneCenter_ = Vector3{};
             sceneRadius_ = 1.0F;
@@ -189,171 +223,165 @@ namespace quantum_sim::gui::density_volume {
                     stack.layers.size() - 1U
                 );
 
-        if (mode == VisualizationMode::FloorField) {
-            if (
-                !historyChanged &&
-                sceneVisibleThroughLayer_.has_value() &&
-                sceneVisibleThroughLayer_.value() == safeSelectedLayer &&
-                indexCount_ > 0U
-            ) {
-                return false;
-            }
+        const bool selectionChanged =
+                !sceneSelectedLayer_.has_value() ||
+                sceneSelectedLayer_.value() != safeSelectedLayer;
 
-            const SceneLayout layout =
-                    LayerStackLayout::buildLayer(
-                        stack.layers[safeSelectedLayer],
+        if (
+            mode == VisualizationMode::LayerStack &&
+            historyChanged
+        ) {
+            scene_ =
+                    SceneBuilder::build(
+                        stack,
+                        safeSelectedLayer,
                         mode
                     );
 
-            sceneMesh_ =
-                    MeshBuilder::build(layout);
+            uploadInstances();
+        } else if (
+            mode == VisualizationMode::FloorField &&
+            (historyChanged || selectionChanged)
+        ) {
+            scene_ =
+                    SceneBuilder::build(
+                        stack,
+                        safeSelectedLayer,
+                        mode
+                    );
 
-            uploadMesh(sceneMesh_);
-            layerIndexCounts_.clear();
-            layerSceneCenters_.clear();
-            layerSceneRadii_.clear();
-            builtThroughLayer_.reset();
-            sceneCenter_ = layout.center;
-            sceneRadius_ = layout.radius;
-            sceneFingerprint_ = stack.fingerprint;
-            sceneVisibleThroughLayer_ = safeSelectedLayer;
-            sceneMode_ = mode;
-            return true;
+            uploadInstances();
+        } else if (!historyChanged && !selectionChanged) {
+            return false;
         }
 
-        if (historyChanged) {
-            std::size_t maximumVoxelCount{};
-
-            for (const DensityLayer &layer : stack.layers) {
-                if (
-                    layer.cells.size() >
-                    (
-                        std::numeric_limits<std::size_t>::max() -
-                        maximumVoxelCount
-                    ) / 2U
-                ) {
-                    throw std::runtime_error{
-                        "Density Volume layer stack exceeds mesh capacity limits."
-                    };
-                }
-
-                maximumVoxelCount +=
-                        layer.cells.size() * 2U;
-            }
+        if (mode == VisualizationMode::LayerStack) {
+            const std::size_t visibleCount =
+                    scene_.layerEndInstanceCounts.at(
+                        safeSelectedLayer
+                    );
 
             if (
-                maximumVoxelCount >
-                std::numeric_limits<std::size_t>::max() /
-                MeshBuilder::verticesPerVoxel ||
-                maximumVoxelCount >
-                std::numeric_limits<std::size_t>::max() /
-                MeshBuilder::indicesPerBeveledVoxel
-            ) {
-                throw std::runtime_error{
-                    "Density Volume layer stack exceeds mesh capacity limits."
-                };
-            }
-
-            const std::size_t maximumIndexCount =
-                    maximumVoxelCount *
-                    MeshBuilder::indicesPerBeveledVoxel;
-
-            if (
-                maximumIndexCount >
+                visibleCount >
                 static_cast<std::size_t>(
                     std::numeric_limits<int>::max()
                 )
             ) {
                 throw std::runtime_error{
-                    "Density Volume mesh exceeds OpenGL draw-index limits."
+                    "Density Volume instance count exceeds OpenGL limits."
                 };
             }
 
-            sceneMesh_ = Mesh{};
+            visibleInstanceCount_ =
+                    static_cast<int>(visibleCount);
 
-            // Begin empty and grow with the visible debugger history. Reserving
-            // the final 260-layer mesh here made large presets allocate hundreds
-            // of megabytes before the first frame was displayed.
-            allocateMeshStorage(
-                0U,
-                0U
-            );
+            Vector3 minimum{
+                std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max()
+            };
 
-            layerIndexCounts_.assign(stack.layers.size(), 0U);
-            layerSceneCenters_.assign(
-                stack.layers.size(),
-                Vector3{}
-            );
-            layerSceneRadii_.assign(stack.layers.size(), 1.0F);
-            builtThroughLayer_.reset();
-            sceneFingerprint_ = stack.fingerprint;
-            sceneVisibleThroughLayer_.reset();
-            sceneMode_ = mode;
-        } else if (
-            sceneVisibleThroughLayer_.has_value() &&
-            sceneVisibleThroughLayer_.value() == safeSelectedLayer &&
-            indexCount_ > 0U
-        ) {
-            return false;
-        }
-
-        if (
-            !builtThroughLayer_.has_value() ||
-            safeSelectedLayer > builtThroughLayer_.value()
-        ) {
-            const std::size_t firstNewLayer =
-                    builtThroughLayer_.has_value()
-                        ? builtThroughLayer_.value() + 1U
-                        : 0U;
-
-            const std::size_t firstNewVertex =
-                    sceneMesh_.vertices.size();
-
-            const std::size_t firstNewIndex =
-                    sceneMesh_.indices.size();
+            Vector3 maximum{
+                std::numeric_limits<float>::lowest(),
+                std::numeric_limits<float>::lowest(),
+                std::numeric_limits<float>::lowest()
+            };
 
             for (
-                std::size_t layerIndex = firstNewLayer;
-                layerIndex <= safeSelectedLayer;
-                ++layerIndex
+                std::size_t index = 0U;
+                index < visibleCount;
+                ++index
             ) {
-                const SceneLayout layerLayout =
-                        LayerStackLayout::buildLayer(
-                            stack.layers[layerIndex],
-                            VisualizationMode::LayerStack
+                const VoxelInstance &voxel =
+                        scene_.voxels[index];
+
+                const Vector3 halfSize =
+                        voxel.size * 0.5F;
+
+                minimum.x =
+                        std::min(
+                            minimum.x,
+                            voxel.center.x - halfSize.x
                         );
 
-                MeshBuilder::append(sceneMesh_, layerLayout);
-                layerIndexCounts_[layerIndex] =
-                        sceneMesh_.indices.size();
-                layerSceneCenters_[layerIndex] =
-                        layerLayout.center;
-                layerSceneRadii_[layerIndex] =
-                        layerLayout.radius;
+                minimum.y =
+                        std::min(
+                            minimum.y,
+                            voxel.center.y - halfSize.y
+                        );
+
+                minimum.z =
+                        std::min(
+                            minimum.z,
+                            voxel.center.z - halfSize.z
+                        );
+
+                maximum.x =
+                        std::max(
+                            maximum.x,
+                            voxel.center.x + halfSize.x
+                        );
+
+                maximum.y =
+                        std::max(
+                            maximum.y,
+                            voxel.center.y + halfSize.y
+                        );
+
+                maximum.z =
+                        std::max(
+                            maximum.z,
+                            voxel.center.z + halfSize.z
+                        );
             }
 
-            uploadMeshSuffix(
-                sceneMesh_,
-                firstNewVertex,
-                firstNewIndex
-            );
+            sceneCenter_ =
+                    (minimum + maximum) * 0.5F;
 
-            builtThroughLayer_ =
-                    safeSelectedLayer;
+            const float visibleLength =
+                    maximum.x - minimum.x;
+
+            const float visibleHeight =
+                    maximum.y - minimum.y;
+
+            const float visibleWidth =
+                    maximum.z - minimum.z;
+
+            // The viewport is deliberately wide. Treating a long history as
+            // a sphere wastes most of that horizontal field of view and makes
+            // its voxels unreadably small. This framing measure reserves the
+            // full vertical matrix while fitting X against a typical 2:1+
+            // panel aspect; clip planes still retain generous scene margins.
+            sceneRadius_ =
+                    std::max(
+                        {
+                            visibleLength / 3.15F,
+                            visibleHeight * 0.88F,
+                            visibleWidth * 0.82F,
+                            1.0F
+                        }
+                    ) *
+                    1.03F;
+
+            scene_.groundCenter.x =
+                    sceneCenter_.x;
+
+            scene_.groundHalfExtentX =
+                    std::max(
+                        visibleLength * 0.68F +
+                        visibleWidth * 0.34F,
+                        visibleWidth * 0.78F
+                    );
+        } else {
+            visibleInstanceCount_ =
+                    static_cast<int>(scene_.voxels.size());
+            sceneCenter_ = scene_.center;
+            sceneRadius_ = scene_.radius;
         }
 
-        indexCount_ =
-                layerIndexCounts_[safeSelectedLayer];
-
-        sceneCenter_ =
-                layerSceneCenters_[safeSelectedLayer];
-
-        sceneRadius_ =
-                layerSceneRadii_[safeSelectedLayer];
-
-        sceneVisibleThroughLayer_ =
-                safeSelectedLayer;
-
+        sceneFingerprint_ = stack.fingerprint;
+        sceneSelectedLayer_ = safeSelectedLayer;
+        sceneMode_ = mode;
         return true;
     }
 
@@ -364,7 +392,9 @@ namespace quantum_sim::gui::density_volume {
         const CameraController &camera
     ) {
         if (!initialized_) {
-            throw std::runtime_error{"Density Volume renderer is not initialized."};
+            throw std::runtime_error{
+                "Density Volume renderer is not initialized."
+            };
         }
 
         const int safeWidth =
@@ -382,135 +412,157 @@ namespace quantum_sim::gui::density_volume {
 
         int previousFramebuffer{};
         int previousViewport[4]{};
-        int previousProgram{};
-        int previousVertexArray{};
-        int previousActiveTexture{};
-        int previousTexture0{};
-        int previousTexture1{};
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
-        glGetIntegerv(GL_VIEWPORT, previousViewport);
-        glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
-        glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &previousVertexArray);
-        glGetIntegerv(GL_ACTIVE_TEXTURE, &previousActiveTexture);
 
-        glActiveTexture(GL_TEXTURE0);
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture0);
-        glActiveTexture(GL_TEXTURE1);
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture1);
-        glActiveTexture(static_cast<unsigned int>(previousActiveTexture));
+        glGetIntegerv(
+            GL_FRAMEBUFFER_BINDING,
+            &previousFramebuffer
+        );
 
-        const bool depthTestWasEnabled =
-                glIsEnabled(GL_DEPTH_TEST) == GL_TRUE;
-
-        const bool cullFaceWasEnabled =
-                glIsEnabled(GL_CULL_FACE) == GL_TRUE;
-
-        const bool blendingWasEnabled =
-                glIsEnabled(GL_BLEND) == GL_TRUE;
-
-        const bool scissorTestWasEnabled =
-                glIsEnabled(GL_SCISSOR_TEST) == GL_TRUE;
+        glGetIntegerv(
+            GL_VIEWPORT,
+            previousViewport
+        );
 
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
         glViewport(0, 0, safeWidth, safeHeight);
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LESS);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-        glFrontFace(GL_CCW);
-        glDisable(GL_BLEND);
-        glDisable(GL_SCISSOR_TEST);
 
-        constexpr float clearColor[4]{
-            0.00008F,
-            0.00014F,
-            0.00035F,
+        constexpr std::array<float, 4U> clearScene{
+            0.0018F,
+            0.0045F,
+            0.0110F,
             1.0F
         };
 
-        constexpr unsigned int clearPick[4]{0U, 0U, 0U, 0U};
-        constexpr float clearBloom[4]{0.0F, 0.0F, 0.0F, 1.0F};
+        constexpr std::array<float, 4U> clearBright{
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F
+        };
 
-        glClearBufferfv(GL_COLOR, 0, clearColor);
-        glClearBufferuiv(GL_COLOR, 1, clearPick);
-        glClearBufferfv(GL_COLOR, 2, clearBloom);
-        glClearBufferfi(GL_DEPTH_STENCIL, 0, 1.0F, 0);
+        constexpr std::array<unsigned int, 4U> clearPick{
+            0U,
+            0U,
+            0U,
+            0U
+        };
 
-        const Matrix4 model =
-                identityMatrix();
+        glClearBufferfv(
+            GL_COLOR,
+            0,
+            clearScene.data()
+        );
+
+        glClearBufferuiv(
+            GL_COLOR,
+            1,
+            clearPick.data()
+        );
+
+        glClearBufferfv(
+            GL_COLOR,
+            2,
+            clearBright.data()
+        );
+
+        glClear(
+            GL_DEPTH_BUFFER_BIT |
+            GL_STENCIL_BUFFER_BIT
+        );
+
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_BLEND);
 
         const Matrix4 view =
                 camera.viewMatrix();
 
         const Matrix4 projection =
-                camera.projectionMatrix(safeWidth, safeHeight);
+                camera.projectionMatrix(
+                    safeWidth,
+                    safeHeight
+                );
 
-        glUseProgram(shaderProgram_);
-        glUniformMatrix4fv(modelUniform_, 1, GL_FALSE, model.data());
-        glUniformMatrix4fv(viewUniform_, 1, GL_FALSE, view.data());
-        glUniformMatrix4fv(projectionUniform_, 1, GL_FALSE, projection.data());
-        glUniform1i(
-            selectedLayerUniform_,
-            static_cast<int>(
-                std::min<std::size_t>(
-                    selectedLayer,
-                    static_cast<std::size_t>(std::numeric_limits<int>::max())
-                )
-            )
+        glDisable(GL_CULL_FACE);
+        glUseProgram(gridShaderProgram_);
+        glUniformMatrix4fv(
+            gridViewUniform_,
+            1,
+            GL_FALSE,
+            view.data()
         );
 
-        glBindVertexArray(vertexArray_);
+        glUniformMatrix4fv(
+            gridProjectionUniform_,
+            1,
+            GL_FALSE,
+            projection.data()
+        );
 
-        if (indexCount_ > 0U) {
-            glDrawElements(
+        glUniform3f(
+            gridCenterUniform_,
+            scene_.groundCenter.x,
+            scene_.groundCenter.y,
+            scene_.groundCenter.z
+        );
+
+        glUniform2f(
+            gridExtentUniform_,
+            scene_.groundHalfExtentX,
+            scene_.groundHalfExtentZ
+        );
+
+        glBindVertexArray(gridVertexArray_);
+        glDrawElements(
+            GL_TRIANGLES,
+            6,
+            GL_UNSIGNED_INT,
+            nullptr
+        );
+
+        if (visibleInstanceCount_ > 0) {
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            glFrontFace(GL_CCW);
+            glUseProgram(voxelShaderProgram_);
+
+            glUniformMatrix4fv(
+                voxelViewUniform_,
+                1,
+                GL_FALSE,
+                view.data()
+            );
+
+            glUniformMatrix4fv(
+                voxelProjectionUniform_,
+                1,
+                GL_FALSE,
+                projection.data()
+            );
+
+            glUniform1f(
+                voxelSelectedLayerUniform_,
+                static_cast<float>(selectedLayer)
+            );
+
+            glBindVertexArray(voxelVertexArray_);
+            glDrawElementsInstanced(
                 GL_TRIANGLES,
-                static_cast<int>(indexCount_),
+                cubeIndexCount_,
                 GL_UNSIGNED_INT,
-                nullptr
+                nullptr,
+                visibleInstanceCount_
             );
         }
 
-        renderPostProcess(safeWidth, safeHeight);
-
-        glBindVertexArray(static_cast<unsigned int>(previousVertexArray));
-        glUseProgram(static_cast<unsigned int>(previousProgram));
-
-        if (depthTestWasEnabled) {
-            glEnable(GL_DEPTH_TEST);
-        } else {
-            glDisable(GL_DEPTH_TEST);
-        }
-
-        if (cullFaceWasEnabled) {
-            glEnable(GL_CULL_FACE);
-        } else {
-            glDisable(GL_CULL_FACE);
-        }
-
-        if (blendingWasEnabled) {
-            glEnable(GL_BLEND);
-        } else {
-            glDisable(GL_BLEND);
-        }
-
-        if (scissorTestWasEnabled) {
-            glEnable(GL_SCISSOR_TEST);
-        } else {
-            glDisable(GL_SCISSOR_TEST);
-        }
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(
-            GL_TEXTURE_2D,
-            static_cast<unsigned int>(previousTexture0)
+        renderPostProcess(
+            safeWidth,
+            safeHeight
         );
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(
-            GL_TEXTURE_2D,
-            static_cast<unsigned int>(previousTexture1)
-        );
-        glActiveTexture(static_cast<unsigned int>(previousActiveTexture));
 
+        glBindVertexArray(0);
+        glUseProgram(0);
         glBindFramebuffer(
             GL_FRAMEBUFFER,
             static_cast<unsigned int>(previousFramebuffer)
@@ -539,11 +591,16 @@ namespace quantum_sim::gui::density_volume {
         }
 
         int previousReadFramebuffer{};
-        int previousReadBuffer{};
-        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousReadFramebuffer);
-        glGetIntegerv(GL_READ_BUFFER, &previousReadBuffer);
+        glGetIntegerv(
+            GL_READ_FRAMEBUFFER_BINDING,
+            &previousReadFramebuffer
+        );
 
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_);
+        glBindFramebuffer(
+            GL_READ_FRAMEBUFFER,
+            framebuffer_
+        );
+
         glReadBuffer(GL_COLOR_ATTACHMENT1);
 
         unsigned int pickId{};
@@ -559,126 +616,85 @@ namespace quantum_sim::gui::density_volume {
 
         glBindFramebuffer(
             GL_READ_FRAMEBUFFER,
-            static_cast<unsigned int>(previousReadFramebuffer)
+            static_cast<unsigned int>(
+                previousReadFramebuffer
+            )
         );
-        glReadBuffer(static_cast<unsigned int>(previousReadBuffer));
 
         if (
             pickId == 0U ||
-            pickId > sceneMesh_.pickRecords.size()
+            pickId > scene_.pickRecords.size()
         ) {
             return std::nullopt;
         }
 
-        return sceneMesh_.pickRecords[pickId - 1U];
+        return scene_.pickRecords.at(pickId - 1U);
     }
 
     void Renderer::shutdown() noexcept {
-        if (compositeFramebuffer_ != 0U) {
-            glDeleteFramebuffers(1, &compositeFramebuffer_);
-            compositeFramebuffer_ = 0U;
-        }
-
-        if (blurFramebuffers_[0] != 0U || blurFramebuffers_[1] != 0U) {
-            glDeleteFramebuffers(2, blurFramebuffers_);
-            blurFramebuffers_[0] = 0U;
-            blurFramebuffers_[1] = 0U;
-        }
-
         if (depthStencilBuffer_ != 0U) {
-            glDeleteRenderbuffers(1, &depthStencilBuffer_);
-            depthStencilBuffer_ = 0U;
+            glDeleteRenderbuffers(
+                1,
+                &depthStencilBuffer_
+            );
         }
 
-        if (blurTextures_[0] != 0U || blurTextures_[1] != 0U) {
-            glDeleteTextures(2, blurTextures_);
-            blurTextures_[0] = 0U;
-            blurTextures_[1] = 0U;
-        }
+        glDeleteTextures(1, &colorTexture_);
+        glDeleteTextures(1, &sceneColorTexture_);
+        glDeleteTextures(1, &brightTexture_);
+        glDeleteTextures(1, &pickTexture_);
+        glDeleteTextures(2, blurTextures_);
+        glDeleteFramebuffers(1, &framebuffer_);
+        glDeleteFramebuffers(1, &compositeFramebuffer_);
+        glDeleteFramebuffers(2, blurFramebuffers_);
+        glDeleteVertexArrays(1, &postProcessVertexArray_);
+        glDeleteVertexArrays(1, &gridVertexArray_);
+        glDeleteBuffers(1, &gridVertexBuffer_);
+        glDeleteBuffers(1, &gridIndexBuffer_);
+        glDeleteVertexArrays(1, &voxelVertexArray_);
+        glDeleteBuffers(1, &voxelVertexBuffer_);
+        glDeleteBuffers(1, &voxelIndexBuffer_);
+        glDeleteBuffers(1, &instanceBuffer_);
+        glDeleteProgram(voxelShaderProgram_);
+        glDeleteProgram(gridShaderProgram_);
+        glDeleteProgram(blurShaderProgram_);
+        glDeleteProgram(compositeShaderProgram_);
 
-        if (pickTexture_ != 0U) {
-            glDeleteTextures(1, &pickTexture_);
-            pickTexture_ = 0U;
-        }
-
-        if (brightTexture_ != 0U) {
-            glDeleteTextures(1, &brightTexture_);
-            brightTexture_ = 0U;
-        }
-
-        if (sceneColorTexture_ != 0U) {
-            glDeleteTextures(1, &sceneColorTexture_);
-            sceneColorTexture_ = 0U;
-        }
-
-        if (colorTexture_ != 0U) {
-            glDeleteTextures(1, &colorTexture_);
-            colorTexture_ = 0U;
-        }
-
-        if (framebuffer_ != 0U) {
-            glDeleteFramebuffers(1, &framebuffer_);
-            framebuffer_ = 0U;
-        }
-
-        if (indexBuffer_ != 0U) {
-            glDeleteBuffers(1, &indexBuffer_);
-            indexBuffer_ = 0U;
-        }
-
-        if (vertexBuffer_ != 0U) {
-            glDeleteBuffers(1, &vertexBuffer_);
-            vertexBuffer_ = 0U;
-        }
-
-        if (vertexArray_ != 0U) {
-            glDeleteVertexArrays(1, &vertexArray_);
-            vertexArray_ = 0U;
-        }
-
-        if (shaderProgram_ != 0U) {
-            glDeleteProgram(shaderProgram_);
-            shaderProgram_ = 0U;
-        }
-
-        if (blurShaderProgram_ != 0U) {
-            glDeleteProgram(blurShaderProgram_);
-            blurShaderProgram_ = 0U;
-        }
-
-        if (compositeShaderProgram_ != 0U) {
-            glDeleteProgram(compositeShaderProgram_);
-            compositeShaderProgram_ = 0U;
-        }
-
-        if (postProcessVertexArray_ != 0U) {
-            glDeleteVertexArrays(1, &postProcessVertexArray_);
-            postProcessVertexArray_ = 0U;
-        }
-
+        voxelVertexArray_ = 0U;
+        voxelVertexBuffer_ = 0U;
+        voxelIndexBuffer_ = 0U;
+        instanceBuffer_ = 0U;
+        gridVertexArray_ = 0U;
+        gridVertexBuffer_ = 0U;
+        gridIndexBuffer_ = 0U;
+        voxelShaderProgram_ = 0U;
+        gridShaderProgram_ = 0U;
+        blurShaderProgram_ = 0U;
+        compositeShaderProgram_ = 0U;
+        postProcessVertexArray_ = 0U;
+        framebuffer_ = 0U;
+        colorTexture_ = 0U;
+        sceneColorTexture_ = 0U;
+        brightTexture_ = 0U;
+        pickTexture_ = 0U;
+        depthStencilBuffer_ = 0U;
+        blurFramebuffers_[0] = 0U;
+        blurFramebuffers_[1] = 0U;
+        blurTextures_[0] = 0U;
+        blurTextures_[1] = 0U;
+        compositeFramebuffer_ = 0U;
         framebufferWidth_ = 0;
         framebufferHeight_ = 0;
-        modelUniform_ = -1;
-        viewUniform_ = -1;
-        projectionUniform_ = -1;
-        selectedLayerUniform_ = -1;
-        blurInputUniform_ = -1;
-        blurHorizontalUniform_ = -1;
-        compositeSceneUniform_ = -1;
-        compositeBloomUniform_ = -1;
-        indexCount_ = 0U;
+        cubeIndexCount_ = 0;
+        visibleInstanceCount_ = 0;
+        instanceCapacity_ = 0U;
         sceneFingerprint_ = 0U;
-        sceneVisibleThroughLayer_.reset();
+        sceneSelectedLayer_.reset();
         sceneMode_.reset();
+        scene_ = InstanceScene{};
+        voxelGeometry_ = VoxelGeometry{};
         sceneCenter_ = Vector3{};
         sceneRadius_ = 1.0F;
-        sceneMesh_ = Mesh{};
-        layerIndexCounts_.clear();
-        layerSceneCenters_.clear();
-        layerSceneRadii_.clear();
-        builtThroughLayer_.reset();
-        vertexCapacity_ = 0U;
-        indexCapacity_ = 0U;
         initialized_ = false;
     }
 
@@ -698,209 +714,273 @@ namespace quantum_sim::gui::density_volume {
         return initialized_;
     }
 
-    void Renderer::createShaderProgram() {
-        constexpr const char *vertexShaderSource = R"glsl(
+    void Renderer::createScenePrograms() {
+        constexpr const char *voxelVertexShader = R"glsl(
 #version 330 core
-layout (location = 0) in vec3 aPosition;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec3 aColor;
-layout (location = 3) in float aLayer;
-layout (location = 4) in float aPickId;
-layout (location = 5) in float aMagnitudeVoxel;
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
+layout(location = 2) in vec3 aInstanceCenter;
+layout(location = 3) in vec3 aInstanceSize;
+layout(location = 4) in vec3 aInstanceColor;
+layout(location = 5) in vec4 aInstanceMaterial;
 
-uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProjection;
 
+out vec3 vWorldPosition;
 out vec3 vViewPosition;
-out vec3 vViewNormal;
+out vec3 vNormal;
+out vec3 vLocalPosition;
 out vec3 vColor;
-flat out float vLayer;
-flat out float vPickId;
-flat out float vMagnitudeVoxel;
+flat out vec4 vMaterial;
 
 void main() {
-    vec4 worldPosition = uModel * vec4(aPosition, 1.0);
-    vec4 viewPosition = uView * worldPosition;
+    vec3 safeSize = max(aInstanceSize, vec3(0.001));
+    vec3 worldPosition = aInstanceCenter + aPosition * safeSize;
+    vec4 viewPosition = uView * vec4(worldPosition, 1.0);
+
+    vWorldPosition = worldPosition;
     vViewPosition = viewPosition.xyz;
-    vViewNormal = normalize(mat3(uView * uModel) * aNormal);
-    vColor = aColor;
-    vLayer = aLayer;
-    vPickId = aPickId;
-    vMagnitudeVoxel = aMagnitudeVoxel;
+    vNormal = normalize(aNormal / safeSize);
+    vLocalPosition = aPosition;
+    vColor = aInstanceColor;
+    vMaterial = aInstanceMaterial;
     gl_Position = uProjection * viewPosition;
 }
 )glsl";
 
-        constexpr const char *fragmentShaderSource = R"glsl(
+        constexpr const char *voxelFragmentShader = R"glsl(
 #version 330 core
+in vec3 vWorldPosition;
 in vec3 vViewPosition;
-in vec3 vViewNormal;
+in vec3 vNormal;
+in vec3 vLocalPosition;
 in vec3 vColor;
-flat in float vLayer;
-flat in float vPickId;
-flat in float vMagnitudeVoxel;
+flat in vec4 vMaterial;
 
-uniform int uSelectedLayer;
+uniform float uSelectedLayer;
 
-layout (location = 0) out vec4 fragmentColor;
-layout (location = 1) out uint pickOutput;
-layout (location = 2) out vec4 brightColor;
+layout(location = 0) out vec4 sceneColor;
+layout(location = 1) out uint pickColor;
+layout(location = 2) out vec4 brightColor;
 
 void main() {
-    vec3 normal = normalize(vViewNormal);
+    vec3 normal = normalize(vNormal);
     vec3 viewDirection = normalize(-vViewPosition);
-    vec3 keyDirection = normalize(vec3(-0.44, 0.82, 0.36));
-    vec3 fillDirection = normalize(vec3(0.76, 0.34, -0.46));
-    vec3 halfDirection = normalize(keyDirection + viewDirection);
+    vec3 keyDirection = normalize(vec3(-0.42, 0.78, 0.46));
+    vec3 fillDirection = normalize(vec3(0.62, 0.26, -0.74));
 
     float keyDiffuse = max(dot(normal, keyDirection), 0.0);
-    float wrappedDiffuse = clamp(
-        (dot(normal, keyDirection) + 0.22) / 1.22,
+    float wrappedKey = clamp(
+        (dot(normal, keyDirection) + 0.34) / 1.34,
         0.0,
         1.0
     );
     float fillDiffuse = max(dot(normal, fillDirection), 0.0);
     float hemisphere = normal.y * 0.5 + 0.5;
-    float specular = pow(max(dot(normal, halfDirection), 0.0), 34.0);
-    float rim = pow(
+
+    vec3 halfVector = normalize(keyDirection + viewDirection);
+    float specular = pow(
+        max(dot(normal, halfVector), 0.0),
+        28.0
+    );
+    float fresnel = pow(
         1.0 - max(dot(normal, viewDirection), 0.0),
         3.0
     );
 
-    float selected = abs(vLayer - float(uSelectedLayer)) < 0.25 ? 1.0 : 0.0;
-    float selectedValue = selected * vMagnitudeVoxel;
-    float luminance = max(max(vColor.r, vColor.g), vColor.b);
-    float emissive = pow(luminance, 1.45) * vMagnitudeVoxel;
-    float topFace = smoothstep(0.18, 0.94, normal.y);
-    float sideFace = 1.0 - topFace;
-
-    float ambient = mix(0.12, 0.26, hemisphere);
-    vec3 color = vColor * (
-        ambient +
-        0.66 * wrappedDiffuse +
-        0.28 * keyDiffuse +
-        0.15 * fillDiffuse
+    float lowerFace = smoothstep(-0.50, -0.12, vLocalPosition.y);
+    float sideContact = smoothstep(
+        0.46,
+        0.18,
+        max(abs(vLocalPosition.x), abs(vLocalPosition.z))
     );
+    float contactOcclusion = mix(0.66, 1.0, lowerFace);
+    contactOcclusion *= mix(0.88, 1.0, sideContact);
 
-    color *= mix(0.86, 1.12, topFace);
-    color += vColor * sideFace * 0.055;
+    float selected = abs(vMaterial.z - uSelectedLayer) < 0.45
+        ? 1.08
+        : 0.94;
 
-    color += mix(
-        vec3(0.010, 0.018, 0.040),
-        vColor,
-        0.54
-    ) * rim * (0.13 + 0.22 * vMagnitudeVoxel);
-
-    color += vec3(1.00, 0.82, 0.58) *
-             specular *
-             (0.10 + 0.40 * vMagnitudeVoxel);
-
-    vec3 emission = vColor * emissive * (0.34 + 0.22 * topFace);
-    emission += vec3(1.00, 0.72, 0.30) * selectedValue * emissive * 0.32;
-    color += emission;
-
-    color = mix(
-        color,
-        color * 1.12 + vec3(0.11, 0.045, 0.008),
-        selectedValue
+    vec3 base = max(vColor, vec3(0.008, 0.006, 0.018));
+    vec3 ambient = base * (
+        vec3(0.080, 0.100, 0.155) +
+        vec3(0.095, 0.072, 0.038) * hemisphere
     );
+    vec3 diffuse = base * (
+        wrappedKey * vec3(1.08, 0.76, 0.40) +
+        keyDiffuse * vec3(0.36, 0.24, 0.11) +
+        fillDiffuse * vec3(0.075, 0.105, 0.180)
+    );
+    vec3 highlights =
+        specular * vec3(1.00, 0.84, 0.56) * 0.62 +
+        fresnel * base * 0.22;
 
-    fragmentColor = vec4(color, 1.0);
-    pickOutput = uint(vPickId + 0.5);
+    float emission = vMaterial.x;
+    vec3 emissive =
+        base * emission * 1.42 +
+        vec3(1.00, 0.34, 0.035) * emission * emission * 0.12;
 
-    vec3 thresholded =
-        max(color - vec3(mix(0.20, 0.10, selectedValue)), vec3(0.0));
+    vec3 lit =
+        ((ambient + diffuse) * contactOcclusion + highlights) *
+        selected +
+        emissive;
 
+    float distanceFade = clamp(
+        exp(-length(vViewPosition) * 0.0018),
+        0.74,
+        1.0
+    );
+    vec3 fog = vec3(0.002, 0.006, 0.015);
+    lit = mix(fog, lit, distanceFade);
+
+    sceneColor = vec4(lit, 1.0);
+    pickColor = uint(vMaterial.w + 0.5);
+
+    float luminance = dot(
+        lit,
+        vec3(0.2126, 0.7152, 0.0722)
+    );
+    float bloomMask = smoothstep(
+        0.64,
+        1.48,
+        luminance + emission * 0.42
+    );
     brightColor = vec4(
-        vMagnitudeVoxel > 0.5
-            ? thresholded * (0.92 + emissive * 1.35)
-            : vec3(0.0),
+        lit * bloomMask * (0.60 + emission * 0.42),
         1.0
     );
 }
 )glsl";
 
-        const unsigned int vertexShader =
-                compileShader(
-                    GL_VERTEX_SHADER,
-                    vertexShaderSource,
-                    "Density Volume vertex shader"
+        constexpr const char *gridVertexShader = R"glsl(
+#version 330 core
+layout(location = 0) in vec2 aPosition;
+
+uniform mat4 uView;
+uniform mat4 uProjection;
+uniform vec3 uGridCenter;
+uniform vec2 uGridExtent;
+
+out vec3 vWorldPosition;
+out vec2 vNormalizedPosition;
+
+void main() {
+    vNormalizedPosition = aPosition;
+    vWorldPosition = uGridCenter + vec3(
+        aPosition.x * uGridExtent.x,
+        0.0,
+        aPosition.y * uGridExtent.y
+    );
+    gl_Position =
+        uProjection *
+        uView *
+        vec4(vWorldPosition, 1.0);
+}
+)glsl";
+
+        constexpr const char *gridFragmentShader = R"glsl(
+#version 330 core
+in vec3 vWorldPosition;
+in vec2 vNormalizedPosition;
+
+layout(location = 0) out vec4 sceneColor;
+layout(location = 1) out uint pickColor;
+layout(location = 2) out vec4 brightColor;
+
+float gridLine(vec2 coordinate) {
+    vec2 derivative = max(fwidth(coordinate), vec2(0.0001));
+    vec2 distanceToLine =
+        abs(fract(coordinate - 0.5) - 0.5) /
+        derivative;
+    return 1.0 - min(min(distanceToLine.x, distanceToLine.y), 1.0);
+}
+
+void main() {
+    float minor = gridLine(vWorldPosition.xz / 0.72);
+    float major = gridLine(vWorldPosition.xz / 3.60);
+    float radial = length(vNormalizedPosition);
+    float fade = 1.0 - smoothstep(0.36, 1.18, radial);
+
+    vec3 floorColor = vec3(0.0022, 0.0065, 0.0145);
+    vec3 minorColor = vec3(0.020, 0.072, 0.100);
+    vec3 majorColor = vec3(0.038, 0.125, 0.160);
+    vec3 color = floorColor;
+    color += minorColor * minor * fade * 0.48;
+    color += majorColor * major * fade * 0.56;
+
+    sceneColor = vec4(color, 1.0);
+    pickColor = 0U;
+    brightColor = vec4(0.0, 0.0, 0.0, 1.0);
+}
+)glsl";
+
+        voxelShaderProgram_ =
+                createProgram(
+                    voxelVertexShader,
+                    voxelFragmentShader,
+                    "Density Volume instanced voxel shader"
                 );
 
-        unsigned int fragmentShader{};
-
-        try {
-            fragmentShader =
-                    compileShader(
-                        GL_FRAGMENT_SHADER,
-                        fragmentShaderSource,
-                        "Density Volume fragment shader"
-                    );
-
-            shaderProgram_ =
-                    glCreateProgram();
-
-            glAttachShader(shaderProgram_, vertexShader);
-            glAttachShader(shaderProgram_, fragmentShader);
-            glLinkProgram(shaderProgram_);
-
-            int linked{};
-            glGetProgramiv(shaderProgram_, GL_LINK_STATUS, &linked);
-
-            if (linked != GL_TRUE) {
-                int logLength{};
-                glGetProgramiv(shaderProgram_, GL_INFO_LOG_LENGTH, &logLength);
-
-                std::string log(
-                    static_cast<std::size_t>(std::max(logLength, 1)),
-                    '\0'
+        gridShaderProgram_ =
+                createProgram(
+                    gridVertexShader,
+                    gridFragmentShader,
+                    "Density Volume ground-grid shader"
                 );
 
-                glGetProgramInfoLog(
-                    shaderProgram_,
-                    logLength,
-                    nullptr,
-                    log.data()
+        voxelViewUniform_ =
+                glGetUniformLocation(
+                    voxelShaderProgram_,
+                    "uView"
                 );
 
-                throw std::runtime_error{
-                    std::string{"Failed to link Density Volume shader program: "} + log
-                };
-            }
-        } catch (...) {
-            glDeleteShader(vertexShader);
+        voxelProjectionUniform_ =
+                glGetUniformLocation(
+                    voxelShaderProgram_,
+                    "uProjection"
+                );
 
-            if (fragmentShader != 0U) {
-                glDeleteShader(fragmentShader);
-            }
+        voxelSelectedLayerUniform_ =
+                glGetUniformLocation(
+                    voxelShaderProgram_,
+                    "uSelectedLayer"
+                );
 
-            throw;
-        }
+        gridViewUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uView"
+                );
 
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
+        gridProjectionUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uProjection"
+                );
 
-        modelUniform_ =
-                glGetUniformLocation(shaderProgram_, "uModel");
+        gridCenterUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uGridCenter"
+                );
 
-        viewUniform_ =
-                glGetUniformLocation(shaderProgram_, "uView");
+        gridExtentUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uGridExtent"
+                );
 
-        projectionUniform_ =
-                glGetUniformLocation(shaderProgram_, "uProjection");
-
-        selectedLayerUniform_ =
-                glGetUniformLocation(shaderProgram_, "uSelectedLayer");
-
-        if (
-            modelUniform_ < 0 ||
-            viewUniform_ < 0 ||
-            projectionUniform_ < 0 ||
-            selectedLayerUniform_ < 0
-        ) {
-            throw std::runtime_error{"Density Volume shader uniforms are unavailable."};
-        }
+        requireUniform(voxelViewUniform_, "uView");
+        requireUniform(voxelProjectionUniform_, "uProjection");
+        requireUniform(
+            voxelSelectedLayerUniform_,
+            "uSelectedLayer"
+        );
+        requireUniform(gridViewUniform_, "uView");
+        requireUniform(gridProjectionUniform_, "uProjection");
+        requireUniform(gridCenterUniform_, "uGridCenter");
+        requireUniform(gridExtentUniform_, "uGridExtent");
     }
 
     void Renderer::createPostProcessPrograms() {
@@ -914,46 +994,44 @@ void main() {
         vec2( 3.0, -1.0),
         vec2(-1.0,  3.0)
     );
-
-    const vec2 textureCoordinates[3] = vec2[](
+    const vec2 coordinates[3] = vec2[](
         vec2(0.0, 0.0),
         vec2(2.0, 0.0),
         vec2(0.0, 2.0)
     );
 
     gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
-    vUv = textureCoordinates[gl_VertexID];
+    vUv = coordinates[gl_VertexID];
 }
 )glsl";
 
         constexpr const char *blurFragmentShader = R"glsl(
 #version 330 core
 in vec2 vUv;
-
 uniform sampler2D uInput;
 uniform bool uHorizontal;
-
 out vec4 fragmentColor;
 
 void main() {
-    const float weights[5] = float[](
-        0.227027,
-        0.1945946,
-        0.1216216,
-        0.054054,
-        0.016216
+    const float weights[6] = float[](
+        0.2096,
+        0.1873,
+        0.1328,
+        0.0753,
+        0.0341,
+        0.0123
     );
 
     vec2 texel = 1.0 / vec2(textureSize(uInput, 0));
     vec3 result = texture(uInput, vUv).rgb * weights[0];
 
-    for (int sampleIndex = 1; sampleIndex < 5; ++sampleIndex) {
+    for (int index = 1; index < 6; ++index) {
         vec2 offset = uHorizontal
-            ? vec2(texel.x * float(sampleIndex), 0.0)
-            : vec2(0.0, texel.y * float(sampleIndex));
+            ? vec2(texel.x * float(index), 0.0)
+            : vec2(0.0, texel.y * float(index));
 
-        result += texture(uInput, vUv + offset).rgb * weights[sampleIndex];
-        result += texture(uInput, vUv - offset).rgb * weights[sampleIndex];
+        result += texture(uInput, vUv + offset).rgb * weights[index];
+        result += texture(uInput, vUv - offset).rgb * weights[index];
     }
 
     fragmentColor = vec4(result, 1.0);
@@ -963,23 +1041,40 @@ void main() {
         constexpr const char *compositeFragmentShader = R"glsl(
 #version 330 core
 in vec2 vUv;
-
 uniform sampler2D uScene;
 uniform sampler2D uBloom;
-
 out vec4 fragmentColor;
+
+vec3 acesToneMap(vec3 color) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp(
+        (color * (a * color + b)) /
+        (color * (c * color + d) + e),
+        0.0,
+        1.0
+    );
+}
 
 void main() {
     vec3 scene = texture(uScene, vUv).rgb;
     vec3 bloom = texture(uBloom, vUv).rgb;
-    vec3 hdrColor = scene + bloom * 1.42;
+    vec3 hdr = scene + bloom * 0.92;
 
-    vec3 mapped = vec3(1.0) - exp(-hdrColor * 1.14);
-    mapped = pow(max(mapped, vec3(0.0)), vec3(1.0 / 2.2));
+    vec3 mapped = acesToneMap(hdr * 1.08);
+    mapped = pow(mapped, vec3(1.0 / 2.2));
+
+    float horizon = smoothstep(0.0, 0.88, 1.0 - vUv.y);
+    mapped += vec3(0.002, 0.007, 0.014) * horizon;
 
     vec2 centered = vUv * 2.0 - 1.0;
-    float vignette = 1.0 - smoothstep(0.48, 1.42, dot(centered, centered));
-    mapped *= mix(0.82, 1.0, vignette);
+    float vignette =
+        1.0 -
+        smoothstep(0.52, 1.48, dot(centered, centered));
+    mapped *= mix(0.84, 1.0, vignette);
 
     fragmentColor = vec4(mapped, 1.0);
 }
@@ -996,50 +1091,92 @@ void main() {
                 createProgram(
                     fullScreenVertexShader,
                     compositeFragmentShader,
-                    "Density Volume bloom composite shader"
+                    "Density Volume HDR composite shader"
                 );
 
         blurInputUniform_ =
-                glGetUniformLocation(blurShaderProgram_, "uInput");
+                glGetUniformLocation(
+                    blurShaderProgram_,
+                    "uInput"
+                );
 
         blurHorizontalUniform_ =
-                glGetUniformLocation(blurShaderProgram_, "uHorizontal");
+                glGetUniformLocation(
+                    blurShaderProgram_,
+                    "uHorizontal"
+                );
 
         compositeSceneUniform_ =
-                glGetUniformLocation(compositeShaderProgram_, "uScene");
+                glGetUniformLocation(
+                    compositeShaderProgram_,
+                    "uScene"
+                );
 
         compositeBloomUniform_ =
-                glGetUniformLocation(compositeShaderProgram_, "uBloom");
+                glGetUniformLocation(
+                    compositeShaderProgram_,
+                    "uBloom"
+                );
 
-        if (
-            blurInputUniform_ < 0 ||
-            blurHorizontalUniform_ < 0 ||
-            compositeSceneUniform_ < 0 ||
-            compositeBloomUniform_ < 0
-        ) {
-            throw std::runtime_error{
-                "Density Volume post-process shader uniforms are unavailable."
-            };
-        }
+        requireUniform(blurInputUniform_, "uInput");
+        requireUniform(blurHorizontalUniform_, "uHorizontal");
+        requireUniform(compositeSceneUniform_, "uScene");
+        requireUniform(compositeBloomUniform_, "uBloom");
     }
 
-    void Renderer::createMeshBuffers() {
-        glGenVertexArrays(1, &vertexArray_);
-        glGenBuffers(1, &vertexBuffer_);
-        glGenBuffers(1, &indexBuffer_);
+    void Renderer::createVoxelBuffers() {
+        static_assert(
+            std::is_standard_layout_v<VoxelInstance>
+        );
 
-        glBindVertexArray(vertexArray_);
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
+        if (
+            voxelGeometry_.indices.size() >
+            static_cast<std::size_t>(
+                std::numeric_limits<int>::max()
+            )
+        ) {
+            throw std::runtime_error{
+                "Density Volume rounded cube exceeds OpenGL index limits."
+            };
+        }
+
+        cubeIndexCount_ =
+                static_cast<int>(
+                    voxelGeometry_.indices.size()
+                );
+
+        glGenVertexArrays(1, &voxelVertexArray_);
+        glGenBuffers(1, &voxelVertexBuffer_);
+        glGenBuffers(1, &voxelIndexBuffer_);
+        glGenBuffers(1, &instanceBuffer_);
+        glBindVertexArray(voxelVertexArray_);
+
+        glBindBuffer(
+            GL_ARRAY_BUFFER,
+            voxelVertexBuffer_
+        );
+
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(
+                voxelGeometry_.vertices.size() *
+                sizeof(VoxelVertex)
+            ),
+            voxelGeometry_.vertices.data(),
+            GL_STATIC_DRAW
+        );
 
         glVertexAttribPointer(
             0,
             3,
             GL_FLOAT,
             GL_FALSE,
-            static_cast<int>(sizeof(MeshVertex)),
-            reinterpret_cast<const void *>(offsetof(MeshVertex, position))
+            static_cast<int>(sizeof(VoxelVertex)),
+            reinterpret_cast<const void *>(
+                offsetof(VoxelVertex, position)
+            )
         );
+
         glEnableVertexAttribArray(0);
 
         glVertexAttribPointer(
@@ -1047,52 +1184,139 @@ void main() {
             3,
             GL_FLOAT,
             GL_FALSE,
-            static_cast<int>(sizeof(MeshVertex)),
-            reinterpret_cast<const void *>(offsetof(MeshVertex, normal))
-        );
-        glEnableVertexAttribArray(1);
-
-        glVertexAttribPointer(
-            2,
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            static_cast<int>(sizeof(MeshVertex)),
-            reinterpret_cast<const void *>(offsetof(MeshVertex, color))
-        );
-        glEnableVertexAttribArray(2);
-
-        glVertexAttribPointer(
-            3,
-            1,
-            GL_FLOAT,
-            GL_FALSE,
-            static_cast<int>(sizeof(MeshVertex)),
-            reinterpret_cast<const void *>(offsetof(MeshVertex, layer))
-        );
-        glEnableVertexAttribArray(3);
-
-        glVertexAttribPointer(
-            4,
-            1,
-            GL_FLOAT,
-            GL_FALSE,
-            static_cast<int>(sizeof(MeshVertex)),
-            reinterpret_cast<const void *>(offsetof(MeshVertex, pickId))
-        );
-        glEnableVertexAttribArray(4);
-
-        glVertexAttribPointer(
-            5,
-            1,
-            GL_FLOAT,
-            GL_FALSE,
-            static_cast<int>(sizeof(MeshVertex)),
+            static_cast<int>(sizeof(VoxelVertex)),
             reinterpret_cast<const void *>(
-                offsetof(MeshVertex, magnitudeVoxel)
+                offsetof(VoxelVertex, normal)
             )
         );
-        glEnableVertexAttribArray(5);
+
+        glEnableVertexAttribArray(1);
+
+        glBindBuffer(
+            GL_ELEMENT_ARRAY_BUFFER,
+            voxelIndexBuffer_
+        );
+
+        glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(
+                voxelGeometry_.indices.size() *
+                sizeof(std::uint32_t)
+            ),
+            voxelGeometry_.indices.data(),
+            GL_STATIC_DRAW
+        );
+
+        glBindBuffer(
+            GL_ARRAY_BUFFER,
+            instanceBuffer_
+        );
+
+        const auto defineInstanceAttribute =
+                [](
+                    const unsigned int location,
+                    const int components,
+                    const std::size_t offset
+                ) {
+                    glVertexAttribPointer(
+                        location,
+                        components,
+                        GL_FLOAT,
+                        GL_FALSE,
+                        static_cast<int>(
+                            sizeof(VoxelInstance)
+                        ),
+                        reinterpret_cast<const void *>(offset)
+                    );
+
+                    glEnableVertexAttribArray(location);
+                    glVertexAttribDivisor(location, 1);
+                };
+
+        defineInstanceAttribute(
+            2,
+            3,
+            offsetof(VoxelInstance, center)
+        );
+
+        defineInstanceAttribute(
+            3,
+            3,
+            offsetof(VoxelInstance, size)
+        );
+
+        defineInstanceAttribute(
+            4,
+            3,
+            offsetof(VoxelInstance, color)
+        );
+
+        defineInstanceAttribute(
+            5,
+            4,
+            offsetof(VoxelInstance, emissive)
+        );
+
+        glBindVertexArray(0);
+    }
+
+    void Renderer::createGridBuffers() {
+        constexpr std::array<float, 8U> vertices{
+            -1.0F, -1.0F,
+             1.0F, -1.0F,
+             1.0F,  1.0F,
+            -1.0F,  1.0F
+        };
+
+        constexpr std::array<std::uint32_t, 6U> indices{
+            0U, 1U, 2U,
+            0U, 2U, 3U
+        };
+
+        glGenVertexArrays(1, &gridVertexArray_);
+        glGenBuffers(1, &gridVertexBuffer_);
+        glGenBuffers(1, &gridIndexBuffer_);
+        glBindVertexArray(gridVertexArray_);
+
+        glBindBuffer(
+            GL_ARRAY_BUFFER,
+            gridVertexBuffer_
+        );
+
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(
+                vertices.size() * sizeof(float)
+            ),
+            vertices.data(),
+            GL_STATIC_DRAW
+        );
+
+        glVertexAttribPointer(
+            0,
+            2,
+            GL_FLOAT,
+            GL_FALSE,
+            2 * static_cast<int>(sizeof(float)),
+            nullptr
+        );
+
+        glEnableVertexAttribArray(0);
+
+        glBindBuffer(
+            GL_ELEMENT_ARRAY_BUFFER,
+            gridIndexBuffer_
+        );
+
+        glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(
+                indices.size() *
+                sizeof(std::uint32_t)
+            ),
+            indices.data(),
+            GL_STATIC_DRAW
+        );
 
         glBindVertexArray(0);
     }
@@ -1101,167 +1325,57 @@ void main() {
         glGenVertexArrays(1, &postProcessVertexArray_);
     }
 
-    void Renderer::uploadMesh(const Mesh &mesh) {
-        if (mesh.indices.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-            throw std::runtime_error{"Density Volume mesh exceeds OpenGL draw-index limits."};
-        }
-
-        glBindVertexArray(vertexArray_);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(
-                mesh.vertices.size() * sizeof(MeshVertex)
-            ),
-            mesh.vertices.data(),
-            GL_DYNAMIC_DRAW
-        );
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
-        glBufferData(
-            GL_ELEMENT_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(
-                mesh.indices.size() * sizeof(std::uint32_t)
-            ),
-            mesh.indices.data(),
-            GL_DYNAMIC_DRAW
-        );
-
-        glBindVertexArray(0);
-        vertexCapacity_ = mesh.vertices.size();
-        indexCapacity_ = mesh.indices.size();
-        indexCount_ = mesh.indices.size();
-    }
-
-    void Renderer::allocateMeshStorage(
-        const std::size_t vertexCapacity,
-        const std::size_t indexCapacity
-    ) {
-        glBindVertexArray(vertexArray_);
-
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(
-                vertexCapacity * sizeof(MeshVertex)
-            ),
-            nullptr,
-            GL_DYNAMIC_DRAW
-        );
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
-        glBufferData(
-            GL_ELEMENT_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(
-                indexCapacity * sizeof(std::uint32_t)
-            ),
-            nullptr,
-            GL_DYNAMIC_DRAW
-        );
-
-        glBindVertexArray(0);
-        vertexCapacity_ = vertexCapacity;
-        indexCapacity_ = indexCapacity;
-        indexCount_ = 0U;
-    }
-
-    void Renderer::uploadMeshSuffix(
-        const Mesh &mesh,
-        const std::size_t firstVertex,
-        const std::size_t firstIndex
-    ) {
+    void Renderer::uploadInstances() {
         if (
-            firstVertex > mesh.vertices.size() ||
-            firstIndex > mesh.indices.size()
+            scene_.voxels.size() >
+            static_cast<std::size_t>(
+                std::numeric_limits<int>::max()
+            )
         ) {
             throw std::runtime_error{
-                "Density Volume incremental mesh suffix is outside the mesh."
+                "Density Volume instance count exceeds OpenGL limits."
             };
         }
 
-        std::size_t uploadFirstVertex =
-                firstVertex;
+        glBindBuffer(
+            GL_ARRAY_BUFFER,
+            instanceBuffer_
+        );
 
-        std::size_t uploadFirstIndex =
-                firstIndex;
+        if (scene_.voxels.size() > instanceCapacity_) {
+            const std::size_t grownCapacity =
+                    std::max(
+                        scene_.voxels.size(),
+                        instanceCapacity_ +
+                        instanceCapacity_ / 2U +
+                        256U
+                    );
 
-        if (
-            mesh.vertices.size() > vertexCapacity_ ||
-            mesh.indices.size() > indexCapacity_
-        ) {
-            const auto grownCapacity =
-                    [](
-                        const std::size_t current,
-                        const std::size_t required
-                    ) {
-                if (current == 0U) {
-                    return required;
-                }
-
-                const std::size_t growth =
-                        current / 2U;
-
-                if (
-                    growth >
-                    std::numeric_limits<std::size_t>::max() - current
-                ) {
-                    return required;
-                }
-
-                return std::max(
-                    required,
-                    current + growth
-                );
-            };
-
-            allocateMeshStorage(
-                grownCapacity(vertexCapacity_, mesh.vertices.size()),
-                grownCapacity(indexCapacity_, mesh.indices.size())
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                static_cast<GLsizeiptr>(
+                    grownCapacity *
+                    sizeof(VoxelInstance)
+                ),
+                nullptr,
+                GL_DYNAMIC_DRAW
             );
 
-            // New OpenGL buffers are empty, so upload the complete retained mesh.
-            uploadFirstVertex = 0U;
-            uploadFirstIndex = 0U;
+            instanceCapacity_ =
+                    grownCapacity;
         }
 
-        glBindVertexArray(vertexArray_);
-
-        if (uploadFirstVertex < mesh.vertices.size()) {
-            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
+        if (!scene_.voxels.empty()) {
             glBufferSubData(
                 GL_ARRAY_BUFFER,
-                static_cast<GLintptr>(
-                    uploadFirstVertex * sizeof(MeshVertex)
-                ),
+                0,
                 static_cast<GLsizeiptr>(
-                    (
-                        mesh.vertices.size() -
-                        uploadFirstVertex
-                    ) * sizeof(MeshVertex)
+                    scene_.voxels.size() *
+                    sizeof(VoxelInstance)
                 ),
-                mesh.vertices.data() + uploadFirstVertex
+                scene_.voxels.data()
             );
         }
-
-        if (uploadFirstIndex < mesh.indices.size()) {
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
-            glBufferSubData(
-                GL_ELEMENT_ARRAY_BUFFER,
-                static_cast<GLintptr>(
-                    uploadFirstIndex * sizeof(std::uint32_t)
-                ),
-                static_cast<GLsizeiptr>(
-                    (
-                        mesh.indices.size() -
-                        uploadFirstIndex
-                    ) * sizeof(std::uint32_t)
-                ),
-                mesh.indices.data() + uploadFirstIndex
-            );
-        }
-
-        glBindVertexArray(0);
     }
 
     void Renderer::resizeFramebuffer(
@@ -1271,9 +1385,21 @@ void main() {
         int previousFramebuffer{};
         int previousTexture{};
         int previousRenderbuffer{};
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture);
-        glGetIntegerv(GL_RENDERBUFFER_BINDING, &previousRenderbuffer);
+
+        glGetIntegerv(
+            GL_FRAMEBUFFER_BINDING,
+            &previousFramebuffer
+        );
+
+        glGetIntegerv(
+            GL_TEXTURE_BINDING_2D,
+            &previousTexture
+        );
+
+        glGetIntegerv(
+            GL_RENDERBUFFER_BINDING,
+            &previousRenderbuffer
+        );
 
         const auto allocateColorTexture =
                 [width, height](
@@ -1293,21 +1419,25 @@ void main() {
                         dataType,
                         nullptr
                     );
+
                     glTexParameteri(
                         GL_TEXTURE_2D,
                         GL_TEXTURE_MIN_FILTER,
                         GL_LINEAR
                     );
+
                     glTexParameteri(
                         GL_TEXTURE_2D,
                         GL_TEXTURE_MAG_FILTER,
                         GL_LINEAR
                     );
+
                     glTexParameteri(
                         GL_TEXTURE_2D,
                         GL_TEXTURE_WRAP_S,
                         GL_CLAMP_TO_EDGE
                     );
+
                     glTexParameteri(
                         GL_TEXTURE_2D,
                         GL_TEXTURE_WRAP_T,
@@ -1345,7 +1475,11 @@ void main() {
             GL_UNSIGNED_BYTE
         );
 
-        glBindTexture(GL_TEXTURE_2D, pickTexture_);
+        glBindTexture(
+            GL_TEXTURE_2D,
+            pickTexture_
+        );
+
         glTexImage2D(
             GL_TEXTURE_2D,
             0,
@@ -1357,12 +1491,36 @@ void main() {
             GL_UNSIGNED_INT,
             nullptr
         );
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        glBindRenderbuffer(GL_RENDERBUFFER, depthStencilBuffer_);
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_MIN_FILTER,
+            GL_NEAREST
+        );
+
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_MAG_FILTER,
+            GL_NEAREST
+        );
+
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_WRAP_S,
+            GL_CLAMP_TO_EDGE
+        );
+
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_WRAP_T,
+            GL_CLAMP_TO_EDGE
+        );
+
+        glBindRenderbuffer(
+            GL_RENDERBUFFER,
+            depthStencilBuffer_
+        );
+
         glRenderbufferStorage(
             GL_RENDERBUFFER,
             GL_DEPTH24_STENCIL8,
@@ -1370,7 +1528,11 @@ void main() {
             height
         );
 
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
+        glBindFramebuffer(
+            GL_FRAMEBUFFER,
+            framebuffer_
+        );
+
         glFramebufferTexture2D(
             GL_FRAMEBUFFER,
             GL_COLOR_ATTACHMENT0,
@@ -1402,19 +1564,22 @@ void main() {
             depthStencilBuffer_
         );
 
-        constexpr unsigned int drawBuffers[3]{
+        constexpr std::array<unsigned int, 3U> drawBuffers{
             GL_COLOR_ATTACHMENT0,
             GL_COLOR_ATTACHMENT1,
             GL_COLOR_ATTACHMENT2
         };
 
-        glDrawBuffers(3, drawBuffers);
+        glDrawBuffers(
+            static_cast<int>(drawBuffers.size()),
+            drawBuffers.data()
+        );
 
-        bool framebuffersComplete =
+        bool complete =
                 glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
                 GL_FRAMEBUFFER_COMPLETE;
 
-        for (std::size_t index = 0; index < 2U; ++index) {
+        for (std::size_t index = 0U; index < 2U; ++index) {
             glBindFramebuffer(
                 GL_FRAMEBUFFER,
                 blurFramebuffers_[index]
@@ -1430,13 +1595,17 @@ void main() {
 
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
-            framebuffersComplete =
-                    framebuffersComplete &&
+            complete =
+                    complete &&
                     glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
                     GL_FRAMEBUFFER_COMPLETE;
         }
 
-        glBindFramebuffer(GL_FRAMEBUFFER, compositeFramebuffer_);
+        glBindFramebuffer(
+            GL_FRAMEBUFFER,
+            compositeFramebuffer_
+        );
+
         glFramebufferTexture2D(
             GL_FRAMEBUFFER,
             GL_COLOR_ATTACHMENT0,
@@ -1444,10 +1613,11 @@ void main() {
             colorTexture_,
             0
         );
+
         glDrawBuffer(GL_COLOR_ATTACHMENT0);
 
-        framebuffersComplete =
-                framebuffersComplete &&
+        complete =
+                complete &&
                 glCheckFramebufferStatus(GL_FRAMEBUFFER) ==
                 GL_FRAMEBUFFER_COMPLETE;
 
@@ -1466,9 +1636,9 @@ void main() {
             static_cast<unsigned int>(previousTexture)
         );
 
-        if (!framebuffersComplete) {
+        if (!complete) {
             throw std::runtime_error{
-                "Density Volume scene or bloom framebuffer is incomplete."
+                "Density Volume scene framebuffer is incomplete."
             };
         }
 
@@ -1484,11 +1654,10 @@ void main() {
         glDisable(GL_CULL_FACE);
         glDisable(GL_BLEND);
         glBindVertexArray(postProcessVertexArray_);
-
         glUseProgram(blurShaderProgram_);
         glUniform1i(blurInputUniform_, 0);
 
-        constexpr int blurPassCount = 4;
+        constexpr int blurPassCount = 6;
 
         for (int pass = 0; pass < blurPassCount; ++pass) {
             const std::size_t outputIndex =
@@ -1503,6 +1672,7 @@ void main() {
                 GL_FRAMEBUFFER,
                 blurFramebuffers_[outputIndex]
             );
+
             glViewport(0, 0, width, height);
             glUniform1i(
                 blurHorizontalUniform_,
@@ -1510,7 +1680,11 @@ void main() {
             );
 
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, inputTexture);
+            glBindTexture(
+                GL_TEXTURE_2D,
+                inputTexture
+            );
+
             glDrawArrays(GL_TRIANGLES, 0, 3);
         }
 
@@ -1521,16 +1695,29 @@ void main() {
                     )
                 ];
 
-        glBindFramebuffer(GL_FRAMEBUFFER, compositeFramebuffer_);
+        glBindFramebuffer(
+            GL_FRAMEBUFFER,
+            compositeFramebuffer_
+        );
+
         glViewport(0, 0, width, height);
         glUseProgram(compositeShaderProgram_);
         glUniform1i(compositeSceneUniform_, 0);
         glUniform1i(compositeBloomUniform_, 1);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, sceneColorTexture_);
+        glBindTexture(
+            GL_TEXTURE_2D,
+            sceneColorTexture_
+        );
+
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, blurredTexture);
+        glBindTexture(
+            GL_TEXTURE_2D,
+            blurredTexture
+        );
+
         glDrawArrays(GL_TRIANGLES, 0, 3);
+        glActiveTexture(GL_TEXTURE0);
     }
 }

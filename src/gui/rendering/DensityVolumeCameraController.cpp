@@ -30,14 +30,29 @@ namespace quantum_sim::gui::density_volume {
                 std::max(radius, 1.0F);
 
         launchYawDegrees_ = -40.0F;
-        launchPitchDegrees_ = 25.0F;
+        launchPitchDegrees_ = 20.0F;
         launchDistance_ =
-                std::max(sceneRadius_ * 2.05F, 2.8F);
+                std::max(sceneRadius_ * 1.72F, 2.8F);
 
         // Playback only refreshes clipping and the reset composition. The live
-        // camera stays exactly where the user placed it until an explicit reset.
+        // camera follows untouched playback, but never overwrites a pose the
+        // user has deliberately orbit/panned/zoomed.
         launchTarget_ =
                 center;
+
+        if (framed_ && !userControlled_) {
+            targetYawDegrees_ =
+                    launchYawDegrees_;
+
+            targetPitchDegrees_ =
+                    launchPitchDegrees_;
+
+            targetDistance_ =
+                    launchDistance_;
+
+            destinationTarget_ =
+                    launchTarget_;
+        }
     }
 
     void CameraController::update(const float deltaTime) noexcept {
@@ -71,6 +86,8 @@ namespace quantum_sim::gui::density_volume {
         const float deltaX,
         const float deltaY
     ) noexcept {
+        userControlled_ = true;
+
         targetYawDegrees_ +=
                 deltaX * 0.18F;
 
@@ -86,6 +103,8 @@ namespace quantum_sim::gui::density_volume {
         const float deltaX,
         const float deltaY
     ) {
+        userControlled_ = true;
+
         const float yaw =
                 radians(yawDegrees_);
 
@@ -122,6 +141,8 @@ namespace quantum_sim::gui::density_volume {
     }
 
     void CameraController::zoom(const float wheelDelta) noexcept {
+        userControlled_ = true;
+
         const float zoomStep =
                 std::max(
                     targetDistance_ * 0.12F,
@@ -146,6 +167,7 @@ namespace quantum_sim::gui::density_volume {
         targetPitchDegrees_ = launchPitchDegrees_;
         targetDistance_ = launchDistance_;
         destinationTarget_ = launchTarget_;
+        userControlled_ = false;
     }
 
     Matrix4 CameraController::viewMatrix() const {
@@ -185,7 +207,7 @@ namespace quantum_sim::gui::density_volume {
                 );
 
         return perspectiveMatrix(
-            radians(45.0F),
+            radians(46.0F),
             aspect,
             0.05F,
             farPlane

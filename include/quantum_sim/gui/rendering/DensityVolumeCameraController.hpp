@@ -19,9 +19,10 @@ namespace quantum_sim::gui::density_volume {
         /**
          * Refreshes scene-aware reset and clipping bounds without moving the camera.
          *
-         * Playback calls this when the visible layer range changes. Current
-         * orbit, pan, target, and zoom remain untouched. A later reset uses
-         * the newest composition.
+         * Playback calls this when the visible layer range changes. An
+         * untouched camera follows the new framing targets smoothly. Once the
+         * user orbits, pans, or zooms, the live pose remains untouched and
+         * only a later reset uses the newest composition.
          *
          * @param center Stable look-at target at the latest scene bounds center.
          * @param radius Bounding-sphere radius used for reset distance and clip planes.
@@ -83,21 +84,22 @@ namespace quantum_sim::gui::density_volume {
 
     private:
         float yawDegrees_{-40.0F};
-        float pitchDegrees_{25.0F};
+        float pitchDegrees_{20.0F};
         float distance_{20.0F};
         Vector3 target_{};
 
         float targetYawDegrees_{-40.0F};
-        float targetPitchDegrees_{25.0F};
+        float targetPitchDegrees_{20.0F};
         float targetDistance_{20.0F};
         Vector3 destinationTarget_{};
 
         float launchYawDegrees_{-40.0F};
-        float launchPitchDegrees_{25.0F};
+        float launchPitchDegrees_{20.0F};
         float launchDistance_{20.0F};
         Vector3 launchTarget_{};
         float sceneRadius_{4.0F};
         float smoothness_{2.5F};
+        bool userControlled_{false};
         bool framed_{false};
     };
 }
