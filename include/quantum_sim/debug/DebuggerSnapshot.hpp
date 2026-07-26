@@ -14,12 +14,40 @@ namespace quantum_sim::debug {
      * the session is rebuilt or advanced again.
      */
     struct DebuggerSnapshot {
-        std::size_t currentStepIndex;
+        /**
+         * Displayed timeline position. Zero represents the untouched initial
+         * register; values 1..stepCount represent executed instructions.
+         */
+        std::size_t currentStepNumber;
+
+        /**
+         * Number of executable circuit instructions.
+         */
         std::size_t stepCount;
+
+        /**
+         * Current instruction, or nullopt while displaying initial step zero.
+         */
         std::optional<std::reference_wrapper<const circuit::CircuitInstructionInfo> > instruction;
+
+        /**
+         * Register before the current instruction, or the initial register at step zero.
+         */
         std::reference_wrapper<const quantum::QuantumRegister> beforeState;
+
+        /**
+         * Register displayed at the current timeline position.
+         */
         std::reference_wrapper<const quantum::QuantumRegister> afterState;
+
+        /**
+         * Whether the debugger can advance to another timeline position.
+         */
         bool canMoveNext;
+
+        /**
+         * Whether the debugger can move toward the initial state.
+         */
         bool canMovePrevious;
     };
 }

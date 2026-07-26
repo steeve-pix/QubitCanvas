@@ -13,24 +13,30 @@ namespace quantum_sim::debug {
         return trace_.size();
     }
 
-    std::size_t DebuggerSession::currentStepIndex() const noexcept {
-        return currentStep_;
+    std::size_t DebuggerSession::currentStepNumber() const noexcept {
+        return currentStepNumber_;
+    }
+
+    bool DebuggerSession::isAtInitialState() const noexcept {
+        return currentStepNumber_ == 0U;
     }
 
     const circuit::TraceStep &DebuggerSession::currentStep() const {
-        if (trace_.empty()) {
-            throw std::logic_error{"DebuggerSession::currentStep called with an empty trace"};
+        if (isAtInitialState() || trace_.empty()) {
+            throw std::logic_error{
+                "DebuggerSession::currentStep called at initial step zero"
+            };
         }
 
-        return trace_[currentStep_];
+        return trace_[currentStepNumber_ - 1U];
     }
 
     bool DebuggerSession::canMoveNext() const noexcept {
-        return currentStep_ + 1 < trace_.size();
+        return currentStepNumber_ < trace_.size();
     }
 
     bool DebuggerSession::canMovePrevious() const noexcept {
-        return currentStep_ > 0;
+        return currentStepNumber_ > 0U;
     }
 
     bool DebuggerSession::moveNext() noexcept {
@@ -38,7 +44,7 @@ namespace quantum_sim::debug {
             return false;
         }
 
-        ++currentStep_;
+        ++currentStepNumber_;
         return true;
     }
 
@@ -47,12 +53,12 @@ namespace quantum_sim::debug {
             return false;
         }
 
-        --currentStep_;
+        --currentStepNumber_;
         return true;
     }
 
     void DebuggerSession::restart() noexcept {
-        currentStep_ = 0;
+        currentStepNumber_ = 0U;
     }
 
     const quantum::QuantumRegister &DebuggerSession::initialState() const noexcept {
@@ -60,34 +66,41 @@ namespace quantum_sim::debug {
     }
 
     const quantum::QuantumRegister &DebuggerSession::stateBeforeCurrentStep() const noexcept {
-        if (currentStep_ == 0) {
-            // Step zero compares against the user-provided initial register.
+        if (currentStepNumber_ <= 1U) {
+            // Step zero and the first instruction both begin at the initial register.
             return initialState_;
         }
 
         // Later steps compare against the state after the previous instruction.
-        return trace_[currentStep_ - 1].state;
+        return trace_[currentStepNumber_ - 2U].state;
     }
 
     const circuit::CircuitInstructionInfo &DebuggerSession::currentInstruction() const {
-        return instructions_.at(currentStep_);
+        if (isAtInitialState()) {
+            throw std::logic_error{
+                "DebuggerSession::currentInstruction called at initial step zero"
+            };
+        }
+
+        return instructions_.at(currentStepNumber_ - 1U);
     }
 
     DebuggerSnapshot DebuggerSession::snapshot() const {
-        if (trace_.empty()) {
-            // Empty circuits still need a stable snapshot so the GUI can render.
+        if (isAtInitialState()) {
+            // Step zero is available for both empty and populated circuits.
             return DebuggerSnapshot{
-                .currentStepIndex = 0,
-                .stepCount = 0,
+                .currentStepNumber = 0U,
+                .stepCount = stepCount(),
                 .instruction = std::nullopt,
                 .beforeState = initialState_,
                 .afterState = initialState_,
-                .canMoveNext = false,
+                .canMoveNext = canMoveNext(),
                 .canMovePrevious = false
             };
         }
+
         return DebuggerSnapshot{
-            currentStepIndex(),
+            currentStepNumber(),
             stepCount(),
             std::cref(currentInstruction()),
             std::cref(stateBeforeCurrentStep()),
@@ -112,7 +125,17 @@ namespace quantum_sim::debug {
             throw std::out_of_range{"DebuggerSession::moveToStep index out of range"};
         }
 
-        currentStep_ = index;
+        currentStepNumber_ = index + 1U;
+    }
+
+    void DebuggerSession::moveToStepNumber(const std::size_t stepNumber) {
+        if (stepNumber > trace_.size()) {
+            throw std::out_of_range{
+                "DebuggerSession::moveToStepNumber step number out of range"
+            };
+        }
+
+        currentStepNumber_ = stepNumber;
     }
 
     void DebuggerSession::rebuild(const circuit::QuantumCircuit &circuit,
@@ -125,7 +148,7 @@ namespace quantum_sim::debug {
 
         instructions_ = circuit.instructionInfo();
 
-        currentStep_ = 0;
+        currentStepNumber_ = 0U;
     }
 
     bool DebuggerSession::hasSteps() const noexcept {
