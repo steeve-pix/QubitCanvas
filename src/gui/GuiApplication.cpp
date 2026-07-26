@@ -1769,15 +1769,12 @@ namespace quantum_sim::gui {
 
             recordCircuitForUndo();
 
-            // Controlled, CZ, SWAP, and iSWAP all enter the circuit as full-register matrices.
-            circuit_.insertControlledGate(
+            // Two-qubit placements retain only their local 4x4 matrix, keeping
+            // large-register edits responsive and inexpensive to undo.
+            circuit_.insertTwoQubitGate(
                 instructionIndex,
                 gateName,
-                createControlledGateMatrix(
-                    gateName,
-                    controlQubit,
-                    targetQubit
-                ),
+                createTwoQubitGateMatrix(gateName),
                 controlQubit,
                 targetQubit
             );
@@ -1834,46 +1831,27 @@ namespace quantum_sim::gui {
         circuitRenderer_.cancelPlacement();
     }
 
-    math::ComplexMatrix GuiApplication::createControlledGateMatrix(const std::string &gateName,
-                                                                   std::size_t controlQubit,
-                                                                   std::size_t targetQubit) const {
+    math::ComplexMatrix GuiApplication::createTwoQubitGateMatrix(
+        const std::string &gateName
+    ) {
         if (gateName == "CX") {
-            return gates::cxGate(
-                circuit_.qubitCount(),
-                controlQubit,
-                targetQubit
-            );
+            return gates::cxGate();
         }
 
         if (gateName == "CY") {
-            return gates::cyGate(
-                circuit_.qubitCount(),
-                controlQubit,
-                targetQubit
-            );
+            return gates::cyGate();
         }
 
         if (gateName == "CZ") {
-            return gates::czGate(
-                circuit_.qubitCount(),
-                controlQubit,
-                targetQubit
-            );
+            return gates::czGate();
         }
 
         if (gateName == "SWAP") {
-            return gates::swapGate(
-                circuit_.qubitCount(),
-                controlQubit,
-                targetQubit
-            );
+            return gates::swapGate();
         }
 
         if (gateName == "iSWAP") {
-            return gates::iSwapGate(
-                circuit_.qubitCount(),
-                controlQubit,
-                targetQubit);
+            return gates::iSwapGate();
         }
 
         throw std::invalid_argument(

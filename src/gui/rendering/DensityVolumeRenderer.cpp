@@ -254,10 +254,6 @@ namespace quantum_sim::gui::density_volume {
                 };
             }
 
-            const std::size_t maximumVertexCount =
-                    maximumVoxelCount *
-                    MeshBuilder::verticesPerVoxel;
-
             const std::size_t maximumIndexCount =
                     maximumVoxelCount *
                     MeshBuilder::indicesPerBeveledVoxel;
@@ -274,13 +270,13 @@ namespace quantum_sim::gui::density_volume {
             }
 
             sceneMesh_ = Mesh{};
-            sceneMesh_.vertices.reserve(maximumVertexCount);
-            sceneMesh_.indices.reserve(maximumIndexCount);
-            sceneMesh_.pickRecords.reserve(maximumVoxelCount);
 
+            // Begin empty and grow with the visible debugger history. Reserving
+            // the final 260-layer mesh here made large presets allocate hundreds
+            // of megabytes before the first frame was displayed.
             allocateMeshStorage(
-                maximumVertexCount,
-                maximumIndexCount
+                0U,
+                0U
             );
 
             layerIndexCounts_.assign(stack.layers.size(), 0U);
@@ -1177,48 +1173,91 @@ void main() {
     ) {
         if (
             firstVertex > mesh.vertices.size() ||
-            firstIndex > mesh.indices.size() ||
+            firstIndex > mesh.indices.size()
+        ) {
+            throw std::runtime_error{
+                "Density Volume incremental mesh suffix is outside the mesh."
+            };
+        }
+
+        std::size_t uploadFirstVertex =
+                firstVertex;
+
+        std::size_t uploadFirstIndex =
+                firstIndex;
+
+        if (
             mesh.vertices.size() > vertexCapacity_ ||
             mesh.indices.size() > indexCapacity_
         ) {
-            throw std::runtime_error{
-                "Density Volume incremental mesh exceeds allocated GPU storage."
+            const auto grownCapacity =
+                    [](
+                        const std::size_t current,
+                        const std::size_t required
+                    ) {
+                if (current == 0U) {
+                    return required;
+                }
+
+                const std::size_t growth =
+                        current / 2U;
+
+                if (
+                    growth >
+                    std::numeric_limits<std::size_t>::max() - current
+                ) {
+                    return required;
+                }
+
+                return std::max(
+                    required,
+                    current + growth
+                );
             };
+
+            allocateMeshStorage(
+                grownCapacity(vertexCapacity_, mesh.vertices.size()),
+                grownCapacity(indexCapacity_, mesh.indices.size())
+            );
+
+            // New OpenGL buffers are empty, so upload the complete retained mesh.
+            uploadFirstVertex = 0U;
+            uploadFirstIndex = 0U;
         }
 
         glBindVertexArray(vertexArray_);
 
-        if (firstVertex < mesh.vertices.size()) {
+        if (uploadFirstVertex < mesh.vertices.size()) {
             glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
             glBufferSubData(
                 GL_ARRAY_BUFFER,
                 static_cast<GLintptr>(
-                    firstVertex * sizeof(MeshVertex)
+                    uploadFirstVertex * sizeof(MeshVertex)
                 ),
                 static_cast<GLsizeiptr>(
                     (
                         mesh.vertices.size() -
-                        firstVertex
+                        uploadFirstVertex
                     ) * sizeof(MeshVertex)
                 ),
-                mesh.vertices.data() + firstVertex
+                mesh.vertices.data() + uploadFirstVertex
             );
         }
 
-        if (firstIndex < mesh.indices.size()) {
+        if (uploadFirstIndex < mesh.indices.size()) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer_);
             glBufferSubData(
                 GL_ELEMENT_ARRAY_BUFFER,
                 static_cast<GLintptr>(
-                    firstIndex * sizeof(std::uint32_t)
+                    uploadFirstIndex * sizeof(std::uint32_t)
                 ),
                 static_cast<GLsizeiptr>(
                     (
                         mesh.indices.size() -
-                        firstIndex
+                        uploadFirstIndex
                     ) * sizeof(std::uint32_t)
                 ),
-                mesh.indices.data() + firstIndex
+                mesh.indices.data() + uploadFirstIndex
             );
         }
 
