@@ -67,7 +67,7 @@ namespace quantum_sim::gui {
         /**
          * Creates a supported single-qubit gate by display name.
          *
-         * @param gateName Gate name such as H, X, Y, Z, S, T, Rx, Ry, or Rz.
+         * @param gateName Gate name such as H, X, Y, Z, S, Sdg, T, Tdg, Rx, Ry, or Rz.
          * @param angleRadians Required rotation angle for Rx, Ry, and Rz.
          * @return 2x2 unitary gate matrix.
          * @throws std::invalid_argument if the gate is unsupported or a rotation has no angle.

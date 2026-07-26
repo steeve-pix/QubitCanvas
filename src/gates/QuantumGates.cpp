@@ -114,6 +114,19 @@ namespace quantum_sim::gates {
         };
     };
 
+    math::ComplexMatrix sDaggerGate() {
+        // S-dagger reverses S by applying the conjugate phase -i to |1>.
+        return math::ComplexMatrix{
+            2, 2,
+            std::vector{
+                math::Complex{1.0, 0.0},
+                math::Complex{},
+                math::Complex{},
+                math::Complex{0.0, -1.0},
+            }
+        };
+    }
+
     math::ComplexMatrix tGate() {
         // T is the fourth root of Z: phase angle pi/4 on |1>.
         const double phase =

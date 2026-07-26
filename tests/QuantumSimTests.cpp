@@ -392,6 +392,9 @@ int main() {
     const ComplexMatrix tDagger =
             quantum_sim::gates::tDaggerGate();
 
+    const ComplexMatrix sDagger =
+            quantum_sim::gates::sDaggerGate();
+
     check(
         approximatelyEqual(rx.at(0, 0).real(), 0.0) &&
         approximatelyEqual(rx.at(0, 1).imaginary(), -1.0) &&
@@ -411,6 +414,19 @@ int main() {
         approximatelyEqual(rz.at(1, 1).imaginary(), 1.0) &&
         approximatelyEqual(rz.at(0, 1).magnitude(), 0.0),
         "Rz(pi) applies opposite diagonal phases"
+    );
+
+    check(
+        approximatelyEqual(sDagger.at(0, 0).real(), 1.0) &&
+        approximatelyEqual(sDagger.at(1, 1).real(), 0.0) &&
+        approximatelyEqual(sDagger.at(1, 1).imaginary(), -1.0),
+        "S-dagger applies the inverse pi/2 phase"
+    );
+
+    check(
+        quantum_sim::debug::gateExplanation("Sdg").find("-pi/2") !=
+        std::string::npos,
+        "S-dagger has a debugger and hover-card explanation"
     );
 
     check(

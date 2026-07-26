@@ -37,6 +37,9 @@ namespace {
         if (gateName == "S") {
             return "PHASE-S";
         }
+        if (gateName == "Sdg") {
+            return "PHASE-S DAGGER";
+        }
         if (gateName == "T") {
             return "PHASE-T";
         }
@@ -91,6 +94,9 @@ namespace {
         }
         if (gateName == "S") {
             return gates::sGate();
+        }
+        if (gateName == "Sdg") {
+            return gates::sDaggerGate();
         }
         if (gateName == "T") {
             return gates::tGate();
@@ -280,6 +286,11 @@ namespace quantum_sim::gui {
         {
             "S",
             "S gate: applies a quarter-turn phase shift."
+        },
+        {
+            "Sdg",
+            "Inverse S gate: rotates the |1> phase by -pi/2 radians. "
+            "It cancels the S gate."
         },
         {
             "T",

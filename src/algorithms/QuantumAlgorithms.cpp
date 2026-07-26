@@ -144,7 +144,7 @@ namespace quantum_sim::algorithms {
             circuit.addSingleQubitGate(
                 qubit % 2U == 0U ? "Sdg" : "Tdg",
                 qubit % 2U == 0U
-                    ? gates::sGate().conjugateTranspose()
+                    ? gates::sDaggerGate()
                     : gates::tGate().conjugateTranspose(),
                 qubit
             );
