@@ -71,7 +71,10 @@ see its name, purpose, and unitary matrix.
 - Coherent teleportation
 - Mixed-gate scramble
 
-The register control supports 1 to 10 qubits for applicable presets.
+The algorithm register slider controls the circuit size for every preset from
+1 to 10 qubits. Presets that require two or three working qubits are disabled
+below their minimum. Fixed demonstrations use their leading qubits and leave
+any additional register qubits in the initial state.
 
 ## Build
 

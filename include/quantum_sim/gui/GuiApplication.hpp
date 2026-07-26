@@ -236,9 +236,17 @@ namespace quantum_sim::gui {
          * Builds a circuit for one built-in preset.
          *
          * @param preset Preset to build.
-         * @return Newly constructed circuit.
+         * @return Circuit whose register size matches presetQubitCount_.
          */
         [[nodiscard]] circuit::QuantumCircuit createPresetCircuit(CircuitPreset preset) const;
+
+        /**
+         * Returns the smallest register accepted by a built-in circuit.
+         *
+         * @param preset Preset whose requirement should be queried.
+         * @return Minimum supported qubit count.
+         */
+        [[nodiscard]] static int minimumQubitCount(CircuitPreset preset) noexcept;
 
         /**
          * Samples the current state and stores a display label for the status bar.
