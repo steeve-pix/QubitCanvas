@@ -15,6 +15,30 @@ namespace quantum_sim::gui::density_volume {
             hash *= fnvPrime;
         }
 
+        [[nodiscard]] std::size_t bitReversedDisplayIndex(
+            std::size_t displayIndex,
+            const std::size_t dimension
+        ) noexcept {
+            if (!std::has_single_bit(dimension)) {
+                return displayIndex;
+            }
+
+            const unsigned int bitCount =
+                    std::bit_width(dimension) - 1U;
+
+            std::size_t basisIndex{};
+
+            for (unsigned int bit = 0U; bit < bitCount; ++bit) {
+                basisIndex =
+                        (basisIndex << 1U) |
+                        (displayIndex & 1U);
+
+                displayIndex >>= 1U;
+            }
+
+            return basisIndex;
+        }
+
         [[nodiscard]] DensityBin buildBin(
             const quantum::QuantumRegister &state,
             const std::size_t binIndex,
@@ -110,9 +134,26 @@ namespace quantum_sim::gui::density_volume {
 
             layer.bins.reserve(dimension);
 
-            for (std::size_t binIndex = 0; binIndex < dimension; ++binIndex) {
+            for (
+                std::size_t displayBinIndex = 0U;
+                displayBinIndex < dimension;
+                ++displayBinIndex
+            ) {
+                // The simulator remains q0-most-significant. Reordering only
+                // the display axes makes q0 the fastest-changing visual axis,
+                // matching the reference density-matrix convention.
+                const std::size_t basisBinIndex =
+                        bitReversedDisplayIndex(
+                            displayBinIndex,
+                            dimension
+                        );
+
                 layer.bins.push_back(
-                    buildBin(state, binIndex, dimension)
+                    buildBin(
+                        state,
+                        basisBinIndex,
+                        dimension
+                    )
                 );
             }
 

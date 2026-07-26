@@ -48,7 +48,10 @@ namespace quantum_sim::gui::density_volume {
         std::vector<DensityCell> cells;
 
         /**
-         * Returns a matrix cell using row-major indexing.
+         * Returns a matrix cell using row-major display indexing.
+         *
+         * Display axes use bit-reversed basis ordering so q0 changes along
+         * adjacent cells without changing the simulator's numerical convention.
          *
          * @throws std::out_of_range when row or column is outside dimension.
          */
@@ -69,6 +72,10 @@ namespace quantum_sim::gui::density_volume {
 
     /**
      * Converts debugger states into exact or explicitly bucketed density data.
+     *
+     * Rows and columns are arranged in bit-reversed display order for both the
+     * 2D heatmap and 3D volume. State amplitudes and circuit execution remain
+     * in the simulator's q0-most-significant convention.
      */
     class DensityModel {
     public:
@@ -77,7 +84,8 @@ namespace quantum_sim::gui::density_volume {
          *
          * Registers with at most maximumDimension states keep every exact
          * density-matrix cell. Larger registers are grouped into probability
-         * preserving row/column buckets.
+         * preserving row/column buckets. Both forms receive the same
+         * bit-reversed visual axis ordering.
          *
          * @param session Debugger trace whose initial and post-step states are converted.
          * @param maximumDimension Largest square matrix dimension to generate.
