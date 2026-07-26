@@ -624,8 +624,20 @@ namespace quantum_sim::gui {
                     !placementModeActive &&
                     ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
-            if (stepBadgeClicked) {
+            const bool stepBadgeDoubleClicked =
+                    stepBadgeHovered &&
+                    !placementModeActive &&
+                    ImGui::IsMouseDoubleClicked(
+                        ImGuiMouseButton_Left
+                    );
+
+            if (stepBadgeDoubleClicked) {
+                gateClickedThisFrame = true;
+                selectedInstructionIndex_ = instructionIndex;
+                requestedStepJumpIndex_ = instructionIndex;
+            } else if (stepBadgeClicked) {
                 // Step badges select gates without requiring a precise gate click.
+                gateClickedThisFrame = true;
                 selectedInstructionIndex_ = instructionIndex;
             }
 
@@ -736,7 +748,21 @@ namespace quantum_sim::gui {
                         !placementModeActive && hovered &&
                         ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
-                if (clicked) {
+                const bool doubleClicked =
+                        !placementModeActive &&
+                        hovered &&
+                        ImGui::IsMouseDoubleClicked(
+                            ImGuiMouseButton_Left
+                        );
+
+                if (doubleClicked) {
+                    gateClickedThisFrame = true;
+                    selectedInstructionIndex_ =
+                            instructionIndex;
+
+                    requestedStepJumpIndex_ =
+                            instructionIndex;
+                } else if (clicked) {
                     gateClickedThisFrame = true;
 
                     if (selectedInstructionIndex_.has_value() &&
@@ -1148,7 +1174,21 @@ namespace quantum_sim::gui {
                     hovered &&
                     ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
-            if (clicked) {
+            const bool doubleClicked =
+                    hovered &&
+                    !placementModeActive &&
+                    ImGui::IsMouseDoubleClicked(
+                        ImGuiMouseButton_Left
+                    );
+
+            if (doubleClicked) {
+                gateClickedThisFrame = true;
+                selectedInstructionIndex_ =
+                        instructionIndex;
+
+                requestedStepJumpIndex_ =
+                        instructionIndex;
+            } else if (clicked) {
                 gateClickedThisFrame = true;
                 if (
                     selectedInstructionIndex_.has_value() &&
@@ -1269,6 +1309,14 @@ namespace quantum_sim::gui {
 
     std::optional<std::size_t> CircuitRenderer::selectedInstructionIndex() const noexcept {
         return selectedInstructionIndex_;
+    }
+
+    std::optional<std::size_t> CircuitRenderer::consumeStepJumpRequest() noexcept {
+        const std::optional<std::size_t> request =
+                requestedStepJumpIndex_;
+
+        requestedStepJumpIndex_.reset();
+        return request;
     }
 
     void CircuitRenderer::clearSelection() noexcept {

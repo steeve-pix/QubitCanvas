@@ -50,6 +50,7 @@ intensity, phase in radians, real component, and imaginary component.
 | Mouse wheel | Zoom |
 | `R` | Reset the camera |
 | Click a voxel | Select its density layer |
+| Double-click a circuit step or gate | Jump the debugger to that step |
 
 ## Gate Library
 
