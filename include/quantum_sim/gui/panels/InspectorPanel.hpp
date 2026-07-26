@@ -4,6 +4,7 @@
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/debug/DebuggerSession.hpp"
 #include "quantum_sim/gui/rendering/BlochSphereRenderer.hpp"
+#include "quantum_sim/gui/rendering/QaveDensityModel.hpp"
 
 #include <array>
 #include <cstddef>
@@ -23,6 +24,8 @@ namespace quantum_sim::gui {
          * @param snapshot Current debugger state to display.
          * @param circuit Circuit whose instruction metadata is inspected.
          * @param selectedInstructionIndex Optional circuit selection from the renderer.
+         * @param densityStack Density history shared with the OpenGL viewport.
+         * @param selectedDensityLayer Layer synchronized between the 2D and 3D views.
          * @param headingFont Font used for the panel title.
          * @return True when the panel jumped to the selected instruction.
          */
@@ -31,6 +34,8 @@ namespace quantum_sim::gui {
             const debug::DebuggerSnapshot &snapshot,
             const circuit::QuantumCircuit &circuit,
             std::optional<std::size_t> selectedInstructionIndex,
+            const qave::DensityStack &densityStack,
+            std::size_t &selectedDensityLayer,
             ImFont *headingFont
         );
 
@@ -112,9 +117,15 @@ namespace quantum_sim::gui {
         /**
          * Draws all quantum-state inspection widgets.
          *
-         * @param state Register to inspect.
+         * @param session Session containing every historical register state.
+         * @param densityStack Density history rendered in both QAVE views.
+         * @param selectedDensityLayer Shared selected layer.
          */
-        void drawQuantumState(const quantum::QuantumRegister &state);
+        void drawQuantumState(
+            debug::DebuggerSession &session,
+            const qave::DensityStack &densityStack,
+            std::size_t &selectedDensityLayer
+        );
 
         /**
          * Draws per-qubit marginal probability bars.
@@ -124,11 +135,17 @@ namespace quantum_sim::gui {
         void drawProbabilities(const quantum::QuantumRegister &state);
 
         /**
-         * Draws compact color cells for all amplitudes.
+         * Draws the synchronized 2D density-matrix layer selector.
          *
-         * @param state Register to visualize.
+         * @param session Session updated when a post-gate layer is selected.
+         * @param densityStack Shared numerical density history.
+         * @param selectedDensityLayer Shared selected layer.
          */
-        void drawStateHeatmap(const quantum::QuantumRegister &state);
+        void drawLayerStack(
+            debug::DebuggerSession &session,
+            const qave::DensityStack &densityStack,
+            std::size_t &selectedDensityLayer
+        );
 
         /**
          * Draws searchable, capped amplitude rows for large registers.
@@ -157,18 +174,5 @@ namespace quantum_sim::gui {
             ImFont *headingFont
         );
 
-        /**
-         * Chooses whether the inspector shows selected-instruction state or current debugger state.
-         *
-         * @param session Debugger session containing trace states.
-         * @param snapshot Current debugger state.
-         * @param selectedInstructionIndex Optional renderer selection.
-         * @return Register state to inspect for this frame.
-         */
-        [[nodiscard]] const quantum::QuantumRegister &resolveInspectedState(
-            const debug::DebuggerSession &session,
-            const debug::DebuggerSnapshot &snapshot,
-            std::optional<std::size_t> selectedInstructionIndex
-        ) const;
     };
 }

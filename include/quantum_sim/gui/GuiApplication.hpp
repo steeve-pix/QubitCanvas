@@ -8,7 +8,9 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "rendering/BlochSphereRenderer.hpp"
 #include "rendering/CircuitRenderer.hpp"
-#include "rendering/QaveCubeRenderer.hpp"
+#include "rendering/QaveCameraController.hpp"
+#include "rendering/QaveDensityModel.hpp"
+#include "rendering/QaveRenderer.hpp"
 
 #include <optional>
 #include <random>
@@ -110,7 +112,9 @@ namespace quantum_sim::gui {
         debug::DebuggerSession session_;
         InspectorPanel inspectorPanel_;
         CircuitRenderer circuitRenderer_;
-        QaveCubeRenderer qaveCubeRenderer_;
+        qave::Renderer qaveRenderer_;
+        qave::CameraController qaveCamera_;
+        qave::DensityStack qaveDensityStack_;
         GateLibraryPanel gateLibraryPanel_;
         std::optional<std::string> pendingGate_;
         std::optional<double> pendingRotationAngleRadians_;
@@ -127,11 +131,33 @@ namespace quantum_sim::gui {
         double nextAutoStepAt_{0.0};
         float heatAmount_{0.78F};
         std::string lastSampleLabel_{"none"};
+        std::size_t selectedQaveLayer_{};
+        std::optional<std::size_t> lastQaveDebuggerStep_;
+        bool qavePointerDragged_{false};
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
          */
         void rebuildDebuggerAfterCircuitEdit();
+
+        /**
+         * Recomputes the shared 2D/3D density history after a trace rebuild.
+         */
+        void rebuildQaveDensityStack();
+
+        /**
+         * Follows debugger navigation while preserving an explicit initial-layer selection.
+         *
+         * @param snapshot Current debugger navigation state.
+         */
+        void synchronizeQaveLayer(const debug::DebuggerSnapshot &snapshot);
+
+        /**
+         * Selects one density layer and synchronizes post-gate layers to the debugger.
+         *
+         * @param layerIndex Initial or post-gate density layer index.
+         */
+        void selectQaveLayer(std::size_t layerIndex);
 
         /**
          * Stores the current circuit for undo and clears stale redo history.
