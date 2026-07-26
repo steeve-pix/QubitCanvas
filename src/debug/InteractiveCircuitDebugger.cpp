@@ -78,6 +78,11 @@ namespace quantum_sim::debug {
                     "Leaves |0> unchanged and multiplies the |1> amplitude by i. "
                     "This adds a phase of pi/2 radians.";
         }
+        if (gateName == "Sdg") {
+            return
+                    "Applies the inverse S phase: |0> stays unchanged and |1> "
+                    "receives a phase of -pi/2 radians.";
+        }
         if (gateName == "T") {
             return
                     "Leaves |0> unchanged and adds a phase of pi/4 radians "

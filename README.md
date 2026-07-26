@@ -49,7 +49,7 @@ and imaginary component.
 
 | Category | Gates |
 | --- | --- |
-| Single-qubit | `H`, `X`, `Y`, `Z`, `S`, `T`, `Tdg` |
+| Single-qubit | `H`, `X`, `Y`, `Z`, `S`, `Sdg`, `T`, `Tdg` |
 | Rotations | `Rx`, `Ry`, `Rz` |
 | Controlled and exchange | `CX`, `CY`, `CZ`, `SWAP`, `iSWAP` |
 

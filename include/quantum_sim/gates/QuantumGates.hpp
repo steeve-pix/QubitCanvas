@@ -49,6 +49,11 @@ namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix sGate();
 
     /**
+     * @return Inverse S phase gate, diag(1, -i).
+     */
+    [[nodiscard]] math::ComplexMatrix sDaggerGate();
+
+    /**
      * @return T phase gate, diag(1, exp(i*pi/4)).
      */
     [[nodiscard]] math::ComplexMatrix tGate();
