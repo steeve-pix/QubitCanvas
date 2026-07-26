@@ -198,8 +198,13 @@ namespace quantum_sim::gui {
          *
          * @param position Screen-space top-left corner of the panel.
          * @param size Screen-space width and height of the panel.
+         * @param snapshot Current debugger state shown by the selected density layer.
          */
-        void drawDensityVolumeViewport(const ImVec2 &position, const ImVec2 &size);
+        void drawDensityVolumeViewport(
+            const ImVec2 &position,
+            const ImVec2 &size,
+            const debug::DebuggerSnapshot &snapshot
+        );
 
         /**
          * Opens rich demo traces at a settled mid-history frame.
