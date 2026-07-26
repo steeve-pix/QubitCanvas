@@ -1,9 +1,9 @@
-#include "quantum_sim/gui/rendering/QaveLayerStackLayout.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeLayout.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     namespace {
         constexpr float matrixSide = 10.5F;
         constexpr float stackBaseThickness = 0.020F;

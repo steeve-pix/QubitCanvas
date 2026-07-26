@@ -1,6 +1,6 @@
-#include "quantum_sim/gui/rendering/QaveRenderer.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeRenderer.hpp"
 
-#include "quantum_sim/gui/rendering/QaveLayerStackLayout.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeLayout.hpp"
 
 #include <glad/gl.h>
 
@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     namespace {
         [[nodiscard]] unsigned int compileShader(
             const unsigned int shaderType,
@@ -72,7 +72,7 @@ namespace quantum_sim::gui::qave {
         const VisualizationMode mode
     ) {
         if (!initialized_) {
-            throw std::runtime_error{"QAVE renderer is not initialized."};
+            throw std::runtime_error{"Density Volume renderer is not initialized."};
         }
 
         if (
@@ -113,7 +113,7 @@ namespace quantum_sim::gui::qave {
         const CameraController &camera
     ) {
         if (!initialized_) {
-            throw std::runtime_error{"QAVE renderer is not initialized."};
+            throw std::runtime_error{"Density Volume renderer is not initialized."};
         }
 
         const int safeWidth =
@@ -425,7 +425,7 @@ void main() {
                 compileShader(
                     GL_VERTEX_SHADER,
                     vertexShaderSource,
-                    "QAVE vertex shader"
+                    "Density Volume vertex shader"
                 );
 
         unsigned int fragmentShader{};
@@ -435,7 +435,7 @@ void main() {
                     compileShader(
                         GL_FRAGMENT_SHADER,
                         fragmentShaderSource,
-                        "QAVE fragment shader"
+                        "Density Volume fragment shader"
                     );
 
             shaderProgram_ =
@@ -465,7 +465,7 @@ void main() {
                 );
 
                 throw std::runtime_error{
-                    std::string{"Failed to link QAVE shader program: "} + log
+                    std::string{"Failed to link Density Volume shader program: "} + log
                 };
             }
         } catch (...) {
@@ -499,7 +499,7 @@ void main() {
             projectionUniform_ < 0 ||
             selectedLayerUniform_ < 0
         ) {
-            throw std::runtime_error{"QAVE shader uniforms are unavailable."};
+            throw std::runtime_error{"Density Volume shader uniforms are unavailable."};
         }
     }
 
@@ -579,7 +579,7 @@ void main() {
 
     void Renderer::uploadMesh(const Mesh &mesh) {
         if (mesh.indices.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-            throw std::runtime_error{"QAVE mesh exceeds OpenGL draw-index limits."};
+            throw std::runtime_error{"Density Volume mesh exceeds OpenGL draw-index limits."};
         }
 
         glBindVertexArray(vertexArray_);
@@ -711,7 +711,7 @@ void main() {
         );
 
         if (framebufferStatus != GL_FRAMEBUFFER_COMPLETE) {
-            throw std::runtime_error{"QAVE framebuffer is incomplete."};
+            throw std::runtime_error{"Density Volume framebuffer is incomplete."};
         }
 
         framebufferWidth_ = width;

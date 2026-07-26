@@ -1,11 +1,11 @@
-#include "quantum_sim/gui/rendering/QaveColorMap.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <numbers>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     namespace {
         [[nodiscard]] Color mix(
             const Color &left,

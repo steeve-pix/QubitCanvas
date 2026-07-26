@@ -1,9 +1,9 @@
-#include "quantum_sim/gui/rendering/QaveMath.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeMath.hpp"
 
 #include <cmath>
 #include <stdexcept>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     Vector3 operator+(const Vector3 &left, const Vector3 &right) noexcept {
         return Vector3{
             left.x + right.x,
@@ -49,7 +49,7 @@ namespace quantum_sim::gui::qave {
                 length(value);
 
         if (vectorLength <= 0.000001F) {
-            throw std::runtime_error{"Cannot normalize a zero-length QAVE vector."};
+            throw std::runtime_error{"Cannot normalize a zero-length Density Volume vector."};
         }
 
         return Vector3{

@@ -1,14 +1,14 @@
 #pragma once
 
-#include "quantum_sim/gui/rendering/QaveLayerStackLayout.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeLayout.hpp"
 
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     /**
-     * Interleaved vertex uploaded to the QAVE OpenGL VBO.
+     * Interleaved vertex uploaded to the Density Volume OpenGL VBO.
      */
     struct MeshVertex {
         float position[3]{};

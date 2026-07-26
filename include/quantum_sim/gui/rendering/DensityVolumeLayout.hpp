@@ -1,13 +1,13 @@
 #pragma once
 
-#include "quantum_sim/gui/rendering/QaveColorMap.hpp"
-#include "quantum_sim/gui/rendering/QaveDensityModel.hpp"
-#include "quantum_sim/gui/rendering/QaveMath.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeMath.hpp"
 
 #include <cstddef>
 #include <vector>
 
-namespace quantum_sim::gui::qave {
+namespace quantum_sim::gui::density_volume {
     /**
      * Spatial presentation used for the shared density-matrix data.
      */
