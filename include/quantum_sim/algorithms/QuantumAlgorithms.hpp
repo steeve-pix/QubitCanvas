@@ -5,9 +5,17 @@
 
 namespace quantum_sim::algorithms {
     /**
-     * @return Two-qubit Bell-state demo circuit: H(q0), CX(q0 -> q1).
+     * Builds a Bell-state demonstration in the leading two qubits.
+     *
+     * Additional register qubits remain in their initial state.
+     *
+     * @param qubitCount Total register size. Must be at least 2.
+     * @return Circuit containing H(q0) and CX(q0 -> q1).
+     * @throws std::invalid_argument if qubitCount is less than 2.
      */
-    [[nodiscard]] circuit::QuantumCircuit bellStateCircuit();
+    [[nodiscard]] circuit::QuantumCircuit bellStateCircuit(
+        std::size_t qubitCount = 2U
+    );
 
     /**
      * Builds a register-wide equal superposition circuit.
@@ -36,26 +44,43 @@ namespace quantum_sim::algorithms {
     [[nodiscard]] circuit::QuantumCircuit inverseQftCircuit(std::size_t qubitCount);
 
     /**
-     * @return Three-qubit GHZ circuit: H(q0), CX(q0 -> q1), CX(q1 -> q2).
+     * Builds a GHZ state across the complete selected register.
+     *
+     * @param qubitCount Number of qubits in the GHZ chain.
+     * @return Circuit containing H(q0) followed by nearest-neighbor CX gates.
+     * @throws std::invalid_argument if qubitCount is zero.
      */
-    [[nodiscard]] circuit::QuantumCircuit ghzStateCircuit();
+    [[nodiscard]] circuit::QuantumCircuit ghzStateCircuit(
+        std::size_t qubitCount = 3U
+    );
 
     /**
-     * Builds the canonical two-qubit Grover search for the marked state |11>.
+     * Builds the canonical two-qubit Grover search for the marked state |11>
+     * in the leading two qubits.
      *
-     * @return Two-qubit circuit with one phase-oracle and diffusion iteration.
+     * Additional register qubits remain in their initial state.
+     *
+     * @param qubitCount Total register size. Must be at least 2.
+     * @return Circuit with one phase-oracle and diffusion iteration on q0/q1.
+     * @throws std::invalid_argument if qubitCount is less than 2.
      */
-    [[nodiscard]] circuit::QuantumCircuit groverSearchCircuit();
+    [[nodiscard]] circuit::QuantumCircuit groverSearchCircuit(
+        std::size_t qubitCount = 2U
+    );
 
     /**
      * Builds a balanced Deutsch-Jozsa demonstration.
      *
-     * q0 and q1 are input qubits, q2 is the oracle ancilla, and the balanced
-     * function is f(x) = x0 XOR x1.
+     * q0 through q(n - 2) are input qubits and q(n - 1) is the oracle ancilla.
+     * The balanced function is the parity of every input bit.
      *
-     * @return Three-qubit Deutsch-Jozsa circuit.
+     * @param qubitCount Total register size. Must be at least 2.
+     * @return Circuit using qubitCount - 1 inputs and one ancilla.
+     * @throws std::invalid_argument if qubitCount is less than 2.
      */
-    [[nodiscard]] circuit::QuantumCircuit deutschJozsaCircuit();
+    [[nodiscard]] circuit::QuantumCircuit deutschJozsaCircuit(
+        std::size_t qubitCount = 3U
+    );
 
     /**
      * Builds a Bernstein-Vazirani circuit for a caller-provided hidden bit string.
@@ -79,9 +104,15 @@ namespace quantum_sim::algorithms {
      * The circuit prepares q0 and q1 as |1>, then toggles q2 through a standard
      * decomposition so execution from |000> finishes in |111>.
      *
-     * @return Three-qubit decomposed Toffoli demonstration.
+     * Additional register qubits remain in their initial state.
+     *
+     * @param qubitCount Total register size. Must be at least 3.
+     * @return Decomposed Toffoli demonstration on q0, q1, and q2.
+     * @throws std::invalid_argument if qubitCount is less than 3.
      */
-    [[nodiscard]] circuit::QuantumCircuit toffoliDemoCircuit();
+    [[nodiscard]] circuit::QuantumCircuit toffoliDemoCircuit(
+        std::size_t qubitCount = 3U
+    );
 
     /**
      * Builds a two-qubit phase-kickback demonstration.
@@ -89,9 +120,15 @@ namespace quantum_sim::algorithms {
      * The target is prepared in |-> before a controlled-X oracle. A final
      * Hadamard pass exposes the kicked-back phase as the basis state |11>.
      *
-     * @return Two-qubit phase-kickback circuit.
+     * Additional register qubits remain in their initial state.
+     *
+     * @param qubitCount Total register size. Must be at least 2.
+     * @return Phase-kickback circuit on q0 and q1.
+     * @throws std::invalid_argument if qubitCount is less than 2.
      */
-    [[nodiscard]] circuit::QuantumCircuit phaseKickbackCircuit();
+    [[nodiscard]] circuit::QuantumCircuit phaseKickbackCircuit(
+        std::size_t qubitCount = 2U
+    );
 
     /**
      * Builds a coherent three-qubit teleportation demonstration.
@@ -100,9 +137,15 @@ namespace quantum_sim::algorithms {
      * and controlled corrections replace measurement feed-forward so every
      * debugger step remains unitary. The prepared state finishes on q2.
      *
-     * @return Three-qubit coherent teleportation circuit.
+     * Additional register qubits remain in their initial state.
+     *
+     * @param qubitCount Total register size. Must be at least 3.
+     * @return Coherent teleportation circuit on q0, q1, and q2.
+     * @throws std::invalid_argument if qubitCount is less than 3.
      */
-    [[nodiscard]] circuit::QuantumCircuit teleportationCircuit();
+    [[nodiscard]] circuit::QuantumCircuit teleportationCircuit(
+        std::size_t qubitCount = 3U
+    );
 
     /**
      * Builds a deterministic mixed-gate circuit for visualization stress testing.

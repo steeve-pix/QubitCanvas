@@ -15,6 +15,7 @@
 #include <iostream>
 #include <cmath>
 #include <numbers>
+#include <stdexcept>
 #include <string>
 
 #include "quantum_sim/debug/DebuggerSession.hpp"
@@ -101,6 +102,48 @@ int main() {
     check(
         approximatelyEqual(totalProbability, 1.0),
         "QFT showcase preserves total probability"
+    );
+
+    check(
+        quantum_sim::algorithms::bellStateCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::ghzStateCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::equalSuperpositionCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::qftCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::inverseQftCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::groverSearchCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::deutschJozsaCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::bernsteinVaziraniCircuit(3, 0b101).qubitCount() == 4U &&
+        quantum_sim::algorithms::toffoliDemoCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::phaseKickbackCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::teleportationCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::scrambleCircuit(4).qubitCount() == 4U,
+        "Every built-in algorithm honors the selected register size"
+    );
+
+    const QuantumRegister expandedGhzResult =
+            quantum_sim::algorithms::ghzStateCircuit(4).execute(
+                QuantumRegister::basisState(4, 0)
+            );
+
+    check(
+        approximatelyEqual(expandedGhzResult.probability(0), 0.5) &&
+        approximatelyEqual(expandedGhzResult.probability(15), 0.5),
+        "Expanded GHZ entangles the complete selected register"
+    );
+
+    bool rejectedUndersizedBell = false;
+
+    try {
+        static_cast<void>(
+            quantum_sim::algorithms::bellStateCircuit(1)
+        );
+    } catch (const std::invalid_argument &) {
+        rejectedUndersizedBell = true;
+    }
+
+    check(
+        rejectedUndersizedBell,
+        "Bell state rejects a register below its two-qubit minimum"
     );
 
     QuantumCircuit densityCircuit{1};
@@ -257,6 +300,16 @@ int main() {
         "Grover search amplifies the marked state |11>"
     );
 
+    const QuantumRegister expandedGroverResult =
+            quantum_sim::algorithms::groverSearchCircuit(4).execute(
+                QuantumRegister::basisState(4, 0)
+            );
+
+    check(
+        approximatelyEqual(expandedGroverResult.probability(12), 1.0),
+        "Expanded Grover preserves idle qubits while marking q0/q1 as |11>"
+    );
+
     const QuantumRegister deutschJozsaResult =
             quantum_sim::algorithms::deutschJozsaCircuit().execute(
                 QuantumRegister::basisState(3, 0)
@@ -272,6 +325,27 @@ int main() {
             1.0
         ),
         "Deutsch-Jozsa identifies the balanced XOR oracle"
+    );
+
+    const QuantumRegister expandedDeutschJozsaResult =
+            quantum_sim::algorithms::deutschJozsaCircuit(4).execute(
+                QuantumRegister::basisState(4, 0)
+            );
+
+    check(
+        approximatelyEqual(
+            expandedDeutschJozsaResult.probabilityOfQubitOne(0),
+            1.0
+        ) &&
+        approximatelyEqual(
+            expandedDeutschJozsaResult.probabilityOfQubitOne(1),
+            1.0
+        ) &&
+        approximatelyEqual(
+            expandedDeutschJozsaResult.probabilityOfQubitOne(2),
+            1.0
+        ),
+        "Expanded Deutsch-Jozsa uses every input qubit in its parity oracle"
     );
 
     const QuantumRegister bernsteinVaziraniResult =
