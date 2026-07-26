@@ -8,6 +8,7 @@
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
+#include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeScene.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
@@ -376,6 +377,32 @@ int main() {
         "Density Volume density cells preserve phase in radians and complex components"
     );
 
+    const auto weakInfernoColor =
+            quantum_sim::gui::density_volume::magnitudeColor(
+                0.0625
+            );
+
+    const auto mediumInfernoColor =
+            quantum_sim::gui::density_volume::magnitudeColor(
+                0.25
+            );
+
+    const auto peakInfernoColor =
+            quantum_sim::gui::density_volume::magnitudeColor(
+                1.0
+            );
+
+    check(
+        weakInfernoColor.blue > weakInfernoColor.red &&
+        weakInfernoColor.red > weakInfernoColor.green &&
+        mediumInfernoColor.red > mediumInfernoColor.blue &&
+        mediumInfernoColor.blue > mediumInfernoColor.green &&
+        peakInfernoColor.red > 0.95F &&
+        peakInfernoColor.green > 0.90F &&
+        peakInfernoColor.blue > 0.75F,
+        "Density Volume Inferno response preserves violet, crimson, and warm peak bands"
+    );
+
     const quantum_sim::gui::density_volume::InstanceScene floorFieldScene =
             quantum_sim::gui::density_volume::SceneBuilder::build(
                 densityStack,
@@ -445,6 +472,22 @@ int main() {
                 0U,
                 0U
             );
+
+    const auto *floorPeak =
+            findInstance(
+                floorFieldScene,
+                floorFieldScene.voxels,
+                1U,
+                0U,
+                0U
+            );
+
+    check(
+        floorPeak != nullptr &&
+        approximatelyEqual(floorPeak->magnitude, 0.52, 1.0e-5) &&
+        approximatelyEqual(floorPeak->size.y, 4.4, 1.0e-5),
+        "Density Volume floor field normalizes height without clipping its Inferno colors"
+    );
 
     const auto *hadamardPeak =
             findInstance(
