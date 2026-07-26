@@ -377,6 +377,59 @@ int main() {
         "Density Volume density cells preserve phase in radians and complex components"
     );
 
+    QuantumCircuit twoQubitHadamardCircuit{2U};
+    twoQubitHadamardCircuit.addSingleQubitGate(
+        "H",
+        quantum_sim::gates::hadamardGate(),
+        0U
+    );
+
+    const quantum_sim::debug::DebuggerSession twoQubitHadamardSession{
+        twoQubitHadamardCircuit,
+        QuantumRegister::basisState(2U, 0U)
+    };
+
+    const auto twoQubitHadamardStack =
+            quantum_sim::gui::density_volume::DensityModel::build(
+                twoQubitHadamardSession,
+                16U
+            );
+
+    const auto &twoQubitHadamardLayer =
+            twoQubitHadamardStack.layers.at(1U);
+
+    check(
+        twoQubitHadamardLayer.bins.at(0U).label == "|00>" &&
+        twoQubitHadamardLayer.bins.at(1U).label == "|10>" &&
+        twoQubitHadamardLayer.bins.at(2U).label == "|01>" &&
+        twoQubitHadamardLayer.bins.at(3U).label == "|11>",
+        "Density Volume display axes use bit-reversed two-qubit basis order"
+    );
+
+    check(
+        approximatelyEqual(
+            twoQubitHadamardLayer.cellAt(0U, 0U).magnitude,
+            0.5
+        ) &&
+        approximatelyEqual(
+            twoQubitHadamardLayer.cellAt(0U, 1U).magnitude,
+            0.5
+        ) &&
+        approximatelyEqual(
+            twoQubitHadamardLayer.cellAt(1U, 0U).magnitude,
+            0.5
+        ) &&
+        approximatelyEqual(
+            twoQubitHadamardLayer.cellAt(1U, 1U).magnitude,
+            0.5
+        ) &&
+        approximatelyEqual(
+            twoQubitHadamardLayer.cellAt(0U, 2U).magnitude,
+            0.0
+        ),
+        "Density Volume renders H(q0) as the reference top-left 2x2 block"
+    );
+
     const auto weakInfernoColor =
             quantum_sim::gui::density_volume::magnitudeColor(
                 0.0625
