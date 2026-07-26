@@ -83,6 +83,11 @@ namespace quantum_sim::debug {
                     "Leaves |0> unchanged and adds a phase of pi/4 radians "
                     "to the |1> amplitude.";
         }
+        if (gateName == "Tdg") {
+            return
+                    "Applies the inverse T phase: |0> stays unchanged and |1> "
+                    "receives a phase of -pi/4 radians.";
+        }
         if (gateName == "SWAP") {
             return
                     "Exchanges the quantum states of two qubits. "

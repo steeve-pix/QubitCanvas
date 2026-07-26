@@ -54,6 +54,11 @@ namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix tGate();
 
     /**
+     * @return Inverse T phase gate, diag(1, exp(-i*pi/4)).
+     */
+    [[nodiscard]] math::ComplexMatrix tDaggerGate();
+
+    /**
      * @return Hadamard gate, which maps basis states into equal superposition.
      */
     [[nodiscard]] math::ComplexMatrix hadamardGate();

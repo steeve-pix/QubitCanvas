@@ -40,6 +40,9 @@ namespace {
         if (gateName == "T") {
             return "PHASE-T";
         }
+        if (gateName == "Tdg") {
+            return "PHASE-T DAGGER";
+        }
         if (gateName == "Rx") {
             return "ROTATION-X";
         }
@@ -91,6 +94,9 @@ namespace {
         }
         if (gateName == "T") {
             return gates::tGate();
+        }
+        if (gateName == "Tdg") {
+            return gates::tDaggerGate();
         }
         if (gateName == "Rx") {
             return gates::rxGate(rotationAngleRadians);
@@ -278,6 +284,11 @@ namespace quantum_sim::gui {
         {
             "T",
             "T gate: applies an eighth-turn phase shift."
+        },
+        {
+            "Tdg",
+            "Inverse T gate: rotates the |1> phase by -pi/4 radians. "
+            "It cancels T and is used in decompositions such as Toffoli."
         }
     };
 
@@ -447,9 +458,50 @@ namespace quantum_sim::gui {
             ImVec4{0.21F, 0.38F, 0.56F, 0.80F}
         );
 
+        const ImGuiViewport *viewport =
+                ImGui::GetMainViewport();
+
+        const ImVec2 pointer =
+                ImGui::GetMousePos();
+
+        constexpr float tooltipWidth = 350.0F;
+        constexpr float estimatedTooltipHeight = 245.0F;
+        constexpr float pointerOffset = 14.0F;
+
+        const float viewportRight =
+                viewport->WorkPos.x + viewport->WorkSize.x;
+
+        const float viewportBottom =
+                viewport->WorkPos.y + viewport->WorkSize.y;
+
+        ImVec2 tooltipPosition{
+            pointer.x + pointerOffset,
+            pointer.y + pointerOffset
+        };
+
+        if (tooltipPosition.x + tooltipWidth > viewportRight) {
+            tooltipPosition.x =
+                    pointer.x - tooltipWidth - pointerOffset;
+        }
+
+        if (
+            tooltipPosition.y + estimatedTooltipHeight >
+            viewportBottom
+        ) {
+            tooltipPosition.y =
+                    pointer.y -
+                    estimatedTooltipHeight -
+                    pointerOffset;
+        }
+
+        ImGui::SetNextWindowPos(
+            tooltipPosition,
+            ImGuiCond_Always
+        );
+
         ImGui::SetNextWindowSizeConstraints(
-            ImVec2{190.0F, 0.0F},
-            ImVec2{430.0F, FLT_MAX}
+            ImVec2{tooltipWidth, 0.0F},
+            ImVec2{tooltipWidth, FLT_MAX}
         );
 
         ImGui::BeginTooltip();
@@ -480,6 +532,7 @@ namespace quantum_sim::gui {
 
         ImGui::Spacing();
         ImGui::Separator();
+        ImGui::TextDisabled("Explanation");
         ImGui::PushTextWrapPos(
             ImGui::GetCursorPosX() + 310.0F
         );

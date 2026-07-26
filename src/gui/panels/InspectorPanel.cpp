@@ -1,5 +1,4 @@
 #include "quantum_sim/gui/panels/InspectorPanel.hpp"
-#include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/gui/rendering/QaveColorMap.hpp"
 
 #include "imgui.h"
@@ -457,19 +456,6 @@ namespace quantum_sim::gui {
         }
 
         drawNavigationConfirmation();
-
-        const std::string explanation =
-                debug::gateExplanation(
-                    inspectedInstruction->name
-                );
-
-        ImGui::Spacing();
-        ImGui::TextDisabled("Explanation");
-
-        ImGui::TextWrapped(
-            "%s",
-            explanation.c_str()
-        );
 
         return jumpedToInstruction;
     }
