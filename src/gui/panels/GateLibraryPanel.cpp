@@ -1,13 +1,12 @@
 #include "quantum_sim/gui/panels/GateLibraryPanel.hpp"
+#include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/gates/QuantumGates.hpp"
 
 #include "imgui.h"
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
-#include <iomanip>
 #include <numbers>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -134,75 +133,6 @@ namespace {
         };
     }
 
-    [[nodiscard]] std::string formatScalar(const double value) {
-        if (std::abs(value) < 1e-9) {
-            return "0";
-        }
-        if (std::abs(value - 1.0) < 1e-9) {
-            return "1";
-        }
-        if (std::abs(value + 1.0) < 1e-9) {
-            return "-1";
-        }
-
-        std::ostringstream output;
-        output << std::fixed << std::setprecision(3) << value;
-
-        std::string text =
-                output.str();
-
-        while (!text.empty() && text.back() == '0') {
-            text.pop_back();
-        }
-
-        if (!text.empty() && text.back() == '.') {
-            text.pop_back();
-        }
-
-        return text;
-    }
-
-    [[nodiscard]] std::string formatComplex(
-        const quantum_sim::math::Complex &value,
-        const double displayMultiplier
-    ) {
-        double real =
-                value.real() * displayMultiplier;
-
-        double imaginary =
-                value.imaginary() * displayMultiplier;
-
-        if (std::abs(real) < 1e-9) {
-            real = 0.0;
-        }
-
-        if (std::abs(imaginary) < 1e-9) {
-            imaginary = 0.0;
-        }
-
-        if (imaginary == 0.0) {
-            return formatScalar(real);
-        }
-
-        const double imaginaryMagnitude =
-                std::abs(imaginary);
-
-        const std::string imaginaryText =
-                std::abs(imaginaryMagnitude - 1.0) < 1e-9
-                    ? "i"
-                    : formatScalar(imaginaryMagnitude) + "i";
-
-        if (real == 0.0) {
-            return imaginary < 0.0
-                       ? "-" + imaginaryText
-                       : imaginaryText;
-        }
-
-        return formatScalar(real) +
-               (imaginary < 0.0 ? "-" : "+") +
-               imaginaryText;
-    }
-
     [[nodiscard]] std::vector<std::vector<std::string> > formattedMatrixCells(
         const quantum_sim::math::ComplexMatrix &matrix,
         const double displayMultiplier
@@ -215,7 +145,7 @@ namespace {
         for (std::size_t row = 0; row < matrix.rows(); ++row) {
             for (std::size_t column = 0; column < matrix.columns(); ++column) {
                 cells[row][column] =
-                        formatComplex(
+                        quantum_sim::gui::notation::formatComplex(
                             matrix.at(row, column),
                             displayMultiplier
                         );
@@ -505,9 +435,14 @@ namespace quantum_sim::gui {
         );
 
         if (isRotationGate(gateName)) {
+            const std::string angleText =
+                    notation::formatRadians(
+                        rotationAngleRadians_
+                    );
+
             ImGui::TextDisabled(
-                "\xCE\xB8 %.3f rad",
-                rotationAngleRadians_
+                "\xCE\xB8 %s",
+                angleText.c_str()
             );
         }
 
@@ -673,9 +608,14 @@ namespace quantum_sim::gui {
                 selectedGate_.value() == "Rz";
 
         if (rotationSelected) {
+            const std::string angleText =
+                    notation::formatRadians(
+                        rotationAngleRadians_
+                    );
+
             ImGui::Text(
-                "Angle: %.3f rad",
-                rotationAngleRadians_
+                "Angle: %s",
+                angleText.c_str()
             );
         }
 
@@ -720,6 +660,16 @@ namespace quantum_sim::gui {
             std::numbers::pi_v<float>,
             "%.3f rad",
             ImGuiSliderFlags_AlwaysClamp
+        );
+
+        const std::string exactAngle =
+                notation::formatRadians(
+                    rotationAngleRadians_
+                );
+
+        ImGui::TextDisabled(
+            "\xCE\xB8 = %s",
+            exactAngle.c_str()
         );
 
         const float availableWidth =

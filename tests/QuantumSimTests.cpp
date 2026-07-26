@@ -7,6 +7,7 @@
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeScene.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
@@ -712,6 +713,48 @@ int main() {
         approximatelyEqual(sDagger.at(1, 1).real(), 0.0) &&
         approximatelyEqual(sDagger.at(1, 1).imaginary(), -1.0),
         "S-dagger applies the inverse pi/2 phase"
+    );
+
+    check(
+        quantum_sim::gui::notation::formatReal(
+            std::numbers::sqrt2 / 2.0
+        ) == "\xE2\x88\x9A""2/2" &&
+        quantum_sim::gui::notation::formatReal(
+            static_cast<double>(
+                static_cast<float>(
+                    std::numbers::sqrt2 / 2.0
+                )
+            )
+        ) == "\xE2\x88\x9A""2/2" &&
+        quantum_sim::gui::notation::formatReal(0.5) == "1/2" &&
+        quantum_sim::gui::notation::formatReal(
+            std::sqrt(2.0 + std::numbers::sqrt2) / 2.0
+        ) == "\xE2\x88\x9A(2+\xE2\x88\x9A""2)/2",
+        "Quantum notation recognizes fractions and common radical constants"
+    );
+
+    check(
+        quantum_sim::gui::notation::formatComplex(
+            quantum_sim::math::Complex{
+                std::numbers::sqrt2 / 2.0,
+                -std::numbers::sqrt2 / 2.0
+            }
+        ) == "\xE2\x88\x9A""2/2-\xE2\x88\x9A""2/2i" &&
+        quantum_sim::gui::notation::formatRadians(
+            -3.0 * std::numbers::pi / 4.0
+        ) == "-3\xCF\x80/4 rad" &&
+        quantum_sim::gui::notation::formatRadians(
+            static_cast<double>(
+                static_cast<float>(
+                    std::numbers::pi / 2.0
+                )
+            )
+        ) == "\xCF\x80/2 rad" &&
+        quantum_sim::gui::notation::formatPolarAmplitude(
+            std::numbers::sqrt2 / 2.0,
+            -std::numbers::pi / 4.0
+        ) == "\xE2\x88\x9A""2/2 e^(-i\xCF\x80/4)",
+        "Quantum notation composes exact complex, angle, and polar forms"
     );
 
     check(

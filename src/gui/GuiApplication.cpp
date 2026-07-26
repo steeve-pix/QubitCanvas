@@ -1,4 +1,5 @@
 #include "quantum_sim/gui/GuiApplication.hpp"
+#include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 
@@ -276,10 +277,15 @@ namespace quantum_sim::gui {
                 }
 
                 if (pendingRotationAngleRadians_.has_value()) {
+                    const std::string angleText =
+                            notation::formatRadians(
+                                pendingRotationAngleRadians_.value()
+                            );
+
                     ImGui::SameLine();
                     ImGui::TextDisabled(
-                        "%.3f rad",
-                        pendingRotationAngleRadians_.value()
+                        "%s",
+                        angleText.c_str()
                     );
                 }
 
@@ -935,11 +941,45 @@ namespace quantum_sim::gui {
                 cell.column,
                 layer.bins[cell.column].label.c_str()
             );
-            ImGui::Text("|\xCF\x81|       %.8f", cell.magnitude);
-            ImGui::Text("intensity   %.8f", cell.intensity);
-            ImGui::Text("phase       %.6f rad", cell.phaseRadians);
-            ImGui::Text("Re(\xCF\x81)     %.8f", cell.real);
-            ImGui::Text("Im(\xCF\x81)     %.8f", cell.imaginary);
+            const std::string magnitudeText =
+                    notation::formatReal(cell.magnitude);
+
+            const std::string intensityText =
+                    notation::formatReal(cell.intensity);
+
+            const std::string phaseText =
+                    notation::formatRadians(cell.phaseRadians);
+
+            const std::string realText =
+                    notation::formatReal(cell.real);
+
+            const std::string imaginaryText =
+                    notation::formatReal(cell.imaginary);
+
+            ImGui::Text(
+                "|\xCF\x81|       %s",
+                magnitudeText.c_str()
+            );
+
+            ImGui::Text(
+                "intensity   %s",
+                intensityText.c_str()
+            );
+
+            ImGui::Text(
+                "phase       %s",
+                phaseText.c_str()
+            );
+
+            ImGui::Text(
+                "Re(\xCF\x81)     %s",
+                realText.c_str()
+            );
+
+            ImGui::Text(
+                "Im(\xCF\x81)     %s",
+                imaginaryText.c_str()
+            );
             ImGui::EndTooltip();
 
             if (
