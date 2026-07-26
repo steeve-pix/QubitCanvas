@@ -19,6 +19,7 @@
 #include <numbers>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "quantum_sim/debug/DebuggerSession.hpp"
 
@@ -104,6 +105,146 @@ int main() {
     check(
         approximatelyEqual(totalProbability, 1.0),
         "QFT showcase preserves total probability"
+    );
+
+    const QuantumRegister directSingleQubitResult =
+            QuantumRegister::basisState(10U, 0U).applySingleQubitGate(
+                quantum_sim::gates::xGate(),
+                9U
+            );
+
+    check(
+        approximatelyEqual(directSingleQubitResult.probability(1U), 1.0),
+        "Direct single-qubit execution respects q0-as-most-significant ordering"
+    );
+
+    const QuantumRegister reversedControlResult =
+            QuantumRegister::basisState(3U, 1U).applyTwoQubitGate(
+                quantum_sim::gates::cxGate(),
+                2U,
+                0U
+            );
+
+    check(
+        approximatelyEqual(reversedControlResult.probability(5U), 1.0),
+        "Compact two-qubit execution supports reversed and non-adjacent operands"
+    );
+
+    QuantumCircuit insertedTwoQubitCircuit{10U};
+    insertedTwoQubitCircuit.insertTwoQubitGate(
+        12U,
+        "CX",
+        quantum_sim::gates::cxGate(),
+        0U,
+        9U
+    );
+
+    const QuantumRegister insertedTwoQubitResult =
+            insertedTwoQubitCircuit.execute(
+                QuantumRegister::basisState(10U, 512U)
+            );
+
+    check(
+        insertedTwoQubitCircuit.instructionCount() == 1U &&
+        insertedTwoQubitCircuit.instructionInfo().front().kind ==
+            quantum_sim::circuit::CircuitInstructionKind::TwoQubit &&
+        approximatelyEqual(insertedTwoQubitResult.probability(513U), 1.0),
+        "Manual ten-qubit placement inserts and executes a compact two-qubit gate"
+    );
+
+    const QuantumCircuit tenQubitQft =
+            quantum_sim::algorithms::qftCircuit(10U);
+
+    const auto tenQubitQftInstructions =
+            tenQubitQft.instructionInfo();
+
+    const std::size_t compactTwoQubitInstructionCount =
+            static_cast<std::size_t>(
+                std::count_if(
+                    tenQubitQftInstructions.begin(),
+                    tenQubitQftInstructions.end(),
+                    [](const quantum_sim::circuit::CircuitInstructionInfo &instruction) {
+                        return instruction.kind ==
+                               quantum_sim::circuit::CircuitInstructionKind::TwoQubit;
+                    }
+                )
+            );
+
+    const bool tenQubitQftContainsFullRegisterGate =
+            std::any_of(
+                tenQubitQftInstructions.begin(),
+                tenQubitQftInstructions.end(),
+                [](const quantum_sim::circuit::CircuitInstructionInfo &instruction) {
+                    return instruction.kind ==
+                           quantum_sim::circuit::CircuitInstructionKind::FullRegister;
+                }
+            );
+
+    check(
+        tenQubitQft.instructionCount() == 260U &&
+        compactTwoQubitInstructionCount == 95U &&
+        !tenQubitQftContainsFullRegisterGate,
+        "Ten-qubit QFT stores all 95 two-qubit operations as compact 4x4 gates"
+    );
+
+    quantum_sim::debug::DebuggerSession tenQubitSession{
+        tenQubitQft,
+        QuantumRegister::basisState(10U, 0U)
+    };
+
+    check(
+        tenQubitSession.stepCount() == tenQubitQft.instructionCount() &&
+        tenQubitSession.currentStep().state.stateCount() == 1024U,
+        "Ten-qubit QFT builds a complete debugger trace without register-sized gates"
+    );
+
+    const quantum_sim::gui::density_volume::DensityStack largeDensityStack =
+            quantum_sim::gui::density_volume::DensityModel::build(
+                tenQubitSession,
+                16U
+            );
+
+    check(
+        largeDensityStack.layers.size() == tenQubitSession.stepCount() + 1U &&
+        largeDensityStack.layers.back().dimension == 16U &&
+        largeDensityStack.layers.back().bucketed,
+        "Ten-qubit debugger history remains bounded to a 16 by 16 density view"
+    );
+
+    const std::vector<QuantumCircuit> tenQubitPresets{
+        quantum_sim::algorithms::bellStateCircuit(10U),
+        quantum_sim::algorithms::ghzStateCircuit(10U),
+        quantum_sim::algorithms::equalSuperpositionCircuit(10U),
+        quantum_sim::algorithms::inverseQftCircuit(10U),
+        quantum_sim::algorithms::groverSearchCircuit(10U),
+        quantum_sim::algorithms::deutschJozsaCircuit(10U),
+        quantum_sim::algorithms::bernsteinVaziraniCircuit(9U, 0b101010101U),
+        quantum_sim::algorithms::toffoliDemoCircuit(10U),
+        quantum_sim::algorithms::phaseKickbackCircuit(10U),
+        quantum_sim::algorithms::teleportationCircuit(10U),
+        quantum_sim::algorithms::scrambleCircuit(10U)
+    };
+
+    check(
+        std::all_of(
+            tenQubitPresets.begin(),
+            tenQubitPresets.end(),
+            [](const QuantumCircuit &preset) {
+                const auto instructions =
+                        preset.instructionInfo();
+
+                return preset.qubitCount() == 10U &&
+                       std::none_of(
+                           instructions.begin(),
+                           instructions.end(),
+                           [](const quantum_sim::circuit::CircuitInstructionInfo &instruction) {
+                               return instruction.kind ==
+                                      quantum_sim::circuit::CircuitInstructionKind::FullRegister;
+                           }
+                       );
+            }
+        ),
+        "Every ten-qubit preset uses bounded-memory local instructions"
     );
 
     check(
@@ -669,5 +810,5 @@ int main() {
         std::cout << "All tests passed.\n";
     }
 
-    return 0;
+    return failures == 0 ? 0 : 1;
 }

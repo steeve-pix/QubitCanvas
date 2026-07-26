@@ -93,16 +93,15 @@ namespace quantum_sim::gui {
         void redoLastCircuitEdit();
 
         /**
-         * Creates a supported two-qubit/full-register gate by display name.
+         * Creates a supported compact two-qubit gate by display name.
          *
          * @param gateName Gate name such as CX, CY, CZ, SWAP, or iSWAP.
-         * @param controlQubit Control or first qubit.
-         * @param targetQubit Target or second qubit.
-         * @return Full-register unitary matrix sized for circuit_.
+         * @return Compact 4x4 unitary matrix for the selected two-qubit gate.
          * @throws std::invalid_argument if gateName is not supported.
          */
-        [[nodiscard]] math::ComplexMatrix createControlledGateMatrix(const std::string &gateName,
-                                                                     std::size_t controlQubit, std::size_t targetQubit) const;
+        [[nodiscard]] static math::ComplexMatrix createTwoQubitGateMatrix(
+            const std::string &gateName
+        );
 
     private:
         ImFont *jetBrainsMonoFont_{nullptr};
