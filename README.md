@@ -14,6 +14,8 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 - Step-by-step debugger with play, pause, restart, scrub, and sampling controls.
 - Synchronized circuit, density-matrix, probability, and Bloch-sphere views.
 - Hover documentation with matrices for every gate in the gate library.
+- Exact quantum notation for familiar fractions, radicals, complex values, and
+  rational multiples of `π`, with compact decimal fallback.
 - JetBrains Mono typography throughout the interface.
 - Raw OpenGL 3.3 Core density visualization rendered through an off-screen
   HDR framebuffer, bloom composite, and Dear ImGui texture display.

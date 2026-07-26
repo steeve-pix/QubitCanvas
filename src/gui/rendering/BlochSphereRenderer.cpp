@@ -1,8 +1,10 @@
 #include "quantum_sim/gui/rendering/BlochSphereRenderer.hpp"
+#include "quantum_sim/gui/QuantumNotation.hpp"
 
 #include "imgui.h"
-#include <utility>
 #include <algorithm>
+#include <string>
+#include <utility>
 
 namespace quantum_sim::gui {
     BlochSphereRenderer::BlochSphereRenderer(
@@ -340,9 +342,18 @@ namespace quantum_sim::gui {
     }
 
     void BlochSphereRenderer::drawCoordinates(const quantum::BlochVector &bloch) const {
-        ImGui::Text("X = %.4f", bloch.x);
-        ImGui::Text("Y = %.4f", bloch.y);
-        ImGui::Text("Z = %.4f", bloch.z);
+        const std::string xText =
+                notation::formatReal(bloch.x, 6);
+
+        const std::string yText =
+                notation::formatReal(bloch.y, 6);
+
+        const std::string zText =
+                notation::formatReal(bloch.z, 6);
+
+        ImGui::Text("X = %s", xText.c_str());
+        ImGui::Text("Y = %s", yText.c_str());
+        ImGui::Text("Z = %s", zText.c_str());
     }
 
     bool BlochSphereRenderer::handleCanvasInteraction(float canvasSize, const quantum::BlochVector &bloch) {

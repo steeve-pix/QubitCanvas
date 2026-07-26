@@ -1,4 +1,5 @@
 #include "quantum_sim/gui/panels/InspectorPanel.hpp"
+#include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
 
 #include "imgui.h"
@@ -890,11 +891,45 @@ namespace quantum_sim::gui {
                 );
             }
 
-            ImGui::Text("|\xCF\x81|       %.8f", cell.magnitude);
-            ImGui::Text("intensity   %.8f", cell.intensity);
-            ImGui::Text("phase       %.6f rad", cell.phaseRadians);
-            ImGui::Text("Re(\xCF\x81)     %.8f", cell.real);
-            ImGui::Text("Im(\xCF\x81)     %.8f", cell.imaginary);
+            const std::string magnitudeText =
+                    notation::formatReal(cell.magnitude);
+
+            const std::string intensityText =
+                    notation::formatReal(cell.intensity);
+
+            const std::string phaseText =
+                    notation::formatRadians(cell.phaseRadians);
+
+            const std::string realText =
+                    notation::formatReal(cell.real);
+
+            const std::string imaginaryText =
+                    notation::formatReal(cell.imaginary);
+
+            ImGui::Text(
+                "|\xCF\x81|       %s",
+                magnitudeText.c_str()
+            );
+
+            ImGui::Text(
+                "intensity   %s",
+                intensityText.c_str()
+            );
+
+            ImGui::Text(
+                "phase       %s",
+                phaseText.c_str()
+            );
+
+            ImGui::Text(
+                "Re(\xCF\x81)     %s",
+                realText.c_str()
+            );
+
+            ImGui::Text(
+                "Im(\xCF\x81)     %s",
+                imaginaryText.c_str()
+            );
             ImGui::EndTooltip();
         }
     }
@@ -1027,7 +1062,14 @@ namespace quantum_sim::gui {
                 ImGui::TextUnformatted(stateInfo.label.c_str());
 
                 ImGui::TableSetColumnIndex(1);
-                ImGui::Text("%.5f", stateInfo.probability);
+                const std::string probabilityText =
+                        notation::formatReal(
+                            stateInfo.probability
+                        );
+
+                ImGui::TextUnformatted(
+                    probabilityText.c_str()
+                );
 
                 ImGui::TableSetColumnIndex(2);
                 const double real =
@@ -1044,18 +1086,46 @@ namespace quantum_sim::gui {
                             ? 0.0
                             : std::atan2(imaginary, real);
 
-                ImGui::Text(
-                    "%.5f e^(i %.5f)",
-                    magnitude,
-                    phase
+                const std::string amplitudeText =
+                        notation::formatPolarAmplitude(
+                            magnitude,
+                            phase
+                        );
+
+                ImGui::TextUnformatted(
+                    amplitudeText.c_str()
                 );
 
                 if (ImGui::IsItemHovered()) {
+                    const std::string realText =
+                            notation::formatReal(real);
+
+                    const std::string imaginaryText =
+                            notation::formatReal(imaginary);
+
+                    const std::string magnitudeText =
+                            notation::formatReal(magnitude);
+
+                    const std::string phaseText =
+                            notation::formatRadians(phase);
+
                     ImGui::BeginTooltip();
-                    ImGui::Text("Re(\xCF\x88)   %.8f", real);
-                    ImGui::Text("Im(\xCF\x88)   %.8f", imaginary);
-                    ImGui::Text("|\xCF\x88|     %.8f", magnitude);
-                    ImGui::Text("phase  %.6f rad", phase);
+                    ImGui::Text(
+                        "Re(\xCF\x88)   %s",
+                        realText.c_str()
+                    );
+                    ImGui::Text(
+                        "Im(\xCF\x88)   %s",
+                        imaginaryText.c_str()
+                    );
+                    ImGui::Text(
+                        "|\xCF\x88|     %s",
+                        magnitudeText.c_str()
+                    );
+                    ImGui::Text(
+                        "phase  %s",
+                        phaseText.c_str()
+                    );
                     ImGui::EndTooltip();
                 }
             }
@@ -1140,18 +1210,39 @@ namespace quantum_sim::gui {
         const double phi =
                 std::atan2(bloch.y, bloch.x);
 
+        const std::string xText =
+                notation::formatReal(bloch.x, 6);
+
+        const std::string yText =
+                notation::formatReal(bloch.y, 6);
+
+        const std::string zText =
+                notation::formatReal(bloch.z, 6);
+
+        const std::string thetaText =
+                notation::formatRadians(theta, 6);
+
+        const std::string phiText =
+                notation::formatRadians(phi, 6);
+
+        const std::string purityText =
+                notation::formatReal(
+                    std::clamp(purity, 0.0, 1.0),
+                    6
+                );
+
         ImGui::Text(
-            "vector (%.4f, %.4f, %.4f)",
-            bloch.x,
-            bloch.y,
-            bloch.z
+            "vector (%s, %s, %s)",
+            xText.c_str(),
+            yText.c_str(),
+            zText.c_str()
         );
 
         ImGui::Text(
-            "\xCE\xB8 %.4f   \xCF\x86 %.4f   purity %.3f",
-            theta,
-            phi,
-            std::clamp(purity, 0.0, 1.0)
+            "\xCE\xB8 %s   \xCF\x86 %s   purity %s",
+            thetaText.c_str(),
+            phiText.c_str(),
+            purityText.c_str()
         );
 
         ImGui::Spacing();

@@ -1,10 +1,10 @@
 #include "quantum_sim/gui/rendering/CircuitRenderer.hpp"
+#include "quantum_sim/gui/QuantumNotation.hpp"
 
 #include "imgui.h"
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <optional>
 #include <string>
 #include <utility>
@@ -635,12 +635,17 @@ namespace quantum_sim::gui {
                 );
 
                 if (instruction.angleRadians.has_value()) {
+                    const std::string angleText =
+                            quantum_sim::gui::notation::formatRadians(
+                                instruction.angleRadians.value()
+                            );
+
                     ImGui::SetTooltip(
-                        "Step %zu of %zu\nGate: %s\nAngle: %.6f rad",
+                        "Step %zu of %zu\nGate: %s\nAngle: %s",
                         instructionIndex + 1,
                         instructions.size(),
                         instruction.name.c_str(),
-                        instruction.angleRadians.value()
+                        angleText.c_str()
                     );
                 } else {
                     ImGui::SetTooltip(
@@ -1126,10 +1131,15 @@ namespace quantum_sim::gui {
                 );
 
                 if (instruction.angleRadians.has_value()) {
+                    const std::string angleText =
+                            quantum_sim::gui::notation::formatRadians(
+                                instruction.angleRadians.value()
+                            );
+
                     ImGui::SetTooltip(
-                        "%s\nAngle: %.6f rad",
+                        "%s\nAngle: %s",
                         instruction.name.c_str(),
-                        instruction.angleRadians.value()
+                        angleText.c_str()
                     );
                 }
             }
@@ -1158,16 +1168,15 @@ namespace quantum_sim::gui {
             drawGate(drawList, ImVec2{x, y}, instruction.name, highlighted, hovered, selected, false);
 
             if (instruction.angleRadians.has_value()) {
-                char angleLabel[32]{};
-                std::snprintf(
-                    angleLabel,
-                    sizeof(angleLabel),
-                    "%.3f rad",
-                    instruction.angleRadians.value()
-                );
+                const std::string angleLabel =
+                        quantum_sim::gui::notation::formatRadians(
+                            instruction.angleRadians.value()
+                        );
 
                 const ImVec2 angleLabelSize =
-                        ImGui::CalcTextSize(angleLabel);
+                        ImGui::CalcTextSize(
+                            angleLabel.c_str()
+                        );
 
                 drawList->AddText(
                     ImVec2{
@@ -1175,7 +1184,7 @@ namespace quantum_sim::gui {
                         y - style_.gateHalfHeight - angleLabelSize.y - 3.0F
                     },
                     instructionColor,
-                    angleLabel
+                    angleLabel.c_str()
                 );
             }
         }
