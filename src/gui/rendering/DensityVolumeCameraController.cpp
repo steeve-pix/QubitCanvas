@@ -17,6 +17,15 @@ namespace quantum_sim::gui::density_volume {
         const Vector3 &center,
         const float radius
     ) {
+        updateSceneBounds(center, radius);
+        reset();
+        framed_ = true;
+    }
+
+    void CameraController::updateSceneBounds(
+        const Vector3 &center,
+        const float radius
+    ) noexcept {
         sceneRadius_ =
                 std::max(radius, 1.0F);
 
@@ -27,9 +36,6 @@ namespace quantum_sim::gui::density_volume {
 
         launchTarget_ =
                 center;
-
-        reset();
-        framed_ = true;
     }
 
     void CameraController::update(const float deltaTime) noexcept {

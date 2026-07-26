@@ -135,6 +135,7 @@ namespace quantum_sim::gui {
         std::size_t selectedDensityLayer_{};
         std::optional<std::size_t> lastDensityDebuggerStep_;
         bool densityVolumePointerDragged_{false};
+        bool densityVolumeCameraFramePending_{true};
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
