@@ -68,7 +68,8 @@ namespace quantum_sim::gui::qave {
 
     bool Renderer::updateScene(
         const DensityStack &stack,
-        const std::size_t visibleThroughLayer
+        const std::size_t selectedLayer,
+        const VisualizationMode mode
     ) {
         if (!initialized_) {
             throw std::runtime_error{"QAVE renderer is not initialized."};
@@ -77,7 +78,9 @@ namespace quantum_sim::gui::qave {
         if (
             sceneFingerprint_ == stack.fingerprint &&
             sceneVisibleThroughLayer_.has_value() &&
-            sceneVisibleThroughLayer_.value() == visibleThroughLayer &&
+            sceneVisibleThroughLayer_.value() == selectedLayer &&
+            sceneMode_.has_value() &&
+            sceneMode_.value() == mode &&
             indexCount_ > 0U
         ) {
             return false;
@@ -86,7 +89,8 @@ namespace quantum_sim::gui::qave {
         const SceneLayout layout =
                 LayerStackLayout::build(
                     stack,
-                    visibleThroughLayer
+                    selectedLayer,
+                    mode
                 );
 
         const Mesh mesh =
@@ -97,7 +101,8 @@ namespace quantum_sim::gui::qave {
         sceneCenter_ = layout.center;
         sceneRadius_ = layout.radius;
         sceneFingerprint_ = stack.fingerprint;
-        sceneVisibleThroughLayer_ = visibleThroughLayer;
+        sceneVisibleThroughLayer_ = selectedLayer;
+        sceneMode_ = mode;
         return true;
     }
 
@@ -325,6 +330,7 @@ namespace quantum_sim::gui::qave {
         indexCount_ = 0U;
         sceneFingerprint_ = 0U;
         sceneVisibleThroughLayer_.reset();
+        sceneMode_.reset();
         sceneCenter_ = Vector3{};
         sceneRadius_ = 1.0F;
         pickRecords_.clear();
@@ -355,6 +361,7 @@ layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec3 aColor;
 layout (location = 3) in float aLayer;
 layout (location = 4) in float aPickId;
+layout (location = 5) in float aMagnitudeVoxel;
 
 uniform mat4 uModel;
 uniform mat4 uView;
@@ -364,6 +371,7 @@ out vec3 vNormal;
 out vec3 vColor;
 flat out float vLayer;
 flat out float vPickId;
+flat out float vMagnitudeVoxel;
 
 void main() {
     vec4 worldPosition = uModel * vec4(aPosition, 1.0);
@@ -371,6 +379,7 @@ void main() {
     vColor = aColor;
     vLayer = aLayer;
     vPickId = aPickId;
+    vMagnitudeVoxel = aMagnitudeVoxel;
     gl_Position = uProjection * uView * worldPosition;
 }
 )glsl";
@@ -381,6 +390,7 @@ in vec3 vNormal;
 in vec3 vColor;
 flat in float vLayer;
 flat in float vPickId;
+flat in float vMagnitudeVoxel;
 
 uniform int uSelectedLayer;
 
@@ -392,12 +402,19 @@ void main() {
     vec3 lightDirection = normalize(vec3(-0.55, 0.90, 0.62));
     float diffuse = max(dot(normal, lightDirection), 0.0);
     float topFace = max(normal.y, 0.0);
-    float sideContrast = 0.78 + 0.22 * max(normal.z, 0.0);
+    float sideContrast = 0.68 + 0.32 * max(normal.z, 0.0);
     float selected = abs(vLayer - float(uSelectedLayer)) < 0.25 ? 1.0 : 0.0;
+    float selectedValue = selected * vMagnitudeVoxel;
+    float emissive = pow(max(max(vColor.r, vColor.g), vColor.b), 2.0);
 
     vec3 color = vColor * (0.30 + 0.70 * diffuse) * sideContrast;
-    color += vColor * topFace * 0.12;
-    color = mix(color, color * 1.12 + vec3(0.18, 0.10, 0.015), selected);
+    color += vColor * topFace * 0.18;
+    color += vColor * emissive * 0.35 * vMagnitudeVoxel;
+    color = mix(
+        color,
+        color * 1.10 + vec3(0.10, 0.045, 0.008),
+        selectedValue
+    );
 
     fragmentColor = vec4(color, 1.0);
     pickOutput = uint(vPickId + 0.5);
@@ -544,6 +561,18 @@ void main() {
             reinterpret_cast<const void *>(offsetof(MeshVertex, pickId))
         );
         glEnableVertexAttribArray(4);
+
+        glVertexAttribPointer(
+            5,
+            1,
+            GL_FLOAT,
+            GL_FALSE,
+            static_cast<int>(sizeof(MeshVertex)),
+            reinterpret_cast<const void *>(
+                offsetof(MeshVertex, magnitudeVoxel)
+            )
+        );
+        glEnableVertexAttribArray(5);
 
         glBindVertexArray(0);
     }

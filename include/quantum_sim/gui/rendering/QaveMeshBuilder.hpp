@@ -16,6 +16,7 @@ namespace quantum_sim::gui::qave {
         float color[3]{};
         float layer{};
         float pickId{};
+        float magnitudeVoxel{};
     };
 
     /**

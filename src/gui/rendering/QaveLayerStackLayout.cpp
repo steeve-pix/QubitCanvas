@@ -4,70 +4,38 @@
 #include <cmath>
 
 namespace quantum_sim::gui::qave {
-    SceneLayout LayerStackLayout::build(
-        const DensityStack &stack,
-        const std::size_t visibleThroughLayer
-    ) {
+    namespace {
         constexpr float matrixSide = 10.5F;
-        constexpr float baseThickness = 0.018F;
-        constexpr float maximumVoxelHeight = 0.24F;
-        constexpr float minimumVisibleHeight = 0.045F;
-        constexpr float layerSpacing = 0.32F;
-        constexpr float layerDepthOffset = 0.045F;
+        constexpr float stackBaseThickness = 0.020F;
+        constexpr float stackMaximumVoxelHeight = 0.24F;
+        constexpr float stackMinimumVisibleHeight = 0.030F;
+        constexpr float stackLayerSpacing = 0.285F;
+        constexpr float floorBaseThickness = 0.055F;
+        constexpr float floorMaximumVoxelHeight = 2.80F;
+        constexpr float floorMinimumVisibleHeight = 0.050F;
         constexpr double visibleMagnitudeThreshold = 0.006;
+        constexpr Color baseTileColor{0.110F, 0.018F, 0.240F};
 
-        SceneLayout layout;
-
-        if (stack.layers.empty()) {
-            return layout;
-        }
-
-        const std::size_t lastLayer =
-                std::min(
-                    visibleThroughLayer,
-                    stack.layers.size() - 1U
-                );
-
-        std::size_t voxelCapacity{};
-
-        for (std::size_t index = 0; index <= lastLayer; ++index) {
-            voxelCapacity +=
-                    stack.layers[index].cells.size() * 2U;
-        }
-
-        layout.voxels.reserve(voxelCapacity);
-
-        for (std::size_t index = 0; index <= lastLayer; ++index) {
-            const DensityLayer &layer =
-                    stack.layers[index];
-
-            double layerMaximumMagnitude{};
-
-            for (const DensityCell &cell : layer.cells) {
-                layerMaximumMagnitude =
-                        std::max(
-                            layerMaximumMagnitude,
-                            cell.magnitude
-                        );
+        void appendDensityLayer(
+            SceneLayout &layout,
+            const DensityLayer &layer,
+            const float baseY,
+            const float baseThickness,
+            const float maximumVoxelHeight,
+            const float minimumVisibleHeight
+        ) {
+            if (layer.dimension == 0U) {
+                return;
             }
-
-            layerMaximumMagnitude =
-                    std::max(layerMaximumMagnitude, 1e-12);
 
             const float cellPitch =
                     matrixSide / static_cast<float>(layer.dimension);
 
             const float tileSide =
-                    cellPitch * 0.88F;
+                    cellPitch * 0.90F;
 
             const float voxelSide =
-                    cellPitch * 0.76F;
-
-            const float layerBaseY =
-                    static_cast<float>(layer.index) * layerSpacing;
-
-            const float layerCenterZ =
-                    -static_cast<float>(layer.index) * layerDepthOffset;
+                    cellPitch * 0.78F;
 
             for (const DensityCell &cell : layer.cells) {
                 const float x =
@@ -78,13 +46,13 @@ namespace quantum_sim::gui::qave {
                 const float z =
                         (
                             static_cast<float>(cell.row) + 0.5F
-                        ) * cellPitch - matrixSide * 0.5F + layerCenterZ;
+                        ) * cellPitch - matrixSide * 0.5F;
 
                 layout.voxels.push_back(
                     PlacedVoxel{
                         .center = Vector3{
                             x,
-                            layerBaseY + baseThickness * 0.5F,
+                            baseY + baseThickness * 0.5F,
                             z
                         },
                         .size = Vector3{
@@ -92,7 +60,7 @@ namespace quantum_sim::gui::qave {
                             baseThickness,
                             tileSide
                         },
-                        .color = Color{0.055F, 0.025F, 0.135F},
+                        .color = baseTileColor,
                         .layer = layer.index,
                         .row = cell.row,
                         .column = cell.column,
@@ -102,7 +70,7 @@ namespace quantum_sim::gui::qave {
 
                 const double normalizedMagnitude =
                         std::clamp(
-                            cell.magnitude / layerMaximumMagnitude,
+                            cell.magnitude,
                             0.0,
                             1.0
                         );
@@ -122,7 +90,7 @@ namespace quantum_sim::gui::qave {
                     PlacedVoxel{
                         .center = Vector3{
                             x,
-                            layerBaseY + baseThickness + height * 0.5F,
+                            baseY + baseThickness + height * 0.5F,
                             z
                         },
                         .size = Vector3{
@@ -143,31 +111,103 @@ namespace quantum_sim::gui::qave {
             }
         }
 
-        const float historyHeight =
-                static_cast<float>(lastLayer) *
-                layerSpacing +
-                baseThickness +
-                maximumVoxelHeight;
+        [[nodiscard]] SceneLayout buildFloorField(
+            const DensityLayer &layer
+        ) {
+            SceneLayout layout;
+            layout.voxels.reserve(layer.cells.size() * 2U);
 
-        const float historyDepth =
-                matrixSide +
-                static_cast<float>(lastLayer) *
-                layerDepthOffset;
+            appendDensityLayer(
+                layout,
+                layer,
+                0.0F,
+                floorBaseThickness,
+                floorMaximumVoxelHeight,
+                floorMinimumVisibleHeight
+            );
 
-        layout.center = Vector3{
-            0.0F,
-            historyHeight * 0.5F,
-            -static_cast<float>(lastLayer) *
-            layerDepthOffset * 0.5F
-        };
+            const float totalHeight =
+                    floorBaseThickness + floorMaximumVoxelHeight;
 
-        layout.radius =
-                std::sqrt(
-                    std::pow(matrixSide * 0.5F, 2.0F) +
-                    std::pow(historyHeight * 0.5F, 2.0F) +
-                    std::pow(historyDepth * 0.5F, 2.0F)
+            layout.center = Vector3{
+                0.0F,
+                totalHeight * 0.5F,
+                0.0F
+            };
+
+            layout.radius =
+                    std::sqrt(
+                        std::pow(matrixSide * 0.5F, 2.0F) * 2.0F +
+                        std::pow(totalHeight * 0.5F, 2.0F)
+                    );
+
+            return layout;
+        }
+
+        [[nodiscard]] SceneLayout buildLayerStack(
+            const DensityStack &stack,
+            const std::size_t lastLayer
+        ) {
+            SceneLayout layout;
+            std::size_t voxelCapacity{};
+
+            for (std::size_t index = 0; index <= lastLayer; ++index) {
+                voxelCapacity +=
+                        stack.layers[index].cells.size() * 2U;
+            }
+
+            layout.voxels.reserve(voxelCapacity);
+
+            for (std::size_t index = 0; index <= lastLayer; ++index) {
+                appendDensityLayer(
+                    layout,
+                    stack.layers[index],
+                    static_cast<float>(index) * stackLayerSpacing,
+                    stackBaseThickness,
+                    stackMaximumVoxelHeight,
+                    stackMinimumVisibleHeight
+                );
+            }
+
+            const float historyHeight =
+                    static_cast<float>(lastLayer) *
+                    stackLayerSpacing +
+                    stackBaseThickness +
+                    stackMaximumVoxelHeight;
+
+            layout.center = Vector3{
+                0.0F,
+                historyHeight * 0.5F,
+                0.0F
+            };
+
+            layout.radius =
+                    std::sqrt(
+                        std::pow(matrixSide * 0.5F, 2.0F) * 2.0F +
+                        std::pow(historyHeight * 0.5F, 2.0F)
+                    );
+
+            return layout;
+        }
+    }
+
+    SceneLayout LayerStackLayout::build(
+        const DensityStack &stack,
+        const std::size_t selectedLayer,
+        const VisualizationMode mode
+    ) {
+        if (stack.layers.empty()) {
+            return SceneLayout{};
+        }
+
+        const std::size_t lastLayer =
+                std::min(
+                    selectedLayer,
+                    stack.layers.size() - 1U
                 );
 
-        return layout;
+        return mode == VisualizationMode::FloorField
+                   ? buildFloorField(stack.layers[lastLayer])
+                   : buildLayerStack(stack, lastLayer);
     }
 }

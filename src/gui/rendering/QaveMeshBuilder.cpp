@@ -84,7 +84,9 @@ namespace quantum_sim::gui::qave {
                             voxel.color.blue
                         },
                         .layer = static_cast<float>(voxel.layer),
-                        .pickId = static_cast<float>(pickId)
+                        .pickId = static_cast<float>(pickId),
+                        .magnitudeVoxel =
+                            voxel.magnitudeVoxel ? 1.0F : 0.0F
                     }
                 );
             }
