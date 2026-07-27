@@ -54,6 +54,23 @@ namespace quantum_sim::gui::notation {
     );
 
     /**
+     * Formats one angle in both pi notation and decimal radians.
+     *
+     * The symbolic or decimal pi multiple remains first for quick recognition,
+     * while the parenthesized radian value preserves a direct numeric reading.
+     *
+     * @param radians Angle in radians.
+     * @param piDecimalPlaces Maximum precision for a decimal pi coefficient.
+     * @param radianDecimalPlaces Maximum precision for the decimal radian value.
+     * @return Representation such as "pi/2 (1.571 rad)" using the pi glyph.
+     */
+    [[nodiscard]] std::string formatAngleMeasurement(
+        double radians,
+        int piDecimalPlaces = 3,
+        int radianDecimalPlaces = 3
+    );
+
+    /**
      * Formats one amplitude in compact polar/exponential form.
      *
      * @param magnitude Non-negative amplitude magnitude.
