@@ -1,4 +1,5 @@
 #include "quantum_sim/gui/panels/GateLibraryPanel.hpp"
+#include "quantum_sim/gui/GateNotation.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/gates/QuantumGates.hpp"
 
@@ -326,39 +327,6 @@ namespace {
                std::abs(value.imaginary()) < 1e-9;
     }
 
-    [[nodiscard]] const char *gateDisplayName(
-        const std::string_view gateName
-    ) noexcept {
-        if (gateName == "Sdg") {
-            return "S\xE2\x80\xA0";
-        }
-
-        if (gateName == "Tdg") {
-            return "T\xE2\x80\xA0";
-        }
-
-        if (gateName == "CSdg") {
-            return "CS\xE2\x80\xA0";
-        }
-
-        if (gateName == "CTdg") {
-            return "CT\xE2\x80\xA0";
-        }
-
-        if (gateName == "SX") {
-            return "\xE2\x88\x9A""X";
-        }
-
-        if (gateName == "SXdg") {
-            return "\xE2\x88\x9A""X\xE2\x80\xA0";
-        }
-
-        if (gateName == "sqrtSWAP") {
-            return "\xE2\x88\x9A""SW";
-        }
-
-        return gateName.data();
-    }
 }
 
 namespace quantum_sim::gui {
@@ -656,7 +624,9 @@ namespace quantum_sim::gui {
 
         const bool clicked =
                 ImGui::Button(
-                    gateDisplayName(gate.name),
+                    gate_notation::displayName(
+                        gate.name
+                    ).data(),
                     ImVec2{
                         style_.gateButtonSize,
                         style_.gateButtonSize
