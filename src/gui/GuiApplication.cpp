@@ -116,7 +116,7 @@ namespace quantum_sim::gui {
             0x2212, 0x2212,
             0x221A, 0x221A,
             0x2220, 0x2220,
-            0x27E9, 0x27E9,
+            0x27E8, 0x27E9,
             0
         };
 
@@ -1313,8 +1313,11 @@ namespace quantum_sim::gui {
                 const ImVec2 buttonMaximum =
                         ImGui::GetItemRectMax();
 
+                constexpr const char *plusKet =
+                        "|+\xE2\x9F\xA9";
+
                 const ImVec2 ketSize =
-                        ImGui::CalcTextSize("|+>");
+                        ImGui::CalcTextSize(plusKet);
 
                 const ImVec2 exponentSize =
                         ImGui::CalcTextSize("n");
@@ -1345,7 +1348,7 @@ namespace quantum_sim::gui {
                 drawList->AddText(
                     ketPosition,
                     textColor,
-                    "|+>"
+                    plusKet
                 );
 
                 drawList->AddText(
@@ -1404,7 +1407,7 @@ namespace quantum_sim::gui {
         scriptButton(
             "Bell",
             CircuitPreset::Bell,
-            "Entangles q0 and q1; extra qubits remain in |0>.",
+            "Entangles q0 and q1; extra qubits remain in |0\xE2\x9F\xA9.",
             false
         );
         scriptButton(
@@ -1434,7 +1437,7 @@ namespace quantum_sim::gui {
         scriptButton(
             "Grover",
             CircuitPreset::Grover,
-            "Searches |11> on q0/q1; extra qubits remain in |0>.",
+            "Searches |11\xE2\x9F\xA9 on q0/q1; extra qubits remain in |0\xE2\x9F\xA9.",
             true
         );
         scriptButton(
@@ -1445,13 +1448,13 @@ namespace quantum_sim::gui {
             );scriptButton(
                 "Kickback",
                 CircuitPreset::Kickback,
-                "Uses q0/q1 to expose phase kickback; extra qubits remain in |0>.",
+                "Uses q0/q1 to expose phase kickback; extra qubits remain in |0\xE2\x9F\xA9.",
                 true
                 );
         scriptButton(
             "Toffoli",
             CircuitPreset::Toffoli,
-            "Runs a decomposed CCX on q0-q2; extra qubits remain in |0>.",
+            "Runs a decomposed CCX on q0-q2; extra qubits remain in |0\xE2\x9F\xA9.",
             false
         );
 
@@ -1464,7 +1467,7 @@ namespace quantum_sim::gui {
         scriptButton(
             "Teleport",
             CircuitPreset::Teleportation,
-            "Teleports from q0 to q2; extra qubits remain in |0>.",
+            "Teleports from q0 to q2; extra qubits remain in |0\xE2\x9F\xA9.",
             false
         );
         scriptButton(

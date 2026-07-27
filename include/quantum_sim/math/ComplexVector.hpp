@@ -51,7 +51,7 @@ namespace quantum_sim::math {
         [[nodiscard]] ComplexVector normalized() const;
 
         /**
-         * Computes the quantum inner product <this|other>.
+         * Computes the quantum inner product ⟨this|other⟩.
          *
          * @param other Vector with the same size.
          * @return Complex inner product.

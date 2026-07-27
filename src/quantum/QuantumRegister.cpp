@@ -66,7 +66,7 @@ namespace quantum_sim::quantum {
 
         std::vector<math::Complex> transformed(stateCount(), math::Complex{});
 
-        // Each zero-bit index owns one independent |0>, |1> amplitude pair.
+        // Each zero-bit index owns one independent |0⟩, |1⟩ amplitude pair.
         // Applying the 2x2 matrix to those pairs avoids a 2^n by 2^n expansion.
         for (std::size_t zeroState{}; zeroState < stateCount(); ++zeroState) {
             if ((zeroState & targetMask) != 0U) {
@@ -127,7 +127,7 @@ namespace quantum_sim::quantum {
         std::vector<math::Complex> transformed(stateCount(), math::Complex{});
 
         // A base state with both selected bits clear identifies one independent
-        // four-amplitude block in local |00>, |01>, |10>, |11> order.
+        // four-amplitude block in local |00⟩, |01⟩, |10⟩, |11⟩ order.
         for (std::size_t baseState{}; baseState < stateCount(); ++baseState) {
             if ((baseState & firstMask) != 0U ||
                 (baseState & secondMask) != 0U) {
@@ -322,7 +322,7 @@ namespace quantum_sim::quantum {
 
             label += isOne ? '1' : '0';
         }
-        label += ">";
+        label += "\xE2\x9F\xA9";
 
         return label;
     }
@@ -354,7 +354,7 @@ namespace quantum_sim::quantum {
         const math::Complex alpha = amplitude(0);
         const math::Complex beta = amplitude(1);
 
-        // Standard Bloch coordinates for alpha|0> + beta|1>.
+        // Standard Bloch coordinates for alpha|0⟩ + beta|1⟩.
         const double x = 2.0 * (alpha.real() * beta.real() + alpha.imaginary() * beta.imaginary());
         const double y = 2.0 * (alpha.real() * beta.imaginary() - alpha.imaginary() * beta.real());
         const double z = alpha.magnitudeSquared() - beta.magnitudeSquared();

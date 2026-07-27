@@ -601,7 +601,7 @@ namespace quantum_sim::gui {
         };
 
         const std::string header =
-                "\xCF\x81 - 2D - LAYER " +
+                "\xCF\x81 = |\xCF\x88\xE2\x9F\xA9\xE2\x9F\xA8\xCF\x88| - LAYER " +
                 std::to_string(selectedDensityLayer) +
                 "/" +
                 std::to_string(densityStack.layers.size() - 1U) +

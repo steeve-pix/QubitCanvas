@@ -55,7 +55,7 @@ namespace quantum_sim::algorithms {
     );
 
     /**
-     * Builds the canonical two-qubit Grover search for the marked state |11>
+     * Builds the canonical two-qubit Grover search for the marked state |11⟩.
      * in the leading two qubits.
      *
      * Additional register qubits remain in their initial state.
@@ -101,8 +101,8 @@ namespace quantum_sim::algorithms {
     /**
      * Builds a Toffoli demonstration using H, T, inverse-T, and CX gates.
      *
-     * The circuit prepares q0 and q1 as |1>, then toggles q2 through a standard
-     * decomposition so execution from |000> finishes in |111>.
+     * The circuit prepares q0 and q1 as |1⟩, then toggles q2 through a standard
+     * decomposition so execution from |000⟩ finishes in |111⟩.
      *
      * Additional register qubits remain in their initial state.
      *
@@ -117,8 +117,8 @@ namespace quantum_sim::algorithms {
     /**
      * Builds a two-qubit phase-kickback demonstration.
      *
-     * The target is prepared in |-> before a controlled-X oracle. A final
-     * Hadamard pass exposes the kicked-back phase as the basis state |11>.
+     * The target is prepared in |-⟩ before a controlled-X oracle. A final
+     * Hadamard pass exposes the kicked-back phase as the basis state |11⟩.
      *
      * Additional register qubits remain in their initial state.
      *

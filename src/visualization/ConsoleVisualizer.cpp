@@ -143,7 +143,7 @@ namespace quantum_sim::visualization {
             output
                     << "q"
                     << qubit
-                    << ": |0> ";
+                    << ": |0\xE2\x9F\xA9 ";
 
             for (std::size_t instructionIndex = 0; instructionIndex < instructions.size(); ++instructionIndex) {
                 const circuit::CircuitInstructionInfo &instruction =
@@ -356,7 +356,7 @@ namespace quantum_sim::visualization {
         const std::size_t markerColumn =
                 static_cast<std::size_t>(std::lround(centerColumn + clampedX * horizontalRadius));
         std::vector<std::string> canvas{
-            "          +Z |0>",
+            "          +Z |0\xE2\x9F\xA9",
             "             |",
             "        .-----------.",
             "      .'             '.",
@@ -366,7 +366,7 @@ namespace quantum_sim::visualization {
             "      '.             .'",
             "        '-----------'",
             "             |",
-            "          -Z |1>"
+            "          -Z |1\xE2\x9F\xA9"
         };
 
         constexpr std::size_t canvasWidth = 29;

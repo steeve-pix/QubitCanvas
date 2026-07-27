@@ -77,7 +77,7 @@ int main(const int argumentCount, char *arguments[]) {
         QuantumCircuit circuit =
                 quantum_sim::algorithms::qftCircuit(4);
 
-        // Presets start from |000...> so the trace is deterministic and easy to inspect.
+        // Presets start from |000...⟩ so the trace is deterministic and easy to inspect.
         const QuantumRegister initialState =
                 QuantumRegister::basisState(
                     circuit.qubitCount(),
@@ -142,10 +142,10 @@ double readRotationAngle() {
 int readRotationInitialState() {
     std::cout
             << "\nChoose the initial qubit state:\n"
-            << "1. |0>\n"
-            << "2. |1>\n"
-            << "3. |+>\n"
-            << "4. |->\n"
+            << "1. |0\xE2\x9F\xA9\n"
+            << "2. |1\xE2\x9F\xA9\n"
+            << "3. |+\xE2\x9F\xA9\n"
+            << "4. |-\xE2\x9F\xA9\n"
             << "Choice: ";
 
     int choice{};
