@@ -35,6 +35,13 @@ namespace quantum_sim::gui {
             ImFont *headingFont
         );
 
+        /**
+         * Focuses probability and Bloch-sphere inspection on one qubit.
+         *
+         * @param qubit Qubit index selected or edited in the circuit.
+         */
+        void focusQubit(std::size_t qubit) noexcept;
+
     private:
         BlochSphereRenderer blochSphereRenderer_;
         std::array<char, 64> amplitudeFilter_{};
@@ -42,6 +49,8 @@ namespace quantum_sim::gui {
         bool sortAmplitudesByProbability_{true};
         int maximumVisibleAmplitudes_{96};
         int inspectedBlochQubit_{0};
+        std::optional<std::size_t> requestedProbabilityFocus_;
+        bool requestInspectorTopFocus_{false};
         double navigationConfirmationUntil_{0.0};
         std::string navigationConfirmationMessage_;
 
