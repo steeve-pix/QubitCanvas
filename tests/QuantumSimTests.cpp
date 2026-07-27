@@ -796,6 +796,24 @@ int main() {
                 1U
             );
 
+    const auto *nextRowPeak =
+            findInstance(
+                historyScene,
+                historyScene.voxels,
+                1U,
+                1U,
+                0U
+            );
+
+    const auto *nextColumnPeak =
+            findInstance(
+                historyScene,
+                historyScene.voxels,
+                1U,
+                0U,
+                1U
+            );
+
     const auto *nextLayerPeak =
             findInstance(
                 historyScene,
@@ -826,15 +844,21 @@ int main() {
         initialPeak != nullptr &&
         hadamardPeak != nullptr &&
         dormantCell != nullptr &&
+        nextRowPeak != nullptr &&
+        nextColumnPeak != nullptr &&
         nextLayerPeak != nullptr &&
-        initialPeak->center.y < hadamardPeak->center.y &&
-        approximatelyEqual(initialPeak->center.x, hadamardPeak->center.x) &&
+        initialPeak->center.x < hadamardPeak->center.x &&
+        approximatelyEqual(initialPeak->center.y, hadamardPeak->center.y) &&
         approximatelyEqual(initialPeak->center.z, hadamardPeak->center.z) &&
-        nextLayerPeak->center.y - initialPeak->center.y >
-            (nextLayerPeak->size.y + initialPeak->size.y) * 0.5F &&
+        nextRowPeak->center.y < hadamardPeak->center.y &&
+        approximatelyEqual(nextRowPeak->center.z, hadamardPeak->center.z) &&
+        nextColumnPeak->center.z > hadamardPeak->center.z &&
+        approximatelyEqual(nextColumnPeak->center.y, hadamardPeak->center.y) &&
+        nextLayerPeak->center.x - initialPeak->center.x >
+            (nextLayerPeak->size.x + initialPeak->size.x) * 0.5F &&
         approximatelyEqual(
-            historyScene.layerCenters.at(1U).y -
-                historyScene.layerCenters.at(0U).y,
+            historyScene.layerCenters.at(1U).x -
+                historyScene.layerCenters.at(0U).x,
             historyScene.layerSpacing
         ) &&
         initialPeak->emissive > dormantCell->emissive &&
@@ -850,7 +874,7 @@ int main() {
             initialPeak->size.x,
             nextLayerPeak->size.x
         ),
-        "Density Volume layers advance on Y with separated fixed-size cubes"
+        "Density Volume layers advance on X with separated fixed-size cubes"
     );
 
     check(
@@ -860,8 +884,8 @@ int main() {
             initialPeak->center.x - initialPeak->size.x * 0.5F &&
         historyScene.framingMinimum.y <=
             initialPeak->center.y - initialPeak->size.y * 0.5F &&
-        historyScene.framingMaximum.y >=
-            nextLayerPeak->center.y + nextLayerPeak->size.y * 0.5F &&
+        historyScene.framingMaximum.x >=
+            nextLayerPeak->center.x + nextLayerPeak->size.x * 0.5F &&
         historyScene.framingMaximum.z >=
             nextLayerPeak->center.z + nextLayerPeak->size.z * 0.5F,
         "Density Volume exposes complete history bounds for launch framing"
