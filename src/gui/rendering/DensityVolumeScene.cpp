@@ -9,7 +9,7 @@
 namespace quantum_sim::gui::density_volume {
     namespace {
         constexpr float cellPitch = 1.0F;
-        constexpr float cubeSide = 0.82F;
+        constexpr float cubeSide = 0.88F;
         constexpr float maximumFloorHeight = 4.4F;
         constexpr float maximumFloorColorMagnitude = 0.52F;
         constexpr float solidVisibilityThreshold = 1.0e-4F;
