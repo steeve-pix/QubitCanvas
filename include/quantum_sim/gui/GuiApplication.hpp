@@ -130,7 +130,13 @@ namespace quantum_sim::gui {
         int presetQubitCount_{4};
         bool playbackPaused_{true};
         double nextAutoStepAt_{0.0};
-        float heatAmount_{0.78F};
+        /**
+         * Fixed emissive intensity used by both density visualization modes.
+         *
+         * Keeping this value internal gives Layer Stack and Floor Field a
+         * consistent presentation without exposing a duplicate palette control.
+         */
+        static constexpr float densityVolumeHeatAmount_{1.5F};
         std::string lastSampleLabel_{"none"};
         std::size_t selectedDensityLayer_{};
         std::optional<std::size_t> lastDensityDebuggerStepNumber_;
