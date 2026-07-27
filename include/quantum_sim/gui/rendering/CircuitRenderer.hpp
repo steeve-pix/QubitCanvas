@@ -208,6 +208,7 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> requestedFocusStepNumber_;
         std::optional<std::size_t> lastFocusedStepNumber_;
         std::size_t lastFocusedInstructionCount_{0};
+        float effectiveWireSpacing_{70.0F};
         float viewZoom_{1.0F};
         bool fitToWindow_{true};
         bool placementModeWasActive_{false};
