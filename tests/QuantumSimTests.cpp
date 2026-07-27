@@ -425,7 +425,15 @@ int main() {
         quantum_sim::algorithms::weightedStatePreparationCircuit(10U),
         quantum_sim::algorithms::bitFlipCodeCircuit(10U),
         quantum_sim::algorithms::steaneCodeCircuit(10U),
-        quantum_sim::algorithms::shorCodeCircuit(10U)
+        quantum_sim::algorithms::shorCodeCircuit(10U),
+        quantum_sim::algorithms::phaseFlipCodeCircuit(10U),
+        quantum_sim::algorithms::fiveQubitCodeCircuit(10U),
+        quantum_sim::algorithms::quantumCountingCircuit(10U),
+        quantum_sim::algorithms::amplitudeEstimationCircuit(10U),
+        quantum_sim::algorithms::rippleCarryAdderCircuit(10U),
+        quantum_sim::algorithms::draperAdderCircuit(10U),
+        quantum_sim::algorithms::iqpCircuit(10U),
+        quantum_sim::algorithms::surfaceCodeStabilizerCircuit(10U)
     };
 
     check(
@@ -1271,6 +1279,168 @@ int main() {
         "Simon rejects registers below its four-qubit minimum"
     );
 
+    const QuantumRegister directCcxResult =
+            QuantumRegister::basisState(3U, 6U).applyThreeQubitGate(
+                quantum_sim::gates::ccxGate(),
+                0U,
+                1U,
+                2U
+            );
+
+    const QuantumRegister directCswapResult =
+            QuantumRegister::basisState(3U, 5U).applyThreeQubitGate(
+                quantum_sim::gates::cSwapGate(),
+                0U,
+                1U,
+                2U
+            );
+
+    check(
+        approximatelyEqual(directCcxResult.probability(7U), 1.0) &&
+        approximatelyEqual(directCswapResult.probability(6U), 1.0),
+        "Compact CCX and CSWAP execute with standard local basis ordering"
+    );
+
+    QuantumCircuit threeQubitCircuit{10U};
+    threeQubitCircuit.insertThreeQubitGate(
+        4U,
+        "CCX",
+        quantum_sim::gates::ccxGate(),
+        9U,
+        0U,
+        5U
+    );
+
+    const auto threeQubitInfo =
+            threeQubitCircuit.instructionInfo().front();
+
+    const QuantumRegister nonAdjacentCcxResult =
+            threeQubitCircuit.execute(
+                QuantumRegister::basisState(10U, 513U)
+            );
+
+    check(
+        threeQubitInfo.kind ==
+            quantum_sim::circuit::CircuitInstructionKind::ThreeQubit &&
+        threeQubitInfo.controlQubit == 9U &&
+        threeQubitInfo.secondaryTargetQubit == 0U &&
+        threeQubitInfo.tertiaryTargetQubit == 5U &&
+        approximatelyEqual(
+            nonAdjacentCcxResult.probability(529U),
+            1.0
+        ),
+        "Three-qubit metadata and execution support non-adjacent ten-qubit operands"
+    );
+
+    const QuantumRegister phaseFlipResult =
+            quantum_sim::algorithms::phaseFlipCodeCircuit().execute(
+                QuantumRegister::basisState(3U, 0U)
+            );
+
+    check(
+        approximatelyEqual(
+            phaseFlipResult.probabilityOfQubitOne(0U),
+            0.25
+        ) &&
+        approximatelyEqual(
+            summedProbability(phaseFlipResult),
+            1.0
+        ),
+        "Phase-flip code restores the prepared logical qubit after a Z error"
+    );
+
+    const QuantumRegister fiveQubitCodeResult =
+            quantum_sim::algorithms::fiveQubitCodeCircuit().execute(
+                QuantumRegister::basisState(5U, 0U)
+            );
+
+    std::size_t fiveQubitPopulatedStates{};
+
+    for (
+        std::size_t state = 0U;
+        state < fiveQubitCodeResult.stateCount();
+        ++state
+    ) {
+        if (fiveQubitCodeResult.probability(state) > 1.0e-10) {
+            ++fiveQubitPopulatedStates;
+        }
+    }
+
+    check(
+        fiveQubitPopulatedStates == 16U &&
+        approximatelyEqual(
+            fiveQubitCodeResult.probability(0U),
+            1.0 / 16.0
+        ) &&
+        approximatelyEqual(
+            summedProbability(fiveQubitCodeResult),
+            1.0
+        ),
+        "Five-qubit perfect code prepares its exact normalized sixteen-term codeword"
+    );
+
+    const QuantumRegister rippleAdderResult =
+            quantum_sim::algorithms::rippleCarryAdderCircuit().execute(
+                QuantumRegister::basisState(4U, 0U)
+            );
+
+    const QuantumRegister draperAdderResult =
+            quantum_sim::algorithms::draperAdderCircuit().execute(
+                QuantumRegister::basisState(4U, 0U)
+            );
+
+    check(
+        approximatelyEqual(rippleAdderResult.probability(7U), 1.0) &&
+        approximatelyEqual(draperAdderResult.probability(7U), 1.0),
+        "Ripple-carry and Draper adders both produce the deterministic result 1 + 2 = 3"
+    );
+
+    const QuantumRegister quantumCountingResult =
+            quantum_sim::algorithms::quantumCountingCircuit().execute(
+                QuantumRegister::basisState(5U, 0U)
+            );
+
+    const QuantumRegister amplitudeEstimationResult =
+            quantum_sim::algorithms::amplitudeEstimationCircuit().execute(
+                QuantumRegister::basisState(4U, 0U)
+            );
+
+    const QuantumRegister iqpResult =
+            quantum_sim::algorithms::iqpCircuit(5U).execute(
+                QuantumRegister::basisState(5U, 0U)
+            );
+
+    const QuantumRegister surfaceCodeResult =
+            quantum_sim::algorithms::surfaceCodeStabilizerCircuit().execute(
+                QuantumRegister::basisState(10U, 0U)
+            );
+
+    double iqpMinimumProbability = 1.0;
+    double iqpMaximumProbability = 0.0;
+
+    for (std::size_t state = 0U; state < iqpResult.stateCount(); ++state) {
+        iqpMinimumProbability =
+                std::min(
+                    iqpMinimumProbability,
+                    iqpResult.probability(state)
+                );
+
+        iqpMaximumProbability =
+                std::max(
+                    iqpMaximumProbability,
+                    iqpResult.probability(state)
+                );
+    }
+
+    check(
+        approximatelyEqual(summedProbability(quantumCountingResult), 1.0) &&
+        approximatelyEqual(summedProbability(amplitudeEstimationResult), 1.0) &&
+        approximatelyEqual(summedProbability(iqpResult), 1.0) &&
+        approximatelyEqual(summedProbability(surfaceCodeResult), 1.0) &&
+        iqpMaximumProbability - iqpMinimumProbability > 1.0e-3,
+        "Counting, estimation, IQP, and surface-code presets stay normalized and IQP is uneven"
+    );
+
     const double halfTurn =
             std::numbers::pi;
 
@@ -1304,7 +1474,21 @@ int main() {
         quantum_sim::gates::crzGate(std::numbers::pi / 3.0),
         quantum_sim::gates::rxxGate(std::numbers::pi / 3.0),
         quantum_sim::gates::ryyGate(std::numbers::pi / 3.0),
-        quantum_sim::gates::rzzGate(std::numbers::pi / 3.0)
+        quantum_sim::gates::rzzGate(std::numbers::pi / 3.0),
+        quantum_sim::gates::chGate(),
+        quantum_sim::gates::csGate(),
+        quantum_sim::gates::csDaggerGate(),
+        quantum_sim::gates::ctGate(),
+        quantum_sim::gates::ctDaggerGate(),
+        quantum_sim::gates::dcxGate(),
+        quantum_sim::gates::ecrGate(),
+        quantum_sim::gates::squareRootSwapGate(),
+        quantum_sim::gates::fSimGate(
+            std::numbers::pi / 3.0,
+            std::numbers::pi / 5.0
+        ),
+        quantum_sim::gates::ccxGate(),
+        quantum_sim::gates::cSwapGate()
     };
 
     check(

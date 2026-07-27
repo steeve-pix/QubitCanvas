@@ -156,6 +156,30 @@ namespace {
         if (preset == "shor-code") {
             return algorithms::shorCodeCircuit(qubitCount);
         }
+        if (preset == "phase-flip") {
+            return algorithms::phaseFlipCodeCircuit(qubitCount);
+        }
+        if (preset == "five-qubit-code") {
+            return algorithms::fiveQubitCodeCircuit(qubitCount);
+        }
+        if (preset == "quantum-counting") {
+            return algorithms::quantumCountingCircuit(qubitCount);
+        }
+        if (preset == "amplitude-estimation") {
+            return algorithms::amplitudeEstimationCircuit(qubitCount);
+        }
+        if (preset == "ripple-adder") {
+            return algorithms::rippleCarryAdderCircuit(qubitCount);
+        }
+        if (preset == "draper-adder") {
+            return algorithms::draperAdderCircuit(qubitCount);
+        }
+        if (preset == "iqp") {
+            return algorithms::iqpCircuit(qubitCount);
+        }
+        if (preset == "surface-code") {
+            return algorithms::surfaceCodeStabilizerCircuit(qubitCount);
+        }
 
         throw std::invalid_argument{
             "Unknown preset: " +

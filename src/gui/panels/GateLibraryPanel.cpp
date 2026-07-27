@@ -26,13 +26,21 @@ namespace {
                gateName == "CRz" ||
                gateName == "RXX" ||
                gateName == "RYY" ||
-               gateName == "RZZ";
+               gateName == "RZZ" ||
+               gateName == "fSim";
     }
 
     [[nodiscard]] bool usesThreeAngles(
         const std::string_view gateName
     ) noexcept {
         return gateName == "U";
+    }
+
+    [[nodiscard]] bool usesPhi(
+        const std::string_view gateName
+    ) noexcept {
+        return gateName == "U" ||
+               gateName == "fSim";
     }
 
     [[nodiscard]] const char *gateTitle(const std::string_view gateName) {
@@ -90,6 +98,21 @@ namespace {
         if (gateName == "CZ") {
             return "CONTROLLED-Z";
         }
+        if (gateName == "CH") {
+            return "CONTROLLED-HADAMARD";
+        }
+        if (gateName == "CS") {
+            return "CONTROLLED-S";
+        }
+        if (gateName == "CSdg") {
+            return "CONTROLLED-S DAGGER";
+        }
+        if (gateName == "CT") {
+            return "CONTROLLED-T";
+        }
+        if (gateName == "CTdg") {
+            return "CONTROLLED-T DAGGER";
+        }
         if (gateName == "CP") {
             return "CONTROLLED-PHASE";
         }
@@ -110,6 +133,24 @@ namespace {
         }
         if (gateName == "RZZ") {
             return "ZZ INTERACTION";
+        }
+        if (gateName == "DCX") {
+            return "DOUBLE-CNOT";
+        }
+        if (gateName == "ECR") {
+            return "ECHOED CROSS-RESONANCE";
+        }
+        if (gateName == "sqrtSWAP") {
+            return "SQUARE ROOT SWAP";
+        }
+        if (gateName == "fSim") {
+            return "FERMIONIC SIMULATION";
+        }
+        if (gateName == "CCX") {
+            return "CONTROLLED-CONTROLLED-X";
+        }
+        if (gateName == "CSWAP") {
+            return "CONTROLLED-SWAP";
         }
         if (gateName == "SWAP") {
             return "SWAP";
@@ -185,6 +226,21 @@ namespace {
         if (gateName == "CZ") {
             return gates::czGate();
         }
+        if (gateName == "CH") {
+            return gates::chGate();
+        }
+        if (gateName == "CS") {
+            return gates::csGate();
+        }
+        if (gateName == "CSdg") {
+            return gates::csDaggerGate();
+        }
+        if (gateName == "CT") {
+            return gates::ctGate();
+        }
+        if (gateName == "CTdg") {
+            return gates::ctDaggerGate();
+        }
         if (gateName == "CP") {
             return gates::controlledPhaseGate(
                 parameters.thetaRadians
@@ -207,6 +263,27 @@ namespace {
         }
         if (gateName == "RZZ") {
             return gates::rzzGate(parameters.thetaRadians);
+        }
+        if (gateName == "DCX") {
+            return gates::dcxGate();
+        }
+        if (gateName == "ECR") {
+            return gates::ecrGate();
+        }
+        if (gateName == "sqrtSWAP") {
+            return gates::squareRootSwapGate();
+        }
+        if (gateName == "fSim") {
+            return gates::fSimGate(
+                parameters.thetaRadians,
+                parameters.phiRadians
+            );
+        }
+        if (gateName == "CCX") {
+            return gates::ccxGate();
+        }
+        if (gateName == "CSWAP") {
+            return gates::cSwapGate();
         }
         if (gateName == "SWAP") {
             return gates::swapGate();
@@ -260,12 +337,24 @@ namespace {
             return "T\xE2\x80\xA0";
         }
 
+        if (gateName == "CSdg") {
+            return "CS\xE2\x80\xA0";
+        }
+
+        if (gateName == "CTdg") {
+            return "CT\xE2\x80\xA0";
+        }
+
         if (gateName == "SX") {
             return "\xE2\x88\x9A""X";
         }
 
         if (gateName == "SXdg") {
             return "\xE2\x88\x9A""X\xE2\x80\xA0";
+        }
+
+        if (gateName == "sqrtSWAP") {
+            return "\xE2\x88\x9A""SW";
         }
 
         return gateName.data();
@@ -398,6 +487,59 @@ namespace quantum_sim::gui {
         }
     };
 
+    constexpr GateDescriptor advancedControlledGates[] = {
+        {
+            "CH",
+            "Controlled Hadamard: mixes the target only when the control is |1\xE2\x9F\xA9."
+        },
+        {
+            "CS",
+            "Controlled S: applies a pi/2 target phase only in the active control branch."
+        },
+        {
+            "CSdg",
+            "Controlled inverse S: reverses the controlled pi/2 phase."
+        },
+        {
+            "CT",
+            "Controlled T: applies a pi/4 target phase only in the active control branch."
+        },
+        {
+            "CTdg",
+            "Controlled inverse T: reverses the controlled pi/4 phase."
+        }
+    };
+
+    constexpr GateDescriptor nativeTwoQubitGates[] = {
+        {
+            "DCX",
+            "Double-CNOT: applies CX in both directions as one two-qubit permutation."
+        },
+        {
+            "ECR",
+            "Echoed cross-resonance: a calibrated entangling primitive used by superconducting hardware."
+        },
+        {
+            "sqrtSWAP",
+            "Square-root SWAP: a half exchange whose second application equals SWAP."
+        },
+        {
+            "fSim",
+            "Fermionic simulation gate: combines excitation exchange theta with conditional phase phi."
+        }
+    };
+
+    constexpr GateDescriptor threeQubitGates[] = {
+        {
+            "CCX",
+            "Toffoli gate: flips the target only when both controls are |1\xE2\x9F\xA9."
+        },
+        {
+            "CSWAP",
+            "Fredkin gate: exchanges two targets only when the control is |1\xE2\x9F\xA9."
+        }
+    };
+
     GateLibraryPanel::GateLibraryPanel(GateLibraryStyle style)
         : style_{std::move(style)} {
     }
@@ -414,7 +556,7 @@ namespace quantum_sim::gui {
         gatePage_ =
                 std::min(
                     gatePage_,
-                    std::size_t{1}
+                    std::size_t{2}
                 );
 
         if (gatePage_ == 0U) {
@@ -431,7 +573,7 @@ namespace quantum_sim::gui {
                 coreTwoQubitGates,
                 std::size(coreTwoQubitGates)
             );
-        } else {
+        } else if (gatePage_ == 1U) {
             drawGateCategory(
                 "Parameterized single-qubit",
                 parameterizedSingleQubitGates,
@@ -452,6 +594,28 @@ namespace quantum_sim::gui {
                 "Two-qubit interactions",
                 interactionGates,
                 std::size(interactionGates)
+            );
+        } else {
+            drawGateCategory(
+                "Advanced controlled",
+                advancedControlledGates,
+                std::size(advancedControlledGates)
+            );
+
+            ImGui::Spacing();
+
+            drawGateCategory(
+                "Native and exchange",
+                nativeTwoQubitGates,
+                std::size(nativeTwoQubitGates)
+            );
+
+            ImGui::Spacing();
+
+            drawGateCategory(
+                "Three-qubit",
+                threeQubitGates,
+                std::size(threeQubitGates)
             );
         }
 
@@ -537,10 +701,18 @@ namespace quantum_sim::gui {
                 gateName == "SX" ||
                 gateName == "SXdg";
 
+        const bool squareRootSwap =
+                gateName == "sqrtSWAP";
+
+        const bool echoedCrossResonance =
+                gateName == "ECR";
+
         const double displayMultiplier =
-                hadamard
+                hadamard ||
+                echoedCrossResonance
                     ? std::numbers::sqrt2
-                    : squareRootX
+                    : squareRootX ||
+                      squareRootSwap
                         ? 2.0
                         : 1.0;
 
@@ -584,8 +756,15 @@ namespace quantum_sim::gui {
         const ImVec2 pointer =
                 ImGui::GetMousePos();
 
-        constexpr float tooltipWidth = 300.0F;
-        constexpr float estimatedTooltipHeight = 220.0F;
+        const float tooltipWidth =
+                matrix.rows() >= 8U
+                    ? 520.0F
+                    : 300.0F;
+
+        const float estimatedTooltipHeight =
+                matrix.rows() >= 8U
+                    ? 360.0F
+                    : 220.0F;
         constexpr float pointerOffset = 14.0F;
 
         const float viewportRight =
@@ -643,21 +822,23 @@ namespace quantum_sim::gui {
             );
         }
 
-        if (usesThreeAngles(gateName)) {
+        if (usesPhi(gateName)) {
             const std::string phiText =
                     notation::formatAngleMeasurement(
                         phiAngleRadians_
-                    );
-
-            const std::string lambdaText =
-                    notation::formatAngleMeasurement(
-                        lambdaAngleRadians_
                     );
 
             ImGui::TextDisabled(
                 "\xCF\x86 = %s",
                 phiText.c_str()
             );
+        }
+
+        if (usesThreeAngles(gateName)) {
+            const std::string lambdaText =
+                    notation::formatAngleMeasurement(
+                        lambdaAngleRadians_
+                    );
 
             ImGui::TextDisabled(
                 "\xCE\xBB = %s",
@@ -671,6 +852,14 @@ namespace quantum_sim::gui {
 
         if (squareRootX) {
             ImGui::TextDisabled("factor 1/2");
+        }
+
+        if (squareRootSwap) {
+            ImGui::TextDisabled("factor 1/2");
+        }
+
+        if (echoedCrossResonance) {
+            ImGui::TextDisabled("factor 1/\xE2\x88\x9A""2");
         }
 
         ImGui::Spacing();
@@ -827,7 +1016,7 @@ namespace quantum_sim::gui {
         gatePage_ =
                 std::min(
                     pageIndex,
-                    std::size_t{1}
+                    std::size_t{2}
                 );
     }
 
@@ -908,14 +1097,19 @@ namespace quantum_sim::gui {
 
         if (
             selectedGate_.has_value() &&
-            usesThreeAngles(selectedGate_.value())
+            usesPhi(selectedGate_.value())
         ) {
             drawAngle(
                 "\xCF\x86",
                 "##PhiAnglePi",
                 phiAngleRadians_
             );
+        }
 
+        if (
+            selectedGate_.has_value() &&
+            usesThreeAngles(selectedGate_.value())
+        ) {
             drawAngle(
                 "\xCE\xBB",
                 "##LambdaAnglePi",
@@ -953,7 +1147,7 @@ namespace quantum_sim::gui {
     }
 
     void GateLibraryPanel::drawPageControls() {
-        constexpr std::size_t pageCount = 2U;
+        constexpr std::size_t pageCount = 3U;
 
         if (
             !ImGui::BeginTable(
