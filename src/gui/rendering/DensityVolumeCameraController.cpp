@@ -175,7 +175,7 @@ namespace quantum_sim::gui::density_volume {
         launchYawDegrees_ =
                 floorField
                     ? 42.0F
-                    : 110.0F;
+                    : 120.0F;
 
         launchPitchDegrees_ =
                 floorField
