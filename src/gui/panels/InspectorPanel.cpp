@@ -725,22 +725,79 @@ namespace quantum_sim::gui {
                     ? 1U
                     : 4U;
 
-        for (std::size_t line = 0; line <= gridDimension; line += gridLineStride) {
-            const float offset =
-                    static_cast<float>(line) * cellSize;
+        const std::size_t majorGridStride =
+                gridDimension >= 4U
+                    ? std::max<std::size_t>(
+                        2U,
+                        gridDimension / 4U
+                    )
+                    : gridDimension;
+
+        const int minorLineAlpha =
+                gridDimension <= 8U
+                    ? 150
+                    : gridDimension <= 16U
+                          ? 126
+                          : gridDimension <= 32U
+                                ? 100
+                                : 76;
+
+        for (
+            std::size_t line = gridLineStride;
+            line < gridDimension;
+            line += gridLineStride
+        ) {
+            const bool majorLine =
+                    line % majorGridStride == 0U;
+
+            const int highlightAlpha =
+                    std::min(
+                        220,
+                        minorLineAlpha + (majorLine ? 46 : 0)
+                    );
+
+            // Pixel-aligned shadow and highlight remain visible over both hot
+            // inferno cells and the dark near-zero matrix background.
+            const float x =
+                    std::floor(
+                        gridOrigin.x +
+                        static_cast<float>(line) * cellSize
+                    ) +
+                    0.5F;
+
+            const float y =
+                    std::floor(
+                        gridOrigin.y +
+                        static_cast<float>(line) * cellSize
+                    ) +
+                    0.5F;
 
             drawList->AddLine(
-                ImVec2{gridOrigin.x + offset, gridOrigin.y},
-                ImVec2{gridOrigin.x + offset, gridMaximum.y},
-                IM_COL32(89, 112, 154, 34),
-                1.0F
+                ImVec2{x, gridOrigin.y},
+                ImVec2{x, gridMaximum.y},
+                IM_COL32(4, 9, 20, majorLine ? 225 : 190),
+                majorLine ? 2.8F : 2.2F
             );
 
             drawList->AddLine(
-                ImVec2{gridOrigin.x, gridOrigin.y + offset},
-                ImVec2{gridMaximum.x, gridOrigin.y + offset},
-                IM_COL32(89, 112, 154, 34),
-                1.0F
+                ImVec2{gridOrigin.x, y},
+                ImVec2{gridMaximum.x, y},
+                IM_COL32(4, 9, 20, majorLine ? 225 : 190),
+                majorLine ? 2.8F : 2.2F
+            );
+
+            drawList->AddLine(
+                ImVec2{x, gridOrigin.y},
+                ImVec2{x, gridMaximum.y},
+                IM_COL32(91, 137, 178, highlightAlpha),
+                majorLine ? 1.25F : 1.0F
+            );
+
+            drawList->AddLine(
+                ImVec2{gridOrigin.x, y},
+                ImVec2{gridMaximum.x, y},
+                IM_COL32(91, 137, 178, highlightAlpha),
+                majorLine ? 1.25F : 1.0F
             );
         }
 
@@ -754,10 +811,10 @@ namespace quantum_sim::gui {
         drawList->AddRect(
             gridOrigin,
             gridMaximum,
-            IM_COL32(93, 139, 192, 155),
+            IM_COL32(102, 158, 207, 220),
             3.0F,
             0,
-            1.0F
+            1.25F
         );
 
         if (hoveredGridCell.has_value()) {
