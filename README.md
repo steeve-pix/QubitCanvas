@@ -50,9 +50,9 @@ ownership of the live camera until reset.
 
 Two synchronized layouts are available:
 
-- **Layer Stack** places complete X-Z density matrices upward along the Y axis
-  and reveals pre-uploaded solid and ghost instance ranges through the
-  selected debugger step.
+- **Layer Stack** places complete vertical Y-Z density matrices along the X
+  axis, growing the history horizontally while revealing pre-uploaded solid
+  and ghost instance ranges through the selected debugger step.
 - **Floor Field** shows the selected density matrix as one square X-Z grid and
   maps `|ρ|` linearly to voxel height.
 

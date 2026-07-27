@@ -381,21 +381,36 @@ namespace quantum_sim::gui::density_volume {
                     );
 
             if (visibleBounds.valid) {
+                const float firstLayerX =
+                        scene_.layerCenters.front().x;
+
+                const float selectedLayerX =
+                        scene_.layerCenters.at(
+                            safeSelectedLayer
+                        ).x;
+
                 scene_.groundCenter = Vector3{
-                    0.0F,
-                    visibleBounds.minimum.y -
-                        scene_.voxelSide * 1.15F,
+                    (firstLayerX + selectedLayerX) * 0.5F,
+                    scene_.framingMinimum.y -
+                        scene_.voxelSide * 0.65F,
                     0.0F
                 };
 
                 scene_.groundHalfExtentX =
                         std::max(
-                            scene_.matrixSpan * 0.78F,
+                            std::abs(
+                                selectedLayerX -
+                                firstLayerX
+                            ) * 0.5F +
+                            scene_.matrixSpan * 0.62F,
                             2.5F
                         );
 
                 scene_.groundHalfExtentZ =
-                        scene_.groundHalfExtentX;
+                        std::max(
+                            scene_.matrixSpan * 0.78F,
+                            2.5F
+                        );
             }
         } else {
             visibleInstanceCount_ =
