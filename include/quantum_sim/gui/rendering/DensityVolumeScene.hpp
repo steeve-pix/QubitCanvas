@@ -68,6 +68,8 @@ namespace quantum_sim::gui::density_volume {
         std::vector<Vector3> layerCenters;
         Vector3 center;
         float radius{1.0F};
+        Vector3 framingMinimum{-1.0F, -1.0F, -1.0F};
+        Vector3 framingMaximum{1.0F, 1.0F, 1.0F};
         float matrixSpan{1.0F};
         float layerSpacing{1.0F};
         float voxelSide{1.0F};

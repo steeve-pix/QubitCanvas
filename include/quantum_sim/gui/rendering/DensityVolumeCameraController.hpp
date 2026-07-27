@@ -11,35 +11,38 @@ namespace quantum_sim::gui::density_volume {
         /**
          * Frames a new scene and stores that composition as the reset view.
          *
-         * @param center Look-at target at the selected density layer.
-         * @param focusRadius Selected matrix radius used for orbit distance.
-         * @param extentRadius Complete visible history radius used for clipping.
+         * The orbit distance is solved from the projected corners of the
+         * complete bounds, camera angle, field of view, and viewport aspect.
+         *
+         * @param minimum Minimum corner of the complete scene.
+         * @param maximum Maximum corner of the complete scene.
+         * @param viewportAspect Physical viewport width divided by height.
          * @param floorField True when framing the height-field presentation.
          */
         void frameScene(
-            const Vector3 &center,
-            float focusRadius,
-            float extentRadius,
+            const Vector3 &minimum,
+            const Vector3 &maximum,
+            float viewportAspect,
             bool floorField = false
         );
 
         /**
-         * Refreshes scene-aware focus, reset, and clipping bounds.
+         * Refreshes scene-aware framing, reset, and clipping bounds.
          *
-         * Playback calls this when the visible layer range changes. An
-         * untouched Layer Stack camera follows the new target without changing
-         * orbit distance. Once the user orbits, pans, or zooms, the live pose
-         * remains untouched and only a later reset uses the newest composition.
+         * Layer-stack playback supplies the complete planned history, so its
+         * untouched camera remains stable while layers are revealed. Once the
+         * user orbits, pans, or zooms, the live pose remains untouched and only
+         * a later reset uses the latest composition.
          *
-         * @param center Look-at target at the selected density layer.
-         * @param focusRadius Selected matrix radius used for orbit distance.
-         * @param extentRadius Complete visible history radius used for clipping.
+         * @param minimum Minimum corner of the complete scene.
+         * @param maximum Maximum corner of the complete scene.
+         * @param viewportAspect Physical viewport width divided by height.
          * @param floorField True when framing the height-field presentation.
          */
         void updateSceneBounds(
-            const Vector3 &center,
-            float focusRadius,
-            float extentRadius,
+            const Vector3 &minimum,
+            const Vector3 &maximum,
+            float viewportAspect,
             bool floorField = false
         ) noexcept;
 
