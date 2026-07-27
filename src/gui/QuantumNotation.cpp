@@ -317,7 +317,9 @@ namespace quantum_sim::gui::notation {
     ) {
         std::string text;
 
-        if (approximatelyEqual(radians, 0.0)) {
+        if (!std::isfinite(radians)) {
+            text = trimDecimal(radians, decimalPlaces);
+        } else if (approximatelyEqual(radians, 0.0)) {
             text = "0";
         } else {
             const double piRatio =
@@ -384,9 +386,10 @@ namespace quantum_sim::gui::notation {
             if (!formattedAsPi) {
                 text =
                         trimDecimal(
-                            radians,
+                            piRatio,
                             decimalPlaces
-                        );
+                        ) +
+                        piSymbol;
             }
         }
 

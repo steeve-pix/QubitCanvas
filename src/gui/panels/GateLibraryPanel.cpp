@@ -613,14 +613,25 @@ namespace quantum_sim::gui {
     void GateLibraryPanel::drawRotationAngleControl() {
         ImGui::TextDisabled("Rotation angle");
         ImGui::SetNextItemWidth(-1.0F);
-        ImGui::SliderFloat(
-            "##RotationAngleRadians",
-            &rotationAngleRadians_,
-            -std::numbers::pi_v<float>,
-            std::numbers::pi_v<float>,
-            "%.3f rad",
-            ImGuiSliderFlags_AlwaysClamp
-        );
+
+        float anglePi =
+                rotationAngleRadians_ /
+                std::numbers::pi_v<float>;
+
+        if (
+            ImGui::SliderFloat(
+                "##RotationAnglePi",
+                &anglePi,
+                -1.0F,
+                1.0F,
+                "%.2f\xCF\x80",
+                ImGuiSliderFlags_AlwaysClamp
+            )
+        ) {
+            rotationAngleRadians_ =
+                    anglePi *
+                    std::numbers::pi_v<float>;
+        }
 
         const std::string exactAngle =
                 notation::formatRadians(

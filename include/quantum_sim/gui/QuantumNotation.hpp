@@ -36,17 +36,21 @@ namespace quantum_sim::gui::notation {
     );
 
     /**
-     * Formats an angle as a rational multiple of pi when possible.
+     * Formats a radian angle as a multiple of pi.
+     *
+     * Common rational multiples retain exact notation. Other finite angles use
+     * a trimmed decimal coefficient, so an angle never falls back to a raw
+     * radian value.
      *
      * @param radians Angle in radians.
-     * @param decimalPlaces Maximum fallback decimal precision.
-     * @param includeUnit Whether to append the "rad" unit.
-     * @return Representation such as "-3π/4 rad".
+     * @param decimalPlaces Maximum precision for a decimal pi coefficient.
+     * @param includeUnit Whether to append the optional " rad" unit.
+     * @return Representation such as "-3π/4" or "0.74π".
      */
     [[nodiscard]] std::string formatRadians(
         double radians,
-        int decimalPlaces = 6,
-        bool includeUnit = true
+        int decimalPlaces = 3,
+        bool includeUnit = false
     );
 
     /**
