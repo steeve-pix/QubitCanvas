@@ -7,6 +7,8 @@
 #include <stdexcept>
 
 namespace {
+    using quantum_sim::circuit::QuantumCircuit;
+
     void requireMinimumQubitCount(
         const std::size_t qubitCount,
         const std::size_t minimum,
@@ -15,6 +17,232 @@ namespace {
         if (qubitCount < minimum) {
             throw std::invalid_argument{errorMessage};
         }
+    }
+
+    void appendControlledPhase(
+        QuantumCircuit &circuit,
+        const std::size_t controlQubit,
+        const std::size_t targetQubit,
+        const double angleRadians
+    ) {
+        const double halfAngle =
+                angleRadians * 0.5;
+
+        circuit.addSingleQubitGate(
+            "Rz",
+            quantum_sim::gates::rzGate(halfAngle),
+            controlQubit,
+            halfAngle
+        );
+
+        circuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            controlQubit,
+            targetQubit
+        );
+
+        circuit.addSingleQubitGate(
+            "Rz",
+            quantum_sim::gates::rzGate(-halfAngle),
+            targetQubit,
+            -halfAngle
+        );
+
+        circuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            controlQubit,
+            targetQubit
+        );
+
+        circuit.addSingleQubitGate(
+            "Rz",
+            quantum_sim::gates::rzGate(halfAngle),
+            targetQubit,
+            halfAngle
+        );
+    }
+
+    void appendForwardQft(
+        QuantumCircuit &circuit,
+        const std::size_t firstQubit,
+        const std::size_t qubitCount
+    ) {
+        for (std::size_t targetOffset = 0U; targetOffset < qubitCount; ++targetOffset) {
+            const std::size_t target =
+                    firstQubit + targetOffset;
+
+            circuit.addSingleQubitGate(
+                "H",
+                quantum_sim::gates::hadamardGate(),
+                target
+            );
+
+            for (
+                std::size_t controlOffset =
+                        targetOffset + 1U;
+                controlOffset < qubitCount;
+                ++controlOffset
+            ) {
+                const double angle =
+                        std::numbers::pi /
+                        static_cast<double>(
+                            std::size_t{1}
+                            << (controlOffset - targetOffset)
+                        );
+
+                appendControlledPhase(
+                    circuit,
+                    firstQubit + controlOffset,
+                    target,
+                    angle
+                );
+            }
+        }
+
+        for (std::size_t offset = 0U; offset < qubitCount / 2U; ++offset) {
+            circuit.addTwoQubitGate(
+                "SWAP",
+                quantum_sim::gates::swapGate(),
+                firstQubit + offset,
+                firstQubit + qubitCount - 1U - offset
+            );
+        }
+    }
+
+    void appendInverseQft(
+        QuantumCircuit &circuit,
+        const std::size_t firstQubit,
+        const std::size_t qubitCount
+    ) {
+        for (std::size_t offset = 0U; offset < qubitCount / 2U; ++offset) {
+            circuit.addTwoQubitGate(
+                "SWAP",
+                quantum_sim::gates::swapGate(),
+                firstQubit + offset,
+                firstQubit + qubitCount - 1U - offset
+            );
+        }
+
+        for (std::size_t targetOffset = qubitCount; targetOffset-- > 0U;) {
+            const std::size_t target =
+                    firstQubit + targetOffset;
+
+            for (
+                std::size_t controlOffset = qubitCount;
+                controlOffset-- > targetOffset + 1U;
+            ) {
+                const double angle =
+                        -std::numbers::pi /
+                        static_cast<double>(
+                            std::size_t{1}
+                            << (controlOffset - targetOffset)
+                        );
+
+                appendControlledPhase(
+                    circuit,
+                    firstQubit + controlOffset,
+                    target,
+                    angle
+                );
+            }
+
+            circuit.addSingleQubitGate(
+                "H",
+                quantum_sim::gates::hadamardGate(),
+                target
+            );
+        }
+    }
+
+    void appendToffoli(
+        QuantumCircuit &circuit,
+        const std::size_t firstControl,
+        const std::size_t secondControl,
+        const std::size_t target
+    ) {
+        circuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), target);
+        circuit.addTwoQubitGate("CX", quantum_sim::gates::cxGate(), secondControl, target);
+        circuit.addSingleQubitGate("Tdg", quantum_sim::gates::tDaggerGate(), target);
+        circuit.addTwoQubitGate("CX", quantum_sim::gates::cxGate(), firstControl, target);
+        circuit.addSingleQubitGate("T", quantum_sim::gates::tGate(), target);
+        circuit.addTwoQubitGate("CX", quantum_sim::gates::cxGate(), secondControl, target);
+        circuit.addSingleQubitGate("Tdg", quantum_sim::gates::tDaggerGate(), target);
+        circuit.addTwoQubitGate("CX", quantum_sim::gates::cxGate(), firstControl, target);
+        circuit.addSingleQubitGate("T", quantum_sim::gates::tGate(), secondControl);
+        circuit.addSingleQubitGate("T", quantum_sim::gates::tGate(), target);
+        circuit.addSingleQubitGate("H", quantum_sim::gates::hadamardGate(), target);
+        circuit.addTwoQubitGate("CX", quantum_sim::gates::cxGate(), firstControl, secondControl);
+        circuit.addSingleQubitGate("T", quantum_sim::gates::tGate(), firstControl);
+        circuit.addSingleQubitGate("Tdg", quantum_sim::gates::tDaggerGate(), secondControl);
+        circuit.addTwoQubitGate("CX", quantum_sim::gates::cxGate(), firstControl, secondControl);
+    }
+
+    void appendControlledRy(
+        QuantumCircuit &circuit,
+        const std::size_t controlQubit,
+        const std::size_t targetQubit,
+        const double angleRadians
+    ) {
+        const double halfAngle =
+                angleRadians * 0.5;
+
+        circuit.addSingleQubitGate(
+            "Ry",
+            quantum_sim::gates::ryGate(halfAngle),
+            targetQubit,
+            halfAngle
+        );
+
+        circuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            controlQubit,
+            targetQubit
+        );
+
+        circuit.addSingleQubitGate(
+            "Ry",
+            quantum_sim::gates::ryGate(-halfAngle),
+            targetQubit,
+            -halfAngle
+        );
+
+        circuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            controlQubit,
+            targetQubit
+        );
+    }
+
+    void appendControlledSwap(
+        QuantumCircuit &circuit,
+        const std::size_t controlQubit,
+        const std::size_t firstTarget,
+        const std::size_t secondTarget
+    ) {
+        circuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            secondTarget,
+            firstTarget
+        );
+
+        appendToffoli(
+            circuit,
+            controlQubit,
+            firstTarget,
+            secondTarget
+        );
+
+        circuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            secondTarget,
+            firstTarget
+        );
     }
 }
 
@@ -591,6 +819,373 @@ namespace quantum_sim::algorithms {
                 qubitCount - 1U
             );
         }
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit simonCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            4U,
+            "The Simon demonstration requires two input and two oracle qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1U);
+
+        // f(x0, x1) = (x0 xor x1, x0 xor x1) has hidden period s = 11.
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 2U);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 1U, 2U);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 3U);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 1U, 3U);
+
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1U);
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit shorPeriodFindingCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            4U,
+            "The compiled Shor period-finding demonstration requires four qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        // q3 represents the two-state work orbit of multiplication by 4 mod 15.
+        circuit.addSingleQubitGate("X", gates::xGate(), 3U);
+
+        for (std::size_t countingQubit = 0U; countingQubit < 3U; ++countingQubit) {
+            circuit.addSingleQubitGate(
+                "H",
+                gates::hadamardGate(),
+                countingQubit
+            );
+        }
+
+        // U^1 toggles the work orbit; U^2 and U^4 are identities for period 2.
+        circuit.addTwoQubitGate(
+            "CX",
+            gates::cxGate(),
+            2U,
+            3U
+        );
+
+        appendInverseQft(
+            circuit,
+            0U,
+            3U
+        );
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit quantumPhaseEstimationCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            3U,
+            "Quantum phase estimation requires two counting qubits and one eigenstate qubit."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        circuit.addSingleQubitGate("X", gates::xGate(), 2U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1U);
+
+        // The |1> eigenstate has phase 1/4, so the two powers contribute pi and pi/2.
+        appendControlledPhase(
+            circuit,
+            0U,
+            2U,
+            std::numbers::pi
+        );
+
+        appendControlledPhase(
+            circuit,
+            1U,
+            2U,
+            std::numbers::pi / 2.0
+        );
+
+        appendInverseQft(
+            circuit,
+            0U,
+            2U
+        );
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit vqeAnsatzCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "The VQE ansatz requires at least two qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        constexpr double theta0 =
+                0.37 * std::numbers::pi;
+
+        constexpr double theta1 =
+                -0.21 * std::numbers::pi;
+
+        constexpr double correlationPhase =
+                0.18 * std::numbers::pi;
+
+        // Hartree-Fock seed |01>, followed by one hardware-efficient ansatz layer.
+        circuit.addSingleQubitGate("X", gates::xGate(), 1U);
+        circuit.addSingleQubitGate("Ry", gates::ryGate(theta0), 0U, theta0);
+        circuit.addSingleQubitGate("Ry", gates::ryGate(theta1), 1U, theta1);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 1U);
+        circuit.addSingleQubitGate(
+            "Rz",
+            gates::rzGate(correlationPhase),
+            1U,
+            correlationPhase
+        );
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 1U);
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit qaoaMaxCutCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "QAOA Max-Cut requires at least two graph vertices."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        constexpr double gamma =
+                0.28 * std::numbers::pi;
+
+        constexpr double beta =
+                0.19 * std::numbers::pi;
+
+        for (std::size_t qubit = 0U; qubit < qubitCount; ++qubit) {
+            circuit.addSingleQubitGate(
+                "H",
+                gates::hadamardGate(),
+                qubit
+            );
+        }
+
+        const auto appendCostEdge =
+                [&](const std::size_t first, const std::size_t second) {
+            circuit.addTwoQubitGate(
+                "CX",
+                gates::cxGate(),
+                first,
+                second
+            );
+
+            circuit.addSingleQubitGate(
+                "Rz",
+                gates::rzGate(2.0 * gamma),
+                second,
+                2.0 * gamma
+            );
+
+            circuit.addTwoQubitGate(
+                "CX",
+                gates::cxGate(),
+                first,
+                second
+            );
+        };
+
+        for (std::size_t qubit = 0U; qubit + 1U < qubitCount; ++qubit) {
+            appendCostEdge(
+                qubit,
+                qubit + 1U
+            );
+        }
+
+        if (qubitCount > 2U) {
+            appendCostEdge(
+                qubitCount - 1U,
+                0U
+            );
+        }
+
+        for (std::size_t qubit = 0U; qubit < qubitCount; ++qubit) {
+            circuit.addSingleQubitGate(
+                "Rx",
+                gates::rxGate(2.0 * beta),
+                qubit,
+                2.0 * beta
+            );
+        }
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit hhlDemoCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            4U,
+            "The HHL demonstration requires two phase qubits, one system qubit, and one ancilla."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        constexpr double inputAngle =
+                std::numbers::pi / 3.0;
+
+        constexpr double reciprocalRotation =
+                std::numbers::pi / 2.5;
+
+        circuit.addSingleQubitGate(
+            "Ry",
+            gates::ryGate(inputAngle),
+            2U,
+            inputAngle
+        );
+
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1U);
+
+        appendControlledPhase(circuit, 0U, 2U, std::numbers::pi);
+        appendControlledPhase(circuit, 1U, 2U, std::numbers::pi / 2.0);
+        appendInverseQft(circuit, 0U, 2U);
+
+        // q1 carries the resolved non-zero eigenvalue in this fixed toy instance.
+        appendControlledRy(
+            circuit,
+            1U,
+            3U,
+            reciprocalRotation
+        );
+
+        // Reverse phase estimation while retaining the solution ancilla.
+        appendForwardQft(circuit, 0U, 2U);
+        appendControlledPhase(circuit, 1U, 2U, -std::numbers::pi / 2.0);
+        appendControlledPhase(circuit, 0U, 2U, -std::numbers::pi);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit swapTestCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            3U,
+            "The SWAP test requires one ancilla and two state qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1U);
+        circuit.addSingleQubitGate("X", gates::xGate(), 2U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+
+        appendControlledSwap(
+            circuit,
+            0U,
+            1U,
+            2U
+        );
+
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit quantumWalkCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            3U,
+            "The coined quantum walk requires one coin and two position qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        for (std::size_t walkStep = 0U; walkStep < 2U; ++walkStep) {
+            circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+
+            // Coin |1> increments the two-bit position modulo four.
+            appendToffoli(circuit, 0U, 2U, 1U);
+            circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 2U);
+
+            // Invert the coin and low position bit to control the decrement branch.
+            circuit.addSingleQubitGate("X", gates::xGate(), 0U);
+            circuit.addSingleQubitGate("X", gates::xGate(), 2U);
+            appendToffoli(circuit, 0U, 2U, 1U);
+            circuit.addSingleQubitGate("X", gates::xGate(), 2U);
+            circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 2U);
+            circuit.addSingleQubitGate("X", gates::xGate(), 0U);
+        }
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit bb84DemoCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "The BB84 basis demonstration requires two signal qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        // Alice encodes bit 1 diagonally on q0; Bob selects the matching basis.
+        circuit.addSingleQubitGate("X", gates::xGate(), 0U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+
+        // q1 carries bit 0 in Z, but Bob chooses X and obtains a random result.
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1U);
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit superdenseCodingCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "Superdense coding requires a shared two-qubit Bell pair."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 1U);
+
+        // Message 11 applies both Z and X to the sender's half.
+        circuit.addSingleQubitGate("Z", gates::zGate(), 0U);
+        circuit.addSingleQubitGate("X", gates::xGate(), 0U);
+
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 1U);
+        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
 
         return circuit;
     }

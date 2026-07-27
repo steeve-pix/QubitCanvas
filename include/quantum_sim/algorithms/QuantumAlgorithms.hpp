@@ -157,6 +157,146 @@ namespace quantum_sim::algorithms {
     [[nodiscard]] circuit::QuantumCircuit scrambleCircuit(std::size_t qubitCount);
 
     /**
+     * Builds a four-qubit Simon demonstration for the hidden period 11.
+     *
+     * q0/q1 form the input register and q2/q3 store a two-to-one parity
+     * oracle. Additional qubits remain untouched.
+     *
+     * @param qubitCount Total register size. Must be at least 4.
+     * @return Simon circuit whose input measurements satisfy y dot 11 = 0.
+     * @throws std::invalid_argument if qubitCount is less than 4.
+     */
+    [[nodiscard]] circuit::QuantumCircuit simonCircuit(
+        std::size_t qubitCount = 4U
+    );
+
+    /**
+     * Builds a compact Shor order-finding demonstration for a = 4 mod 15.
+     *
+     * Three counting qubits estimate the work-register period r = 2. This is
+     * the quantum period-finding component of Shor rather than a general
+     * classical factoring front end.
+     *
+     * @param qubitCount Total register size. Must be at least 4.
+     * @return Compiled order-finding circuit on q0 through q3.
+     * @throws std::invalid_argument if qubitCount is less than 4.
+     */
+    [[nodiscard]] circuit::QuantumCircuit shorPeriodFindingCircuit(
+        std::size_t qubitCount = 4U
+    );
+
+    /**
+     * Builds two-bit quantum phase estimation for the known phase 1/4.
+     *
+     * q0/q1 are counting qubits and q2 is the prepared eigenstate.
+     * Additional qubits remain untouched.
+     *
+     * @param qubitCount Total register size. Must be at least 3.
+     * @return QPE circuit whose counting register resolves binary 0.01.
+     * @throws std::invalid_argument if qubitCount is less than 3.
+     */
+    [[nodiscard]] circuit::QuantumCircuit quantumPhaseEstimationCircuit(
+        std::size_t qubitCount = 3U
+    );
+
+    /**
+     * Builds one fixed two-qubit VQE ansatz layer.
+     *
+     * The circuit prepares a Hartree-Fock seed and applies parameterized
+     * rotations plus entanglement. Classical parameter optimization is
+     * intentionally outside the unitary circuit trace.
+     *
+     * @param qubitCount Total register size. Must be at least 2.
+     * @return Fixed-parameter VQE ansatz on q0/q1.
+     * @throws std::invalid_argument if qubitCount is less than 2.
+     */
+    [[nodiscard]] circuit::QuantumCircuit vqeAnsatzCircuit(
+        std::size_t qubitCount = 2U
+    );
+
+    /**
+     * Builds a p=1 QAOA Max-Cut ansatz over the selected register.
+     *
+     * @param qubitCount Number of graph vertices/qubits. Must be at least 2.
+     * @return Cost and mixer layers for a line graph, closed into a ring when possible.
+     * @throws std::invalid_argument if qubitCount is less than 2.
+     */
+    [[nodiscard]] circuit::QuantumCircuit qaoaMaxCutCircuit(
+        std::size_t qubitCount = 3U
+    );
+
+    /**
+     * Builds a coherent four-qubit HHL structure for a fixed 2x2 toy system.
+     *
+     * The trace includes phase estimation, an eigenvalue-conditioned ancilla
+     * rotation, and phase-register uncomputation. It demonstrates the quantum
+     * kernel without claiming a general sparse-matrix solver.
+     *
+     * @param qubitCount Total register size. Must be at least 4.
+     * @return Fixed HHL demonstration on q0 through q3.
+     * @throws std::invalid_argument if qubitCount is less than 4.
+     */
+    [[nodiscard]] circuit::QuantumCircuit hhlDemoCircuit(
+        std::size_t qubitCount = 4U
+    );
+
+    /**
+     * Builds a three-qubit SWAP-test circuit for two non-identical states.
+     *
+     * q0 is the ancilla while q1/q2 hold |+> and |1>. The controlled SWAP is
+     * decomposed into compact one- and two-qubit instructions.
+     *
+     * @param qubitCount Total register size. Must be at least 3.
+     * @return SWAP test with ancilla-zero probability 3/4.
+     * @throws std::invalid_argument if qubitCount is less than 3.
+     */
+    [[nodiscard]] circuit::QuantumCircuit swapTestCircuit(
+        std::size_t qubitCount = 3U
+    );
+
+    /**
+     * Builds two steps of a coined quantum walk on a four-position cycle.
+     *
+     * q0 is the coin and q1/q2 encode the position. Additional qubits remain
+     * untouched.
+     *
+     * @param qubitCount Total register size. Must be at least 3.
+     * @return Coherent conditional-increment/decrement walk circuit.
+     * @throws std::invalid_argument if qubitCount is less than 3.
+     */
+    [[nodiscard]] circuit::QuantumCircuit quantumWalkCircuit(
+        std::size_t qubitCount = 3U
+    );
+
+    /**
+     * Builds a two-signal BB84 basis demonstration.
+     *
+     * q0 uses matching diagonal preparation/readout and recovers bit 1.
+     * q1 uses a mismatched readout basis and therefore samples randomly.
+     *
+     * @param qubitCount Total register size. Must be at least 2.
+     * @return Unitary BB84 preparation and basis-selection demonstration.
+     * @throws std::invalid_argument if qubitCount is less than 2.
+     */
+    [[nodiscard]] circuit::QuantumCircuit bb84DemoCircuit(
+        std::size_t qubitCount = 2U
+    );
+
+    /**
+     * Builds superdense coding for the classical message 11.
+     *
+     * q0/q1 create a Bell pair, encode both bits on q0, then decode to |11>.
+     * Additional qubits remain untouched.
+     *
+     * @param qubitCount Total register size. Must be at least 2.
+     * @return Superdense coding circuit for message 11.
+     * @throws std::invalid_argument if qubitCount is less than 2.
+     */
+    [[nodiscard]] circuit::QuantumCircuit superdenseCodingCircuit(
+        std::size_t qubitCount = 2U
+    );
+
+    /**
      * Builds a one-qubit Rx rotation demo.
      *
      * @param angleRadians Rotation angle in radians.

@@ -114,11 +114,23 @@ edits rebuild only the affected debugger and density-history suffix.
 - Phase kickback
 - Coherent teleportation
 - Mixed-gate scramble
+- Simon hidden-period demonstration
+- Compiled Shor order finding for `a = 4 mod 15`
+- Quantum Phase Estimation
+- Fixed VQE ansatz
+- One-layer Max-Cut QAOA
+- Fixed 2x2 HHL demonstration
+- SWAP test
+- Coined quantum walk
+- BB84 basis demonstration
+- Superdense coding
 
 The algorithm register slider controls the circuit size for every preset from
-1 to 10 qubits. Presets that require two or three working qubits are disabled
-below their minimum. Fixed demonstrations use their leading qubits and leave
-any additional register qubits in the initial state.
+1 to 10 qubits. Presets below their minimum working-register size are disabled.
+The fixed-height catalog uses previous and next page controls, so the expanded
+algorithm collection does not make the Gate Library taller. Fixed
+demonstrations use their leading qubits and leave any additional register
+qubits in the initial state.
 
 ## Build
 
