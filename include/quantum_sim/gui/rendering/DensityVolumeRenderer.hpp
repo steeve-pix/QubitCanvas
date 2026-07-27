@@ -95,12 +95,17 @@ namespace quantum_sim::gui::density_volume {
         [[nodiscard]] unsigned int colorTexture() const noexcept;
 
         /**
-         * Returns the stable full-scene camera target.
+         * Returns the selected layer center used as the camera target.
          */
         [[nodiscard]] Vector3 sceneCenter() const noexcept;
 
         /**
-         * Returns the stable full-scene bounding-sphere radius.
+         * Returns the selected matrix radius used for camera distance.
+         */
+        [[nodiscard]] float sceneFocusRadius() const noexcept;
+
+        /**
+         * Returns the visible history radius used for clipping.
          */
         [[nodiscard]] float sceneRadius() const noexcept;
 
@@ -164,6 +169,7 @@ namespace quantum_sim::gui::density_volume {
         InstanceScene scene_;
         VoxelGeometry voxelGeometry_;
         Vector3 sceneCenter_{};
+        float sceneFocusRadius_{1.0F};
         float sceneRadius_{1.0F};
         bool initialized_{false};
 

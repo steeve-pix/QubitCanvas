@@ -15,12 +15,14 @@ namespace quantum_sim::gui::density_volume {
 
     void CameraController::frameScene(
         const Vector3 &center,
-        const float radius,
+        const float focusRadius,
+        const float extentRadius,
         const bool floorField
     ) {
         updateSceneBounds(
             center,
-            radius,
+            focusRadius,
+            extentRadius,
             floorField
         );
         reset();
@@ -29,11 +31,18 @@ namespace quantum_sim::gui::density_volume {
 
     void CameraController::updateSceneBounds(
         const Vector3 &center,
-        const float radius,
+        const float focusRadius,
+        const float extentRadius,
         const bool floorField
     ) noexcept {
+        focusRadius_ =
+                std::max(focusRadius, 1.0F);
+
         sceneRadius_ =
-                std::max(radius, 1.0F);
+                std::max(
+                    extentRadius,
+                    focusRadius_
+                );
 
         launchYawDegrees_ =
                 floorField
@@ -47,14 +56,14 @@ namespace quantum_sim::gui::density_volume {
 
         launchDistance_ =
                 std::max(
-                    sceneRadius_ *
+                    focusRadius_ *
                     (floorField ? 2.05F : 1.90F),
                     3.2F
                 );
 
-        // Playback only refreshes clipping and the reset composition. The live
-        // camera follows untouched playback, but never overwrites a pose the
-        // user has deliberately orbit/panned/zoomed.
+        // Untouched layer-stack playback follows the newest layer without
+        // changing orbit distance. Floor Field still reframes because its
+        // selected matrix can change height as well as target.
         launchTarget_ =
                 center;
 
@@ -65,8 +74,10 @@ namespace quantum_sim::gui::density_volume {
             targetPitchDegrees_ =
                     launchPitchDegrees_;
 
-            targetDistance_ =
-                    launchDistance_;
+            if (floorField) {
+                targetDistance_ =
+                        launchDistance_;
+            }
 
             destinationTarget_ =
                     launchTarget_;
@@ -170,8 +181,8 @@ namespace quantum_sim::gui::density_volume {
         targetDistance_ =
                 std::clamp(
                     targetDistance_ - wheelDelta * zoomStep,
-                    std::max(sceneRadius_ * 0.42F, 2.0F),
-                    std::max(sceneRadius_ * 8.0F, 30.0F)
+                    std::max(focusRadius_ * 0.42F, 2.0F),
+                    std::max(focusRadius_ * 8.0F, 30.0F)
                 );
     }
 
@@ -234,5 +245,9 @@ namespace quantum_sim::gui::density_volume {
 
     bool CameraController::isFramed() const noexcept {
         return framed_;
+    }
+
+    float CameraController::orbitDistance() const noexcept {
+        return distance_;
     }
 }
