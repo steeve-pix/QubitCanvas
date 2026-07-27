@@ -26,6 +26,8 @@ namespace quantum_sim::gui {
         // Wire and gate symbol sizing.
         float wireThickness{1.7F};
         float gateHalfWidth{18.0F};
+        float maximumGateHalfWidth{32.0F};
+        float gateLabelPaddingX{6.0F};
         float gateHalfHeight{18.0F};
         float gateCornerRadius{5.0F};
         float gateOutlineThickness{1.8F};
