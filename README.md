@@ -133,7 +133,9 @@ Undo snapshots. Loading a preset asks for confirmation when the current circuit
 contains custom edits.
 
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
-`iSWAP` uses the same path geometry with a centered `(i)` marker.
+Compact `SW`, `iSW`, and `√SW` badges distinguish exchange variants without
+obscuring their crossed paths. Placed-gate hover cards identify every operand
+and explain the behavior of controlled, exchange, and interaction gates.
 `CCX` and `CSWAP` use a three-click placement flow and render as genuine
 three-wire circuit operations. Their compact 8x8 matrices execute directly
 against eight-amplitude blocks without expansion to the full register.
