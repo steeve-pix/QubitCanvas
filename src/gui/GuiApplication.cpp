@@ -35,7 +35,6 @@ namespace quantum_sim::gui {
                 );
 
         rebuildDensityVolume();
-        settleDebuggerPreview();
         synchronizeDensityLayer(session_.snapshot());
     }
 
@@ -1038,23 +1037,6 @@ namespace quantum_sim::gui {
         ImGui::End();
     }
 
-
-    void GuiApplication::settleDebuggerPreview() {
-        if (
-            !session_.hasSteps() ||
-            session_.stepCount() < 4U
-        ) {
-            return;
-        }
-
-        session_.moveToStep(
-            std::min(
-                session_.stepCount() - 1U,
-                session_.stepCount() * 2U / 5U
-            )
-        );
-    }
-
     void GuiApplication::rebuildDensityVolume() {
         densityVolumeStack_ =
                 density_volume::DensityModel::build(session_, 16U);
@@ -1368,16 +1350,11 @@ namespace quantum_sim::gui {
             }
 
             if (clicked) {
-                if (!queuedPreset_.has_value()) {
-                    queuedPresetShouldResumePlayback_ =
-                            !playbackPaused_;
-                }
-
                 queuedPreset_ =
                         preset;
 
-                // Stop the old trace immediately. The queued preset resumes
-                // from its first step when this click happened during playback.
+                // Every replacement circuit opens on its untouched initial
+                // state, even when the previous circuit was playing.
                 playbackPaused_ = true;
             }
 
@@ -1507,8 +1484,7 @@ namespace quantum_sim::gui {
     }
 
     void GuiApplication::loadPreset(
-        const CircuitPreset preset,
-        const bool settlePreview
+        const CircuitPreset preset
     ) {
         circuit_ =
                 createPresetCircuit(preset);
@@ -1535,10 +1511,6 @@ namespace quantum_sim::gui {
         playbackPaused_ = true;
 
         rebuildDebuggerAfterCircuitEdit();
-
-        if (settlePreview) {
-            settleDebuggerPreview();
-        }
     }
 
     void GuiApplication::applyQueuedPreset() {
@@ -1549,17 +1521,8 @@ namespace quantum_sim::gui {
         const CircuitPreset preset =
                 queuedPreset_.value();
 
-        const bool resumePlayback =
-                queuedPresetShouldResumePlayback_;
-
         queuedPreset_.reset();
-        queuedPresetShouldResumePlayback_ = false;
-        loadPreset(preset, !resumePlayback);
-
-        if (resumePlayback) {
-            playbackPaused_ = false;
-            nextAutoStepAt_ = ImGui::GetTime() + 0.45;
-        }
+        loadPreset(preset);
     }
 
     circuit::QuantumCircuit GuiApplication::createPresetCircuit(CircuitPreset preset) const {
