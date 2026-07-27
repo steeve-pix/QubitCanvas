@@ -1,28 +1,135 @@
 #include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numbers>
 
 namespace quantum_sim::gui::density_volume {
     namespace {
+        constexpr float verticalFieldOfViewDegrees = 46.0F;
+
         [[nodiscard]] float radians(const float degrees) noexcept {
             return degrees *
                    std::numbers::pi_v<float> /
                    180.0F;
         }
+
+        [[nodiscard]] Vector3 boundsCenter(
+            const Vector3 &minimum,
+            const Vector3 &maximum
+        ) noexcept {
+            return (minimum + maximum) * 0.5F;
+        }
+
+        [[nodiscard]] float fittedOrbitDistance(
+            const Vector3 &minimum,
+            const Vector3 &maximum,
+            const Vector3 &center,
+            const float yawDegrees,
+            const float pitchDegrees,
+            const float viewportAspect
+        ) noexcept {
+            const float yaw =
+                    radians(yawDegrees);
+
+            const float pitch =
+                    radians(pitchDegrees);
+
+            const float cosineYaw =
+                    std::cos(yaw);
+
+            const float sineYaw =
+                    std::sin(yaw);
+
+            const float cosinePitch =
+                    std::cos(pitch);
+
+            const float sinePitch =
+                    std::sin(pitch);
+
+            const Vector3 forward{
+                -cosineYaw * cosinePitch,
+                -sinePitch,
+                -sineYaw * cosinePitch
+            };
+
+            const Vector3 right{
+                sineYaw,
+                0.0F,
+                -cosineYaw
+            };
+
+            const Vector3 up{
+                -cosineYaw * sinePitch,
+                cosinePitch,
+                -sineYaw * sinePitch
+            };
+
+            const float tangentHalfVertical =
+                    std::tan(
+                        radians(verticalFieldOfViewDegrees) *
+                        0.5F
+                    );
+
+            const float tangentHalfHorizontal =
+                    tangentHalfVertical *
+                    std::max(viewportAspect, 0.1F);
+
+            const std::array<Vector3, 8U> corners{
+                Vector3{minimum.x, minimum.y, minimum.z},
+                Vector3{minimum.x, minimum.y, maximum.z},
+                Vector3{minimum.x, maximum.y, minimum.z},
+                Vector3{minimum.x, maximum.y, maximum.z},
+                Vector3{maximum.x, minimum.y, minimum.z},
+                Vector3{maximum.x, minimum.y, maximum.z},
+                Vector3{maximum.x, maximum.y, minimum.z},
+                Vector3{maximum.x, maximum.y, maximum.z}
+            };
+
+            float requiredDistance{};
+
+            for (const Vector3 &corner : corners) {
+                const Vector3 relative =
+                        corner - center;
+
+                const float depthOffset =
+                        dot(relative, forward);
+
+                requiredDistance =
+                        std::max({
+                            requiredDistance,
+                            std::abs(dot(relative, right)) /
+                                tangentHalfHorizontal -
+                                depthOffset,
+                            std::abs(dot(relative, up)) /
+                                tangentHalfVertical -
+                                depthOffset
+                        });
+            }
+
+            const float radius =
+                    length(maximum - minimum) * 0.5F;
+
+            return std::max(
+                requiredDistance +
+                    radius * 0.08F +
+                    0.2F,
+                3.2F
+            );
+        }
     }
 
     void CameraController::frameScene(
-        const Vector3 &center,
-        const float focusRadius,
-        const float extentRadius,
+        const Vector3 &minimum,
+        const Vector3 &maximum,
+        const float viewportAspect,
         const bool floorField
     ) {
         updateSceneBounds(
-            center,
-            focusRadius,
-            extentRadius,
+            minimum,
+            maximum,
+            viewportAspect,
             floorField
         );
         reset();
@@ -30,18 +137,39 @@ namespace quantum_sim::gui::density_volume {
     }
 
     void CameraController::updateSceneBounds(
-        const Vector3 &center,
-        const float focusRadius,
-        const float extentRadius,
+        const Vector3 &minimum,
+        const Vector3 &maximum,
+        const float viewportAspect,
         const bool floorField
     ) noexcept {
+        const Vector3 safeMinimum{
+            std::min(minimum.x, maximum.x),
+            std::min(minimum.y, maximum.y),
+            std::min(minimum.z, maximum.z)
+        };
+
+        const Vector3 safeMaximum{
+            std::max(minimum.x, maximum.x),
+            std::max(minimum.y, maximum.y),
+            std::max(minimum.z, maximum.z)
+        };
+
+        const Vector3 halfExtent =
+                (safeMaximum - safeMinimum) * 0.5F;
+
         focusRadius_ =
-                std::max(focusRadius, 1.0F);
+                std::max(
+                    std::sqrt(
+                        halfExtent.x * halfExtent.x +
+                        halfExtent.z * halfExtent.z
+                    ),
+                    1.0F
+                );
 
         sceneRadius_ =
                 std::max(
-                    extentRadius,
-                    focusRadius_
+                    length(halfExtent),
+                    1.0F
                 );
 
         launchYawDegrees_ =
@@ -54,18 +182,21 @@ namespace quantum_sim::gui::density_volume {
                     ? 46.0F
                     : 25.0F;
 
-        launchDistance_ =
-                std::max(
-                    focusRadius_ *
-                    (floorField ? 2.05F : 1.90F),
-                    3.2F
+        launchTarget_ =
+                boundsCenter(
+                    safeMinimum,
+                    safeMaximum
                 );
 
-        // Untouched layer-stack playback follows the newest layer without
-        // changing orbit distance. Floor Field still reframes because its
-        // selected matrix can change height as well as target.
-        launchTarget_ =
-                center;
+        launchDistance_ =
+                fittedOrbitDistance(
+                    safeMinimum,
+                    safeMaximum,
+                    launchTarget_,
+                    launchYawDegrees_,
+                    launchPitchDegrees_,
+                    viewportAspect
+                );
 
         if (framed_ && !userControlled_) {
             targetYawDegrees_ =
@@ -74,10 +205,8 @@ namespace quantum_sim::gui::density_volume {
             targetPitchDegrees_ =
                     launchPitchDegrees_;
 
-            if (floorField) {
-                targetDistance_ =
-                        launchDistance_;
-            }
+            targetDistance_ =
+                    launchDistance_;
 
             destinationTarget_ =
                     launchTarget_;
@@ -182,7 +311,7 @@ namespace quantum_sim::gui::density_volume {
                 std::clamp(
                     targetDistance_ - wheelDelta * zoomStep,
                     std::max(focusRadius_ * 0.42F, 2.0F),
-                    std::max(focusRadius_ * 8.0F, 30.0F)
+                    std::max(sceneRadius_ * 8.0F, 30.0F)
                 );
     }
 
@@ -236,7 +365,7 @@ namespace quantum_sim::gui::density_volume {
                 );
 
         return perspectiveMatrix(
-            radians(46.0F),
+            radians(verticalFieldOfViewDegrees),
             aspect,
             0.05F,
             farPlane

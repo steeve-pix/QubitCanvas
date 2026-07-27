@@ -41,11 +41,12 @@ bloom pass and linear-to-sRGB output preserve the warm gold, orange, magenta,
 and violet range without heavy tone-map compression. Restrained face lighting,
 perspective framing, depth testing, and a procedural ground grid keep cube
 tops, sides, matrix depth, and history separation readable.
-Layer Stack frames the selected matrix at a stable orbit distance. During
-untouched playback, the look-at target climbs to each new layer while the full
-history extent is used only for safe clipping; the camera does not zoom
-backward as the history grows. Manual orbit, pan, or zoom keeps ownership of
-the camera until reset.
+Layer Stack reserves a tight frame for the algorithm's complete density
+history as soon as the preset loads. Its projected bounds, camera angle,
+perspective field of view, and viewport aspect determine the orbit distance,
+so playback fills the prepared view without camera drift or incremental
+zooming. Resizing recalculates the fit, while manual orbit, pan, or zoom keeps
+ownership of the live camera until reset.
 
 Two synchronized layouts are available:
 
