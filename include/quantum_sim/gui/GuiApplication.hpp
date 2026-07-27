@@ -114,6 +114,18 @@ namespace quantum_sim::gui {
         );
 
     private:
+        /**
+         * Complete authoring state stored by Undo and Redo.
+         *
+         * A snapshot includes the register because loading a preset or creating
+         * a blank circuit may change the qubit count as well as the gates.
+         */
+        struct EditorSnapshot {
+            circuit::QuantumCircuit circuit;
+            quantum::QuantumRegister initialState;
+            bool hasUnsavedEdits{false};
+        };
+
         ImFont *jetBrainsMonoFont_{nullptr};
         ImFont *jetBrainsMonoHeadingFont_{nullptr};
         circuit::QuantumCircuit &circuit_;
@@ -133,8 +145,11 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> queuedInstructionDeletion_;
         std::optional<InstructionMove> queuedInstructionMove_;
         std::optional<CircuitPreset> queuedPreset_;
-        std::vector<circuit::QuantumCircuit> undoHistory_;
-        std::vector<circuit::QuantumCircuit> redoHistory_;
+        std::optional<CircuitPreset> presetAwaitingConfirmation_;
+        std::optional<std::size_t> queuedBlankCircuitQubitCount_;
+        bool queuedClearCircuit_{false};
+        std::vector<EditorSnapshot> undoHistory_;
+        std::vector<EditorSnapshot> redoHistory_;
         std::mt19937 randomEngine_{std::random_device{}()};
         CanvasMode canvasMode_{CanvasMode::LayerStack};
         int presetQubitCount_{4};
@@ -155,6 +170,8 @@ namespace quantum_sim::gui {
         bool densityVolumeCameraFramePending_{true};
         bool circuitFocusMode_{false};
         bool followManualEdits_{true};
+        bool circuitHasUnsavedEdits_{false};
+        std::optional<std::size_t> lastInspectorSelection_;
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
@@ -190,9 +207,15 @@ namespace quantum_sim::gui {
         void selectDensityLayer(std::size_t layerIndex);
 
         /**
-         * Stores the current circuit for undo and clears stale redo history.
+         * Stores the complete current editor state and clears stale redo history.
          */
-        void recordCircuitForUndo();
+        void recordEditorForUndo();
+
+        /**
+         * Clears placement, selection, and queued instruction state after a
+         * whole-circuit replacement.
+         */
+        void resetEditorTransientState() noexcept;
 
         /**
          * Applies QubitCanvas colors, spacing, and rounding to the ImGui style.
@@ -283,6 +306,19 @@ namespace quantum_sim::gui {
          * Applies a preset queued by the previous frame before snapshots are created.
          */
         void applyQueuedPreset();
+
+        /**
+         * Replaces the editor with an empty circuit using the requested register size.
+         *
+         * @param qubitCount Number of qubits in the new blank circuit.
+         */
+        void createBlankCircuit(std::size_t qubitCount);
+
+        /**
+         * Removes every instruction while preserving the current register size
+         * and initial state.
+         */
+        void clearCircuitInstructions();
 
         /**
          * Builds a circuit for one built-in preset.

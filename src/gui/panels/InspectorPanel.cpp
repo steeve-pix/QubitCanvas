@@ -157,6 +157,16 @@ namespace {
 }
 
 namespace quantum_sim::gui {
+    void InspectorPanel::focusQubit(
+        const std::size_t qubit
+    ) noexcept {
+        inspectedBlochQubit_ =
+                static_cast<int>(qubit);
+        requestedProbabilityFocus_ =
+                qubit;
+        requestInspectorTopFocus_ = true;
+    }
+
     void InspectorPanel::draw(
         debug::DebuggerSession &session,
         const debug::DebuggerSnapshot &snapshot,
@@ -165,6 +175,11 @@ namespace quantum_sim::gui {
         std::size_t &selectedDensityLayer,
         ImFont *headingFont
     ) {
+        if (requestInspectorTopFocus_) {
+            ImGui::SetScrollY(0.0F);
+            requestInspectorTopFocus_ = false;
+        }
+
         drawHeader(snapshot, selectedInstructionIndex, headingFont);
 
         drawQuantumState(
@@ -379,6 +394,18 @@ namespace quantum_sim::gui {
     void InspectorPanel::drawProbabilities(const quantum::QuantumRegister &state) {
         ImGui::TextDisabled("Qubit probabilities");
 
+        const bool useBoundedRegion =
+                state.qubitCount() > 4U;
+
+        if (useBoundedRegion) {
+            ImGui::BeginChild(
+                "QubitProbabilityRegion",
+                ImVec2{0.0F, 188.0F},
+                false,
+                ImGuiWindowFlags_AlwaysVerticalScrollbar
+            );
+        }
+
         pushInspectorTableStyle();
 
         if (
@@ -408,6 +435,20 @@ namespace quantum_sim::gui {
                         1.0F - oneProbability;
 
                 ImGui::TableNextRow();
+
+                const bool focusThisRow =
+                        requestedProbabilityFocus_.has_value() &&
+                        requestedProbabilityFocus_.value() == qubit;
+
+                if (focusThisRow) {
+                    ImGui::TableSetBgColor(
+                        ImGuiTableBgTarget_RowBg0,
+                        ImGui::GetColorU32(
+                            ImVec4{0.08F, 0.34F, 0.48F, 0.42F}
+                        )
+                    );
+                }
+
                 ImGui::TableSetColumnIndex(0);
                 ImGui::Text("q%zu", qubit);
 
@@ -438,12 +479,22 @@ namespace quantum_sim::gui {
 
                 ImGui::TableSetColumnIndex(2);
                 ImGui::Text("%.1f%%", zeroProbability * 100.0F);
+
+                if (focusThisRow && useBoundedRegion) {
+                    ImGui::SetScrollHereY(0.5F);
+                }
             }
 
             ImGui::EndTable();
         }
 
         popInspectorTableStyle();
+
+        if (useBoundedRegion) {
+            ImGui::EndChild();
+        }
+
+        requestedProbabilityFocus_.reset();
     }
 
     void InspectorPanel::drawLayerStack(
