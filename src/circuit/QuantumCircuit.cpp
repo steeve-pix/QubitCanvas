@@ -51,7 +51,8 @@ namespace quantum_sim::circuit {
         std::string name,
         math::ComplexMatrix gate,
         const std::size_t firstQubit,
-        const std::size_t secondQubit
+        const std::size_t secondQubit,
+        const std::optional<double> angleRadians
     ) {
         if (gate.rows() != 4U || gate.columns() != 4U) {
             throw std::invalid_argument{"A two-qubit gate must be a 4 by 4 matrix."};
@@ -74,7 +75,40 @@ namespace quantum_sim::circuit {
                 std::move(name),
                 std::move(gate),
                 firstQubit,
-                secondQubit
+                secondQubit,
+                angleRadians
+            }
+        );
+    }
+
+    void QuantumCircuit::addReflection(
+        std::string name,
+        math::ComplexVector normalizedAxis,
+        const std::size_t displayQubit
+    ) {
+        const std::size_t expectedSize =
+                std::size_t{1} << qubitCount_;
+
+        if (
+            normalizedAxis.size() != expectedSize ||
+            !normalizedAxis.isNormalized()
+        ) {
+            throw std::invalid_argument{
+                "Reflection axis must be a normalized full-register vector."
+            };
+        }
+
+        if (displayQubit >= qubitCount_) {
+            throw std::out_of_range{
+                "Reflection display qubit is outside the circuit."
+            };
+        }
+
+        instructions_.push_back(
+            ReflectionInstruction{
+                std::move(name),
+                std::move(normalizedAxis),
+                displayQubit
             }
         );
     }
@@ -126,6 +160,11 @@ namespace quantum_sim::circuit {
                                            actualInstruction.gate,
                                            actualInstruction.firstQubit,
                                            actualInstruction.secondQubit
+                                       );
+                           } else if constexpr (std::is_same_v<InstructionType, ReflectionInstruction>) {
+                               currentState =
+                                       currentState.applyReflection(
+                                           actualInstruction.normalizedAxis
                                        );
                            } else {
                                currentState = currentState.applyGate(actualInstruction.gate);
@@ -221,6 +260,21 @@ namespace quantum_sim::circuit {
                             std::to_string(actualInstruction.firstQubit) +
                             " and " +
                             std::to_string(actualInstruction.secondQubit);
+
+                    if (actualInstruction.angleRadians.has_value()) {
+                        description +=
+                                " at " +
+                                std::to_string(actualInstruction.angleRadians.value()) +
+                                " radians";
+                    }
+                } else if constexpr (std::is_same_v<InstructionType, ReflectionInstruction>) {
+                    currentState =
+                            currentState.applyReflection(
+                                actualInstruction.normalizedAxis
+                            );
+
+                    description =
+                            actualInstruction.name;
                 } else {
                     currentState = currentState.applyGate(actualInstruction.gate);
                     description = actualInstruction.name;
@@ -258,6 +312,15 @@ namespace quantum_sim::circuit {
                         std::nullopt,
                         actualInstruction.firstQubit,
                         actualInstruction.secondQubit,
+                        actualInstruction.angleRadians
+                    });
+                } else if constexpr (std::is_same_v<InstructionType, ReflectionInstruction>) {
+                    result.push_back(CircuitInstructionInfo{
+                        actualInstruction.name,
+                        CircuitInstructionKind::Reflection,
+                        actualInstruction.displayQubit,
+                        std::nullopt,
+                        std::nullopt,
                         std::nullopt
                     });
                 } else {
@@ -396,7 +459,8 @@ namespace quantum_sim::circuit {
         std::string name,
         math::ComplexMatrix gate,
         const std::size_t firstQubit,
-        const std::size_t secondQubit
+        const std::size_t secondQubit,
+        const std::optional<double> angleRadians
     ) {
         if (gate.rows() != 4U || gate.columns() != 4U) {
             throw std::invalid_argument{"A two-qubit gate must be a 4 by 4 matrix."};
@@ -423,7 +487,8 @@ namespace quantum_sim::circuit {
                 std::move(name),
                 std::move(gate),
                 firstQubit,
-                secondQubit
+                secondQubit,
+                angleRadians
             }
         );
     }

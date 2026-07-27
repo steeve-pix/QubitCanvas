@@ -64,6 +64,38 @@ namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix tDaggerGate();
 
     /**
+     * @return Principal square root of Pauli-X.
+     */
+    [[nodiscard]] math::ComplexMatrix sxGate();
+
+    /**
+     * @return Inverse principal square root of Pauli-X.
+     */
+    [[nodiscard]] math::ComplexMatrix sxDaggerGate();
+
+    /**
+     * Creates a general one-qubit phase gate.
+     *
+     * @param angleRadians Phase applied to the |1> basis state.
+     * @return diag(1, exp(i * angleRadians)).
+     */
+    [[nodiscard]] math::ComplexMatrix phaseGate(double angleRadians);
+
+    /**
+     * Creates the universal three-angle one-qubit gate.
+     *
+     * @param thetaRadians Polar rotation angle.
+     * @param phiRadians Relative output phase.
+     * @param lambdaRadians Relative input phase.
+     * @return U(theta, phi, lambda) in the standard computational basis.
+     */
+    [[nodiscard]] math::ComplexMatrix uGate(
+        double thetaRadians,
+        double phiRadians,
+        double lambdaRadians
+    );
+
+    /**
      * @return Hadamard gate, which maps basis states into equal superposition.
      */
     [[nodiscard]] math::ComplexMatrix hadamardGate();
@@ -82,6 +114,64 @@ namespace quantum_sim::gates {
      * @return Two-qubit controlled-Z matrix for adjacent two-qubit states.
      */
     [[nodiscard]] math::ComplexMatrix czGate();
+
+    /**
+     * Creates a controlled phase gate.
+     *
+     * @param angleRadians Phase applied only to |11>.
+     * @return Compact 4x4 controlled-phase matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix controlledPhaseGate(
+        double angleRadians
+    );
+
+    /**
+     * Creates a controlled X-axis rotation.
+     *
+     * @param angleRadians Target rotation angle.
+     * @return Compact 4x4 controlled-Rx matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix crxGate(double angleRadians);
+
+    /**
+     * Creates a controlled Y-axis rotation.
+     *
+     * @param angleRadians Target rotation angle.
+     * @return Compact 4x4 controlled-Ry matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix cryGate(double angleRadians);
+
+    /**
+     * Creates a controlled Z-axis rotation.
+     *
+     * @param angleRadians Target rotation angle.
+     * @return Compact 4x4 controlled-Rz matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix crzGate(double angleRadians);
+
+    /**
+     * Creates the two-qubit XX interaction exp(-i theta X tensor X / 2).
+     *
+     * @param angleRadians Interaction angle.
+     * @return Compact 4x4 RXX matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix rxxGate(double angleRadians);
+
+    /**
+     * Creates the two-qubit YY interaction exp(-i theta Y tensor Y / 2).
+     *
+     * @param angleRadians Interaction angle.
+     * @return Compact 4x4 RYY matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix ryyGate(double angleRadians);
+
+    /**
+     * Creates the two-qubit ZZ interaction exp(-i theta Z tensor Z / 2).
+     *
+     * @param angleRadians Interaction angle.
+     * @return Compact 4x4 RZZ matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix rzzGate(double angleRadians);
 
     /**
      * @return Two-qubit SWAP matrix for adjacent two-qubit states.
