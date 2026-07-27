@@ -10,8 +10,9 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 
 ## Highlights
 
-- Editable multi-qubit circuit with repeated placement, insertion, drag
-  reordering, selection, undo, redo, and deletion.
+- Editable multi-qubit circuit with blank-register creation, repeated
+  placement, insertion, drag reordering, selection, whole-circuit Clear,
+  undo, redo, and deletion.
 - Step-by-step debugger with play, pause, restart, scrub, and sampling controls.
 - Synchronized circuit, density-matrix, probability, and Bloch-sphere views.
 - Hover documentation with matrices for every gate in the gate library.
@@ -40,6 +41,9 @@ bloom pass and linear-to-sRGB output preserve the warm gold, orange, magenta,
 and violet range without heavy tone-map compression. Restrained face lighting,
 perspective framing, depth testing, and a procedural ground grid keep cube
 tops, sides, matrix depth, and history separation readable.
+Camera bounds follow the visible solid volume with a minimum amount of grid
+context, so sparse initial states remain grounded and legible instead of being
+reduced to a distant point inside the complete logical matrix extent.
 
 Two synchronized layouts are available:
 
@@ -97,6 +101,19 @@ shows the state after each manual edit. Existing gates can be dragged to a new
 timeline position or moved one step with the adjacent arrow controls. Manual
 edits rebuild only the affected debugger and density-history suffix.
 
+The step scrubber above the canvas provides direct navigation through long
+circuits. `Ctrl` + mouse wheel changes timeline zoom, while `Shift` + mouse
+wheel pans the timeline horizontally. Placement accepts the complete visible
+wire band rather than requiring a click on one small marker. Ten-qubit layouts
+compress wire spacing to keep the full register readable, and the inspector
+scrolls its probability table to the qubit most recently selected or edited.
+
+`New blank circuit` creates an empty register using the qubit slider. The
+`Clear circuit` button removes all current gates without changing the register.
+Both actions, algorithm replacement, and register-size changes store complete
+Undo snapshots. Loading a preset asks for confirmation when the current circuit
+contains custom edits.
+
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
 `iSWAP` uses the same path geometry with a centered `(i)` marker.
 
@@ -125,8 +142,9 @@ edits rebuild only the affected debugger and density-history suffix.
 - BB84 basis demonstration
 - Superdense coding
 
-The algorithm register slider controls the circuit size for every preset from
-1 to 10 qubits. Presets below their minimum working-register size are disabled.
+The register slider controls the size of the next blank circuit or preset from
+1 to 10 qubits; it does not silently resize the circuit currently being edited.
+Presets below their minimum working-register size are disabled.
 The fixed-height catalog uses previous and next page controls, so the expanded
 algorithm collection does not make the Gate Library taller. Fixed
 demonstrations use their leading qubits and leave any additional register

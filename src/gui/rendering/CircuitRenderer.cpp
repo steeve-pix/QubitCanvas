@@ -149,7 +149,27 @@ namespace quantum_sim::gui {
                     1
                 );
 
-        const float calculatedContentHeight = style_.canvasPaddingY + style_.topMargin + style_.wireSpacing *
+        const float availableWireHeight =
+                std::max(
+                    0.0F,
+                    ImGui::GetWindowHeight() -
+                    style_.canvasPaddingY * 2.0F -
+                    style_.topMargin -
+                    style_.gateHalfHeight -
+                    10.0F
+                );
+
+        effectiveWireSpacing_ =
+                qubitCount > 1U
+                    ? std::clamp(
+                        availableWireHeight /
+                            static_cast<float>(qubitCount - 1U),
+                        40.0F,
+                        style_.wireSpacing
+                    )
+                    : style_.wireSpacing;
+
+        const float calculatedContentHeight = style_.canvasPaddingY + style_.topMargin + effectiveWireSpacing_ *
                                               static_cast<float>(qubitCount > 0 ? qubitCount - 1 : 0) + style_.
                                               gateHalfHeight + style_.canvasPaddingY;
 
@@ -187,6 +207,22 @@ namespace quantum_sim::gui {
                     );
         }
 
+        if (
+            ImGui::IsWindowHovered() &&
+            ImGui::GetIO().KeyShift &&
+            !ImGui::GetIO().KeyCtrl &&
+            std::abs(ImGui::GetIO().MouseWheel) > 0.0F
+        ) {
+            ImGui::SetScrollX(
+                std::clamp(
+                    ImGui::GetScrollX() -
+                        ImGui::GetIO().MouseWheel * 90.0F,
+                    0.0F,
+                    ImGui::GetScrollMaxX()
+                )
+            );
+        }
+
         float gateSpacing =
                 style_.gateSpacing * viewZoom_;
 
@@ -219,7 +255,7 @@ namespace quantum_sim::gui {
 
         const float lastWireY =
                 firstWireY +
-                style_.wireSpacing *
+                effectiveWireSpacing_ *
                 static_cast<float>(qubitCount - 1);
 
         if (
@@ -414,7 +450,7 @@ namespace quantum_sim::gui {
         for (std::size_t qubit = 0; qubit < circuit.qubitCount(); ++qubit) {
             const float y =
                     firstWireY +
-                    style_.wireSpacing *
+                    effectiveWireSpacing_ *
                     static_cast<float>(qubit);
 
             const std::string label =
@@ -458,10 +494,16 @@ namespace quantum_sim::gui {
         };
 
         if (singleQubitPlacement) {
+            const float placementBandHalfHeight =
+                    std::max(
+                        16.0F,
+                        effectiveWireSpacing_ * 0.47F
+                    );
+
             for (std::size_t qubit = 0; qubit < circuit.qubitCount(); ++qubit) {
                 const float y =
                         firstWireY +
-                        style_.wireSpacing *
+                        effectiveWireSpacing_ *
                         static_cast<float>(qubit);
 
                 const bool hovered =
@@ -469,12 +511,12 @@ namespace quantum_sim::gui {
                         isPointInsideRect(
                             mousePosition,
                             ImVec2{
-                                placementX - style_.gateHalfWidth,
-                                y - style_.gateHalfHeight
+                                wireStartX,
+                                y - placementBandHalfHeight
                             },
                             ImVec2{
-                                placementX + style_.gateHalfWidth,
-                                y + style_.gateHalfHeight
+                                displayedWireEndX,
+                                y + placementBandHalfHeight
                             }
                         );
 
@@ -489,12 +531,20 @@ namespace quantum_sim::gui {
                         ImGuiMouseCursor_Hand
                     );
 
-                    ImGui::SetTooltip(
-                        "Place %s on q%zu before step %zu",
-                        pendingGate->c_str(),
-                        qubit,
-                        insertionIndex + 1U
-                    );
+                    if (insertionIndex >= instructions.size()) {
+                        ImGui::SetTooltip(
+                            "Append %s to q%zu",
+                            pendingGate->c_str(),
+                            qubit
+                        );
+                    } else {
+                        ImGui::SetTooltip(
+                            "Insert %s on q%zu before step %zu",
+                            pendingGate->c_str(),
+                            qubit,
+                            insertionIndex + 1U
+                        );
+                    }
                 }
 
                 if (clicked) {
@@ -541,6 +591,11 @@ namespace quantum_sim::gui {
         }
         if (controlledPlacement) {
             std::optional<std::size_t> hoveredPlacementQubit;
+            const float placementBandHalfHeight =
+                    std::max(
+                        16.0F,
+                        effectiveWireSpacing_ * 0.47F
+                    );
 
             for (
                 std::size_t qubit = 0;
@@ -549,7 +604,7 @@ namespace quantum_sim::gui {
             ) {
                 const float y =
                         firstWireY +
-                        style_.wireSpacing *
+                        effectiveWireSpacing_ *
                         static_cast<float>(qubit);
 
                 if (
@@ -557,12 +612,12 @@ namespace quantum_sim::gui {
                     isPointInsideRect(
                         mousePosition,
                         ImVec2{
-                            placementX - style_.gateHalfWidth,
-                            y - style_.gateHalfHeight
+                            wireStartX,
+                            y - placementBandHalfHeight
                         },
                         ImVec2{
-                            placementX + style_.gateHalfWidth,
-                            y + style_.gateHalfHeight
+                            displayedWireEndX,
+                            y + placementBandHalfHeight
                         }
                     )
                 ) {
@@ -580,14 +635,14 @@ namespace quantum_sim::gui {
             ) {
                 const float controlY =
                         firstWireY +
-                        style_.wireSpacing *
+                        effectiveWireSpacing_ *
                         static_cast<float>(
                             pendingControlQubit_.value()
                         );
 
                 const float targetY =
                         firstWireY +
-                        style_.wireSpacing *
+                        effectiveWireSpacing_ *
                         static_cast<float>(
                             hoveredPlacementQubit.value()
                         );
@@ -610,21 +665,21 @@ namespace quantum_sim::gui {
                         pendingTargetQubit_.value() == qubit;
                 const float y =
                         firstWireY +
-                        style_.wireSpacing *
+                        effectiveWireSpacing_ *
                         static_cast<float>(qubit);
 
                 const bool hovered =
                         ImGui::IsWindowHovered() &&
                         isPointInsideRect(
-                            mousePosition,
-                            ImVec2{
-                                placementX - style_.gateHalfWidth,
-                                y - style_.gateHalfHeight
-                            },
-                            ImVec2{
-                                placementX + style_.gateHalfWidth,
-                                y + style_.gateHalfHeight
-                            }
+                        mousePosition,
+                        ImVec2{
+                            wireStartX,
+                            y - placementBandHalfHeight
+                        },
+                        ImVec2{
+                            displayedWireEndX,
+                            y + placementBandHalfHeight
+                        }
                         );
 
                 const bool clicked =
@@ -806,7 +861,7 @@ namespace quantum_sim::gui {
         ) {
             const float y =
                     firstWireY +
-                    style_.wireSpacing *
+                    effectiveWireSpacing_ *
                     static_cast<float>(qubit);
 
             const bool identityHovered =
@@ -831,7 +886,7 @@ namespace quantum_sim::gui {
                 drawList,
                 ImVec2{firstGateX, y},
                 "I",
-                initialStepHighlighted,
+                false,
                 identityHovered,
                 false,
                 false
@@ -1053,10 +1108,10 @@ namespace quantum_sim::gui {
 
             if (instruction.controlQubit.has_value() &&
                 instruction.secondaryTargetQubit.has_value()) {
-                const float controlY = firstWireY + style_.wireSpacing * static_cast<float>(instruction.controlQubit.
+                const float controlY = firstWireY + effectiveWireSpacing_ * static_cast<float>(instruction.controlQubit.
                                            value());
 
-                const float targetY = firstWireY + style_.wireSpacing * static_cast<float>(instruction.
+                const float targetY = firstWireY + effectiveWireSpacing_ * static_cast<float>(instruction.
                                           secondaryTargetQubit.value());
 
                 const ImVec2 controlCenter{
@@ -1530,7 +1585,7 @@ namespace quantum_sim::gui {
                 continue;
             }
 
-            const float y = firstWireY + style_.wireSpacing * static_cast<float>(instruction.targetQubit.value());
+            const float y = firstWireY + effectiveWireSpacing_ * static_cast<float>(instruction.targetQubit.value());
 
             drawList->AddRectFilled(
                 ImVec2{x - style_.wireGapHalfWidth, y - style_.wireGapHalfHeight},

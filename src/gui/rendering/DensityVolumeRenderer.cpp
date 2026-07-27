@@ -13,6 +13,113 @@
 
 namespace quantum_sim::gui::density_volume {
     namespace {
+        /**
+         * Axis-aligned bounds for the visible solid portion of an instance scene.
+         */
+        struct VisibleVoxelBounds {
+            Vector3 minimum;
+            Vector3 maximum;
+            Vector3 center;
+            float radius{1.0F};
+            bool valid{false};
+        };
+
+        /**
+         * Measures only instances currently submitted to the solid voxel pass.
+         *
+         * @param voxels Complete ordered instance list.
+         * @param visibleCount Prefix length rendered for the selected layer.
+         * @return Bounds around visible solids, or an invalid result when empty.
+         */
+        [[nodiscard]] VisibleVoxelBounds calculateVisibleVoxelBounds(
+            const std::vector<VoxelInstance> &voxels,
+            const std::size_t visibleCount
+        ) noexcept {
+            const std::size_t safeCount =
+                    std::min(
+                        visibleCount,
+                        voxels.size()
+                    );
+
+            if (safeCount == 0U) {
+                return VisibleVoxelBounds{};
+            }
+
+            VisibleVoxelBounds bounds;
+            bounds.minimum = Vector3{
+                std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max(),
+                std::numeric_limits<float>::max()
+            };
+            bounds.maximum = Vector3{
+                std::numeric_limits<float>::lowest(),
+                std::numeric_limits<float>::lowest(),
+                std::numeric_limits<float>::lowest()
+            };
+
+            for (std::size_t index = 0U; index < safeCount; ++index) {
+                const VoxelInstance &voxel =
+                        voxels[index];
+
+                const Vector3 halfSize{
+                    voxel.size.x * 0.5F,
+                    voxel.size.y * 0.5F,
+                    voxel.size.z * 0.5F
+                };
+
+                bounds.minimum.x =
+                        std::min(
+                            bounds.minimum.x,
+                            voxel.center.x - halfSize.x
+                        );
+                bounds.minimum.y =
+                        std::min(
+                            bounds.minimum.y,
+                            voxel.center.y - halfSize.y
+                        );
+                bounds.minimum.z =
+                        std::min(
+                            bounds.minimum.z,
+                            voxel.center.z - halfSize.z
+                        );
+                bounds.maximum.x =
+                        std::max(
+                            bounds.maximum.x,
+                            voxel.center.x + halfSize.x
+                        );
+                bounds.maximum.y =
+                        std::max(
+                            bounds.maximum.y,
+                            voxel.center.y + halfSize.y
+                        );
+                bounds.maximum.z =
+                        std::max(
+                            bounds.maximum.z,
+                            voxel.center.z + halfSize.z
+                        );
+            }
+
+            bounds.center = Vector3{
+                (bounds.minimum.x + bounds.maximum.x) * 0.5F,
+                (bounds.minimum.y + bounds.maximum.y) * 0.5F,
+                (bounds.minimum.z + bounds.maximum.z) * 0.5F
+            };
+
+            const Vector3 halfExtent{
+                (bounds.maximum.x - bounds.minimum.x) * 0.5F,
+                (bounds.maximum.y - bounds.minimum.y) * 0.5F,
+                (bounds.maximum.z - bounds.minimum.z) * 0.5F
+            };
+
+            bounds.radius =
+                    std::max(
+                        length(halfExtent),
+                        0.5F
+                    );
+            bounds.valid = true;
+            return bounds;
+        }
+
         [[nodiscard]] unsigned int compileShader(
             const unsigned int shaderType,
             const char *source,
@@ -289,40 +396,53 @@ namespace quantum_sim::gui::density_volume {
             visibleGhostCount_ =
                     static_cast<int>(visibleGhostCount);
 
-            const float visibleLength =
-                    static_cast<float>(safeSelectedLayer) *
-                    scene_.layerSpacing +
-                    scene_.voxelSide;
-
-            sceneCenter_ = Vector3{
-                (visibleLength - scene_.voxelSide) * 0.5F,
-                0.0F,
-                0.0F
-            };
-
-            // Keep the logical matrix bounds in the composition even when most
-            // numerical cells are zero and therefore rendered only as edges or
-            // omitted. This prevents sparse states from collapsing the camera.
-            sceneRadius_ =
-                    std::max(
-                        {
-                            visibleLength / 3.15F,
-                            scene_.matrixSpan * 0.88F,
-                            scene_.matrixSpan * 0.82F,
-                            1.0F
-                        }
-                    ) *
-                    1.04F;
-
-            scene_.groundCenter.x =
-                    sceneCenter_.x;
-
-            scene_.groundHalfExtentX =
-                    std::max(
-                        visibleLength * 0.68F +
-                        scene_.matrixSpan * 0.34F,
-                        scene_.matrixSpan * 0.78F
+            const VisibleVoxelBounds visibleBounds =
+                    calculateVisibleVoxelBounds(
+                        scene_.voxels,
+                        visibleSolidCount
                     );
+
+            if (visibleBounds.valid) {
+                const float minimumContextRadius =
+                        std::clamp(
+                            scene_.matrixSpan * 0.28F,
+                            1.4F,
+                            4.6F
+                        );
+
+                sceneCenter_ =
+                        visibleBounds.center;
+
+                sceneRadius_ =
+                        std::max(
+                            visibleBounds.radius * 1.18F,
+                            minimumContextRadius
+                        );
+
+                scene_.groundCenter = Vector3{
+                    sceneCenter_.x,
+                    visibleBounds.minimum.y -
+                        scene_.voxelSide * 1.15F,
+                    sceneCenter_.z
+                };
+
+                scene_.groundHalfExtentX =
+                        std::max(
+                            sceneRadius_ * 1.28F,
+                            2.5F
+                        );
+
+                scene_.groundHalfExtentZ =
+                        scene_.groundHalfExtentX;
+            } else {
+                sceneCenter_ =
+                        scene_.center;
+                sceneRadius_ =
+                        std::max(
+                            scene_.radius,
+                            1.0F
+                        );
+            }
         } else {
             visibleInstanceCount_ =
                     static_cast<int>(scene_.voxels.size());
