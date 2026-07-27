@@ -101,6 +101,8 @@ namespace quantum_sim::gui {
         ImU32 placementGuideColor{IM_COL32(70, 170, 220, 90)};
         ImU32 placementPreviewFillColor{IM_COL32(24, 70, 92, 220)};
         ImU32 placementPreviewOutlineColor{IM_COL32(70, 190, 235, 255)};
+        ImU32 placementWireColor{IM_COL32(80, 205, 255, 210)};
+        ImU32 reorderGuideColor{IM_COL32(255, 190, 55, 235)};
         ImU32 controlledGateColor{IM_COL32(175, 100, 255, 255)};
         ImU32 hoveredControlledGateColor{IM_COL32(210, 150, 255, 255)};
         ImU32 stepBadgeFillColor{IM_COL32(28, 38, 52, 230)};
