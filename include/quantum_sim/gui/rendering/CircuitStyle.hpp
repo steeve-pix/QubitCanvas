@@ -13,7 +13,7 @@ namespace quantum_sim::gui {
         float topMargin{64.0F};
         float wireSpacing{70.0F};
         float gateSpacing{90.0F};
-        float minimumGateSpacing{50.0F};
+        float minimumGateSpacing{64.0F};
         float wireStartOffset{40.0F};
         float firstGateOffset{55.0F};
         float rightPadding{65.0F};

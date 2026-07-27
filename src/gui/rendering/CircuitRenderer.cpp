@@ -49,6 +49,68 @@ namespace {
                point.y >= minimum.y &&
                point.y <= maximum.y;
     }
+
+    [[nodiscard]] bool isTwoQubitGateName(
+        const std::string &gateName
+    ) noexcept {
+        return gateName == "CX" ||
+               gateName == "CY" ||
+               gateName == "CZ" ||
+               gateName == "CP" ||
+               gateName == "CRx" ||
+               gateName == "CRy" ||
+               gateName == "CRz" ||
+               gateName == "SWAP" ||
+               gateName == "iSWAP" ||
+               gateName == "RXX" ||
+               gateName == "RYY" ||
+               gateName == "RZZ";
+    }
+
+    [[nodiscard]] bool isInteractionGateName(
+        const std::string &gateName
+    ) noexcept {
+        return gateName == "RXX" ||
+               gateName == "RYY" ||
+               gateName == "RZZ";
+    }
+
+    [[nodiscard]] const char *twoQubitTargetLabel(
+        const std::string &gateName
+    ) noexcept {
+        if (gateName == "CX") {
+            return "X";
+        }
+        if (gateName == "CY") {
+            return "Y";
+        }
+        if (gateName == "CZ") {
+            return "Z";
+        }
+        if (gateName == "CP") {
+            return "P";
+        }
+        if (gateName == "CRx") {
+            return "Rx";
+        }
+        if (gateName == "CRy") {
+            return "Ry";
+        }
+        if (gateName == "CRz") {
+            return "Rz";
+        }
+        if (gateName == "RXX") {
+            return "X";
+        }
+        if (gateName == "RYY") {
+            return "Y";
+        }
+        if (gateName == "RZZ") {
+            return "Z";
+        }
+
+        return "?";
+    }
 }
 
 namespace quantum_sim::gui {
@@ -121,12 +183,8 @@ namespace quantum_sim::gui {
 
         const bool controlledPlacement =
                 placementModeActive &&
-                (
-                    pendingGate.value() == "CX" ||
-                    pendingGate.value() == "CY" ||
-                    pendingGate.value() == "CZ" ||
-                    pendingGate.value() == "SWAP" ||
-                    pendingGate.value() == "iSWAP"
+                isTwoQubitGateName(
+                    pendingGate.value()
                 );
 
         if (controlledPlacement) {
@@ -695,18 +753,20 @@ namespace quantum_sim::gui {
                 const bool choosingTarget =
                         pendingControlQubit_.has_value();
 
-                const char *targetPreviewLabel = "T";
+                const char *targetPreviewLabel =
+                        twoQubitTargetLabel(
+                            pendingGate.value()
+                        );
 
-                if (pendingGate.value() == "CX") {
-                    targetPreviewLabel = "X";
-                } else if (pendingGate.value() == "CY") {
-                    targetPreviewLabel = "Y";
-                } else if (pendingGate.value() == "CZ") {
-                    targetPreviewLabel = "Z";
-                }
+                const bool symmetricInteraction =
+                        isInteractionGateName(
+                            pendingGate.value()
+                        );
 
                 const char *previewLabel =
-                        choosingTarget
+                        symmetricInteraction
+                            ? targetPreviewLabel
+                            : choosingTarget
                             ? isSelectedControl
                                   ? "C"
                                   : targetPreviewLabel
@@ -1209,6 +1269,11 @@ namespace quantum_sim::gui {
                 const bool isSwapFamily =
                         isSwap || isISwap;
 
+                const bool isInteraction =
+                        isInteractionGateName(
+                            instruction.name
+                        );
+
                 if (!highlighted && hovered) {
                     gateColor = style_.hoveredControlledGateColor;
                 }
@@ -1400,6 +1465,149 @@ namespace quantum_sim::gui {
                     continue;
                 }
 
+                if (isInteraction) {
+                    const char *axisLabel =
+                            twoQubitTargetLabel(
+                                instruction.name
+                            );
+
+                    const auto drawInteractionBox =
+                            [&](const ImVec2 &center, const ImU32 color) {
+                        const ImVec2 minimum{
+                            center.x - style_.gateHalfWidth,
+                            center.y - style_.gateHalfHeight
+                        };
+
+                        const ImVec2 maximum{
+                            center.x + style_.gateHalfWidth,
+                            center.y + style_.gateHalfHeight
+                        };
+
+                        drawList->AddRectFilled(
+                            minimum,
+                            maximum,
+                            backgroundColor,
+                            style_.gateCornerRadius
+                        );
+
+                        drawList->AddRect(
+                            minimum,
+                            maximum,
+                            color,
+                            style_.gateCornerRadius,
+                            0,
+                            style_.controlledConnectionThickness
+                        );
+
+                        const ImVec2 labelSize =
+                                ImGui::CalcTextSize(
+                                    axisLabel
+                                );
+
+                        drawList->AddText(
+                            ImVec2{
+                                center.x - labelSize.x * 0.5F,
+                                center.y - labelSize.y * 0.5F
+                            },
+                            color,
+                            axisLabel
+                        );
+                    };
+
+                    const float direction =
+                            targetY >= controlY
+                                ? 1.0F
+                                : -1.0F;
+
+                    const ImVec2 connectionStart{
+                        x,
+                        controlY +
+                        direction * style_.gateHalfHeight
+                    };
+
+                    const ImVec2 connectionEnd{
+                        x,
+                        targetY -
+                        direction * style_.gateHalfHeight
+                    };
+
+                    if (selected) {
+                        drawList->AddLine(
+                            controlCenter,
+                            targetCenter,
+                            style_.selectedGateOutlineColor,
+                            style_.controlledConnectionThickness +
+                            style_.selectedGateOutlineThickness * 2.0F
+                        );
+
+                        for (const ImVec2 center : {controlCenter, targetCenter}) {
+                            drawList->AddRect(
+                                ImVec2{
+                                    center.x -
+                                    style_.gateHalfWidth -
+                                    style_.selectedGateOutlinePadding,
+                                    center.y -
+                                    style_.gateHalfHeight -
+                                    style_.selectedGateOutlinePadding
+                                },
+                                ImVec2{
+                                    center.x +
+                                    style_.gateHalfWidth +
+                                    style_.selectedGateOutlinePadding,
+                                    center.y +
+                                    style_.gateHalfHeight +
+                                    style_.selectedGateOutlinePadding
+                                },
+                                style_.selectedGateOutlineColor,
+                                style_.selectedGateOutlineCornerRadius,
+                                0,
+                                style_.selectedGateOutlineThickness
+                            );
+                        }
+                    }
+
+                    if (highlighted) {
+                        const int glowAlpha =
+                                static_cast<int>(
+                                    style_.controlledGlowBaseAlpha +
+                                    pulse *
+                                    style_.controlledGlowPulseAlpha
+                                );
+
+                        const ImU32 glowColor =
+                                withAlpha(
+                                    style_.controlledGlowColor,
+                                    glowAlpha
+                                );
+
+                        drawList->AddLine(
+                            connectionStart,
+                            connectionEnd,
+                            glowColor,
+                            style_.controlledGlowLineThickness
+                        );
+                    }
+
+                    drawList->AddLine(
+                        connectionStart,
+                        connectionEnd,
+                        gateColor,
+                        style_.controlledConnectionThickness
+                    );
+
+                    drawInteractionBox(
+                        controlCenter,
+                        gateColor
+                    );
+
+                    drawInteractionBox(
+                        targetCenter,
+                        gateColor
+                    );
+
+                    continue;
+                }
+
                 const float direction =
                         targetY >= controlY
                             ? 1.0F
@@ -1523,15 +1731,10 @@ namespace quantum_sim::gui {
                     gateColor
                 );
 
-                const char *targetLabel = "?";
-
-                if (instruction.name == "CX") {
-                    targetLabel = "X";
-                } else if (instruction.name == "CY") {
-                    targetLabel = "Y";
-                } else if (instruction.name == "CZ") {
-                    targetLabel = "Z";
-                }
+                const char *targetLabel =
+                        twoQubitTargetLabel(
+                            instruction.name
+                        );
 
                 const ImVec2 targetBoxMin{
                     targetCenter.x - style_.gateHalfWidth,
@@ -2101,8 +2304,42 @@ namespace quantum_sim::gui {
             style_.gateOutlineThickness
         );
 
+        ImFont *font =
+                ImGui::GetFont();
+
+        const float baseFontSize =
+                ImGui::GetFontSize();
+
+        const ImVec2 baseTextSize =
+                ImGui::CalcTextSize(
+                    label.c_str()
+                );
+
+        const float availableTextWidth =
+                std::max(
+                    1.0F,
+                    style_.gateHalfWidth *
+                    2.0F -
+                    6.0F
+                );
+
+        const float textScale =
+                baseTextSize.x > availableTextWidth
+                    ? availableTextWidth /
+                        baseTextSize.x
+                    : 1.0F;
+
+        const float fittedFontSize =
+                baseFontSize *
+                textScale;
+
         const ImVec2 textSize =
-                ImGui::CalcTextSize(label.c_str());
+                font->CalcTextSizeA(
+                    fittedFontSize,
+                    10000.0F,
+                    0.0F,
+                    label.c_str()
+                );
 
         const ImVec2 textPosition{
             center.x - textSize.x / 2.0F,
@@ -2110,6 +2347,8 @@ namespace quantum_sim::gui {
         };
 
         drawList->AddText(
+            font,
+            fittedFontSize,
             textPosition,
             style_.gateTextColor,
             label.c_str()

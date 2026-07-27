@@ -11,8 +11,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -22,10 +25,103 @@
 #include "imgui_internal.h"
 #include "quantum_sim/gates/QuantumGates.hpp"
 
+namespace {
+    [[nodiscard]] bool usesGateParameters(
+        const std::string_view gateName
+    ) noexcept {
+        return gateName == "P" ||
+               gateName == "U" ||
+               gateName == "Rx" ||
+               gateName == "Ry" ||
+               gateName == "Rz" ||
+               gateName == "CP" ||
+               gateName == "CRx" ||
+               gateName == "CRy" ||
+               gateName == "CRz" ||
+               gateName == "RXX" ||
+               gateName == "RYY" ||
+               gateName == "RZZ";
+    }
+
+    [[nodiscard]] bool isControlledGate(
+        const std::string_view gateName
+    ) noexcept {
+        return gateName == "CX" ||
+               gateName == "CY" ||
+               gateName == "CZ" ||
+               gateName == "CP" ||
+               gateName == "CRx" ||
+               gateName == "CRy" ||
+               gateName == "CRz";
+    }
+
+    [[nodiscard]] bool isSymmetricTwoQubitGate(
+        const std::string_view gateName
+    ) noexcept {
+        return gateName == "SWAP" ||
+               gateName == "iSWAP" ||
+               gateName == "RXX" ||
+               gateName == "RYY" ||
+               gateName == "RZZ";
+    }
+
+    [[nodiscard]] bool writeFramebufferPpm(
+        const std::string &path,
+        const int width,
+        const int height,
+        const std::vector<unsigned char> &pixels
+    ) {
+        std::ofstream output{
+            path,
+            std::ios::binary
+        };
+
+        if (!output) {
+            return false;
+        }
+
+        output
+                << "P6\n"
+                << width
+                << ' '
+                << height
+                << "\n255\n";
+
+        const std::size_t rowByteCount =
+                static_cast<std::size_t>(width) *
+                3U;
+
+        // OpenGL's framebuffer origin is lower-left; PPM viewers expect top-left.
+        for (int row = height; row-- > 0;) {
+            const std::size_t rowOffset =
+                    static_cast<std::size_t>(row) *
+                    rowByteCount;
+
+            output.write(
+                reinterpret_cast<const char *>(
+                    pixels.data() +
+                    rowOffset
+                ),
+                static_cast<std::streamsize>(
+                    rowByteCount
+                )
+            );
+        }
+
+        return static_cast<bool>(output);
+    }
+}
+
 namespace quantum_sim::gui {
-    GuiApplication::GuiApplication(circuit::QuantumCircuit &circuit,
-                                   const quantum::QuantumRegister &initialState)
-        : circuit_{circuit}, initialState_{initialState}, session_{circuit_, initialState_} {
+    GuiApplication::GuiApplication(
+        circuit::QuantumCircuit &circuit,
+        const quantum::QuantumRegister &initialState,
+        GuiLaunchOptions launchOptions
+    )
+        : circuit_{circuit},
+          initialState_{initialState},
+          session_{circuit_, initialState_},
+          launchOptions_{std::move(launchOptions)} {
         presetQubitCount_ =
                 static_cast<int>(
                     std::clamp(
@@ -36,6 +132,33 @@ namespace quantum_sim::gui {
                 );
 
         rebuildDensityVolume();
+
+        if (launchOptions_.algorithmPage.has_value()) {
+            algorithmPage_ =
+                    std::min(
+                        launchOptions_.algorithmPage.value(),
+                        std::size_t{2}
+                    );
+        }
+
+        if (launchOptions_.gatePage.has_value()) {
+            gateLibraryPanel_.setPage(
+                launchOptions_.gatePage.value()
+            );
+        }
+
+        if (launchOptions_.armedGate.has_value()) {
+            armGatePlacement(
+                launchOptions_.armedGate.value()
+            );
+        }
+
+        if (launchOptions_.startAtFinalStep) {
+            session_.moveToStepNumber(
+                session_.stepCount()
+            );
+        }
+
         synchronizeDensityLayer(session_.snapshot());
     }
 
@@ -49,7 +172,30 @@ namespace quantum_sim::gui {
 
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-        GLFWwindow *window = glfwCreateWindow(1280, 720, "QubitCanvas", nullptr, nullptr);
+        if (launchOptions_.hiddenWindow) {
+            glfwWindowHint(
+                GLFW_VISIBLE,
+                GLFW_FALSE
+            );
+        }
+
+        const int initialWindowWidth =
+                launchOptions_.capturePath.has_value()
+                    ? 1920
+                    : 1280;
+
+        const int initialWindowHeight =
+                launchOptions_.capturePath.has_value()
+                    ? 1080
+                    : 720;
+
+        GLFWwindow *window = glfwCreateWindow(
+            initialWindowWidth,
+            initialWindowHeight,
+            "QubitCanvas",
+            nullptr,
+            nullptr
+        );
 
         if (window == nullptr) {
             glfwTerminate();
@@ -58,7 +204,9 @@ namespace quantum_sim::gui {
 
         // QubitCanvas uses three dense technical work areas; maximize the
         // initial window so display scaling cannot hide the inspector.
-        glfwMaximizeWindow(window);
+        if (!launchOptions_.hiddenWindow) {
+            glfwMaximizeWindow(window);
+        }
         glfwMakeContextCurrent(window);
 
         const int loadedOpenGlVersion =
@@ -107,6 +255,7 @@ namespace quantum_sim::gui {
         static constexpr ImWchar jetBrainsMonoGlyphRanges[]{
             0x0020, 0x00FF,
             0x03B8, 0x03B8,
+            0x03BB, 0x03BB,
             0x03C0, 0x03C1,
             0x03C6, 0x03C6,
             0x03C8, 0x03C8,
@@ -155,6 +304,8 @@ namespace quantum_sim::gui {
         ImGui_ImplGlfw_InitForOpenGL(window, true);
 
         ImGui_ImplOpenGL3_Init("#version 330");
+
+        bool captureFailed = false;
 
         while (glfwWindowShouldClose(window) == GLFW_FALSE) {
             // Read operating-system events:
@@ -273,8 +424,7 @@ namespace quantum_sim::gui {
                         circuitRenderer_.hasPendingControlQubit();
 
                 const bool isSwapFamily =
-                        gateName == "SWAP" ||
-                        gateName == "iSWAP";
+                        isSymmetricTwoQubitGate(gateName);
 
                 if (isSwapFamily) {
                     ImGui::TextColored(
@@ -284,11 +434,7 @@ namespace quantum_sim::gui {
                             : "Placement mode: %s - choose first qubit",
                         gateName.c_str()
                     );
-                } else if (
-                    gateName == "CX" ||
-                    gateName == "CY" ||
-                    gateName == "CZ"
-                ) {
+                } else if (isControlledGate(gateName)) {
                     ImGui::TextColored(
                         ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
                         hasFirstQubit
@@ -304,10 +450,10 @@ namespace quantum_sim::gui {
                     );
                 }
 
-                if (pendingRotationAngleRadians_.has_value()) {
+                if (pendingGateParameters_.has_value()) {
                     const std::string angleText =
                             notation::formatAngleMeasurement(
-                                pendingRotationAngleRadians_.value()
+                                pendingGateParameters_->thetaRadians
                             );
 
                     ImGui::SameLine();
@@ -315,6 +461,25 @@ namespace quantum_sim::gui {
                         "%s",
                         angleText.c_str()
                     );
+
+                    if (gateName == "U") {
+                        const std::string phiText =
+                                notation::formatAngleMeasurement(
+                                    pendingGateParameters_->phiRadians
+                                );
+
+                        const std::string lambdaText =
+                                notation::formatAngleMeasurement(
+                                    pendingGateParameters_->lambdaRadians
+                                );
+
+                        ImGui::SameLine();
+                        ImGui::TextDisabled(
+                            "\xCF\x86 %s  \xCE\xBB %s",
+                            phiText.c_str(),
+                            lambdaText.c_str()
+                        );
+                    }
                 }
 
                 ImGui::SameLine();
@@ -742,8 +907,8 @@ namespace quantum_sim::gui {
                 queuedSingleQubitPlacement_ =
                         std::move(singleQubitPlacement);
 
-                queuedSingleQubitRotationAngleRadians_ =
-                        pendingRotationAngleRadians_;
+                queuedSingleQubitParameters_ =
+                        pendingGateParameters_;
             }
 
             const auto controlledPlacement =
@@ -752,6 +917,9 @@ namespace quantum_sim::gui {
             if (controlledPlacement.has_value()) {
                 queuedControlledPlacement_ =
                         controlledPlacement;
+
+                queuedTwoQubitParameters_ =
+                        pendingGateParameters_;
             }
 
             const auto selectedInstructionIndex =
@@ -900,6 +1068,56 @@ namespace quantum_sim::gui {
                 ImGui::GetDrawData()
             );
 
+            ++renderedFrameCount_;
+
+            if (
+                launchOptions_.capturePath.has_value() &&
+                renderedFrameCount_ >=
+                    launchOptions_.captureAfterFrames
+            ) {
+                glPixelStorei(
+                    GL_PACK_ALIGNMENT,
+                    1
+                );
+
+                std::vector<unsigned char> pixels(
+                    static_cast<std::size_t>(framebufferWidth) *
+                    static_cast<std::size_t>(framebufferHeight) *
+                    3U
+                );
+
+                glReadPixels(
+                    0,
+                    0,
+                    framebufferWidth,
+                    framebufferHeight,
+                    GL_RGB,
+                    GL_UNSIGNED_BYTE,
+                    pixels.data()
+                );
+
+                if (
+                    !writeFramebufferPpm(
+                        launchOptions_.capturePath.value(),
+                        framebufferWidth,
+                        framebufferHeight,
+                        pixels
+                    )
+                ) {
+                    captureFailed = true;
+
+                    glfwSetWindowShouldClose(
+                        window,
+                        GLFW_TRUE
+                    );
+                }
+
+                glfwSetWindowShouldClose(
+                    window,
+                    GLFW_TRUE
+                );
+            }
+
             // Present the completed frame.
             glfwSwapBuffers(window);
         }
@@ -911,6 +1129,12 @@ namespace quantum_sim::gui {
 
         glfwDestroyWindow(window);
         glfwTerminate();
+
+        if (captureFailed) {
+            throw std::runtime_error{
+                "Failed to write the requested framebuffer capture."
+            };
+        }
     }
 
     void GuiApplication::configureStyle() const {
@@ -1044,15 +1268,10 @@ namespace quantum_sim::gui {
         pendingGate_ =
                 gateName;
 
-        const bool rotationGate =
-                gateName == "Rx" ||
-                gateName == "Ry" ||
-                gateName == "Rz";
-
-        pendingRotationAngleRadians_ =
-                rotationGate
-                    ? std::optional<double>{
-                        gateLibraryPanel_.rotationAngleRadians()
+        pendingGateParameters_ =
+                usesGateParameters(gateName)
+                    ? std::optional<GateParameters>{
+                        gateLibraryPanel_.gateParameters()
                     }
                     : std::nullopt;
 
@@ -1063,7 +1282,7 @@ namespace quantum_sim::gui {
 
     void GuiApplication::cancelGatePlacement() noexcept {
         pendingGate_.reset();
-        pendingRotationAngleRadians_.reset();
+        pendingGateParameters_.reset();
         gateLibraryPanel_.clearSelection();
         circuitRenderer_.cancelPlacement();
     }
@@ -1840,7 +2059,7 @@ namespace quantum_sim::gui {
             {
                 "Grover",
                 CircuitPreset::Grover,
-                "Searches |11\xE2\x9F\xA9 on q0/q1; extra qubits remain in |0\xE2\x9F\xA9."
+                "Searches the all-one state across the complete selected register."
             },
             {
                 "Deutsch-J",
@@ -1927,8 +2146,51 @@ namespace quantum_sim::gui {
             }
         }};
 
+        static constexpr std::array<AlgorithmEntry, 8U> thirdPage{{
+            {
+                "W State",
+                CircuitPreset::WState,
+                "Shares one excitation equally across the complete register."
+            },
+            {
+                "Dicke k=2",
+                CircuitPreset::DickeState,
+                "Populates every basis state containing exactly two excitations."
+            },
+            {
+                "Graph State",
+                CircuitPreset::GraphState,
+                "Creates a linear cluster state with CZ edges between neighbors."
+            },
+            {
+                "Seeded Random",
+                CircuitPreset::RandomCircuit,
+                "Uses reproducible random rotations and entanglers for uneven probabilities."
+            },
+            {
+                "Weighted State",
+                CircuitPreset::WeightedState,
+                "Prepares a deterministic non-uniform probability distribution."
+            },
+            {
+                "Bit-flip Code",
+                CircuitPreset::BitFlipCode,
+                "Encodes one qubit, injects an X error, and coherently corrects it."
+            },
+            {
+                "Steane [[7,1,3]]",
+                CircuitPreset::SteaneCode,
+                "Prepares the logical-zero state of the seven-qubit Steane code."
+            },
+            {
+                "Shor [[9,1,3]]",
+                CircuitPreset::ShorCode,
+                "Encodes one qubit against bit and phase errors with nine qubits."
+            }
+        }};
+
         constexpr std::size_t pageCount =
-                2U;
+                3U;
 
         algorithmPage_ =
                 std::min(
@@ -1968,8 +2230,10 @@ namespace quantum_sim::gui {
 
         if (algorithmPage_ == 0U) {
             drawPage(firstPage);
-        } else {
+        } else if (algorithmPage_ == 1U) {
             drawPage(secondPage);
+        } else {
+            drawPage(thirdPage);
         }
 
         ImGui::EndChild();
@@ -2349,6 +2613,49 @@ namespace quantum_sim::gui {
             return algorithms::superdenseCodingCircuit(qubitCount);
         }
 
+        if (preset == CircuitPreset::WState) {
+            return algorithms::wStateCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::DickeState) {
+            return algorithms::dickeStateCircuit(
+                qubitCount,
+                2U
+            );
+        }
+
+        if (preset == CircuitPreset::GraphState) {
+            return algorithms::graphStateCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::RandomCircuit) {
+            return algorithms::randomCircuit(
+                qubitCount,
+                0x514255424954ULL +
+                static_cast<std::uint64_t>(
+                    qubitCount
+                )
+            );
+        }
+
+        if (preset == CircuitPreset::WeightedState) {
+            return algorithms::weightedStatePreparationCircuit(
+                qubitCount
+            );
+        }
+
+        if (preset == CircuitPreset::BitFlipCode) {
+            return algorithms::bitFlipCodeCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::SteaneCode) {
+            return algorithms::steaneCodeCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::ShorCode) {
+            return algorithms::shorCodeCircuit(qubitCount);
+        }
+
         throw std::invalid_argument{
             "Unsupported circuit preset."
         };
@@ -2366,7 +2673,11 @@ namespace quantum_sim::gui {
             preset == CircuitPreset::Vqe ||
             preset == CircuitPreset::Qaoa ||
             preset == CircuitPreset::Bb84 ||
-            preset == CircuitPreset::Superdense
+            preset == CircuitPreset::Superdense ||
+            preset == CircuitPreset::WState ||
+            preset == CircuitPreset::DickeState ||
+            preset == CircuitPreset::GraphState ||
+            preset == CircuitPreset::RandomCircuit
         ) {
             return 2;
         }
@@ -2376,7 +2687,8 @@ namespace quantum_sim::gui {
             preset == CircuitPreset::Teleportation ||
             preset == CircuitPreset::Qpe ||
             preset == CircuitPreset::SwapTest ||
-            preset == CircuitPreset::QuantumWalk
+            preset == CircuitPreset::QuantumWalk ||
+            preset == CircuitPreset::BitFlipCode
         ) {
             return 3;
         }
@@ -2387,6 +2699,14 @@ namespace quantum_sim::gui {
             preset == CircuitPreset::Hhl
         ) {
             return 4;
+        }
+
+        if (preset == CircuitPreset::SteaneCode) {
+            return 7;
+        }
+
+        if (preset == CircuitPreset::ShorCode) {
+            return 9;
         }
 
         return 1;
@@ -2463,7 +2783,7 @@ namespace quantum_sim::gui {
 
     math::ComplexMatrix GuiApplication::createSingleQubitGateMatrix(
         const std::string &gateName,
-        const std::optional<double> angleRadians
+        const GateParameters &parameters
     ) const {
         if (gateName == "H") {
             return gates::hadamardGate();
@@ -2497,26 +2817,38 @@ namespace quantum_sim::gui {
             return gates::tDaggerGate();
         }
 
-        if (
-            gateName == "Rx" ||
-            gateName == "Ry" ||
-            gateName == "Rz"
-        ) {
-            if (!angleRadians.has_value()) {
-                throw std::invalid_argument(
-                    gateName + " requires an angle in radians."
-                );
-            }
+        if (gateName == "SX") {
+            return gates::sxGate();
+        }
 
-            if (gateName == "Rx") {
-                return gates::rxGate(angleRadians.value());
-            }
+        if (gateName == "SXdg") {
+            return gates::sxDaggerGate();
+        }
 
-            if (gateName == "Ry") {
-                return gates::ryGate(angleRadians.value());
-            }
+        if (gateName == "P") {
+            return gates::phaseGate(
+                parameters.thetaRadians
+            );
+        }
 
-            return gates::rzGate(angleRadians.value());
+        if (gateName == "U") {
+            return gates::uGate(
+                parameters.thetaRadians,
+                parameters.phiRadians,
+                parameters.lambdaRadians
+            );
+        }
+
+        if (gateName == "Rx") {
+            return gates::rxGate(parameters.thetaRadians);
+        }
+
+        if (gateName == "Ry") {
+            return gates::ryGate(parameters.thetaRadians);
+        }
+
+        if (gateName == "Rz") {
+            return gates::rzGate(parameters.thetaRadians);
         }
 
         throw std::invalid_argument("Unsupported single-qubit gate " + gateName);
@@ -2635,8 +2967,17 @@ namespace quantum_sim::gui {
             const std::size_t targetQubit =
                     queuedSingleQubitPlacement_->targetQubit;
 
+            const GateParameters parameters =
+                    queuedSingleQubitParameters_.value_or(
+                        GateParameters{}
+                    );
+
             const std::optional<double> angleRadians =
-                    queuedSingleQubitRotationAngleRadians_;
+                    usesGateParameters(gateName)
+                        ? std::optional<double>{
+                            parameters.thetaRadians
+                        }
+                        : std::nullopt;
 
             recordEditorForUndo();
 
@@ -2650,13 +2991,13 @@ namespace quantum_sim::gui {
             circuit_.insertSingleQubitGate(
                 instructionIndex,
                 gateName,
-                createSingleQubitGateMatrix(gateName, angleRadians),
+                createSingleQubitGateMatrix(gateName, parameters),
                 targetQubit,
                 angleRadians
             );
 
             queuedSingleQubitPlacement_.reset();
-            queuedSingleQubitRotationAngleRadians_.reset();
+            queuedSingleQubitParameters_.reset();
             circuitHasUnsavedEdits_ = true;
             inspectorPanel_.focusQubit(targetQubit);
 
@@ -2684,6 +3025,18 @@ namespace quantum_sim::gui {
                         circuit_.instructionCount()
                     );
 
+            const GateParameters parameters =
+                    queuedTwoQubitParameters_.value_or(
+                        GateParameters{}
+                    );
+
+            const std::optional<double> angleRadians =
+                    usesGateParameters(gateName)
+                        ? std::optional<double>{
+                            parameters.thetaRadians
+                        }
+                        : std::nullopt;
+
             recordEditorForUndo();
 
             // Two-qubit placements retain only their local 4x4 matrix, keeping
@@ -2691,12 +3044,14 @@ namespace quantum_sim::gui {
             circuit_.insertTwoQubitGate(
                 instructionIndex,
                 gateName,
-                createTwoQubitGateMatrix(gateName),
+                createTwoQubitGateMatrix(gateName, parameters),
                 controlQubit,
-                targetQubit
+                targetQubit,
+                angleRadians
             );
 
             queuedControlledPlacement_.reset();
+            queuedTwoQubitParameters_.reset();
             circuitHasUnsavedEdits_ = true;
             inspectorPanel_.focusQubit(targetQubit);
 
@@ -2811,7 +3166,8 @@ namespace quantum_sim::gui {
     }
 
     math::ComplexMatrix GuiApplication::createTwoQubitGateMatrix(
-        const std::string &gateName
+        const std::string &gateName,
+        const GateParameters &parameters
     ) {
         if (gateName == "CX") {
             return gates::cxGate();
@@ -2823,6 +3179,36 @@ namespace quantum_sim::gui {
 
         if (gateName == "CZ") {
             return gates::czGate();
+        }
+
+        if (gateName == "CP") {
+            return gates::controlledPhaseGate(
+                parameters.thetaRadians
+            );
+        }
+
+        if (gateName == "CRx") {
+            return gates::crxGate(parameters.thetaRadians);
+        }
+
+        if (gateName == "CRy") {
+            return gates::cryGate(parameters.thetaRadians);
+        }
+
+        if (gateName == "CRz") {
+            return gates::crzGate(parameters.thetaRadians);
+        }
+
+        if (gateName == "RXX") {
+            return gates::rxxGate(parameters.thetaRadians);
+        }
+
+        if (gateName == "RYY") {
+            return gates::ryyGate(parameters.thetaRadians);
+        }
+
+        if (gateName == "RZZ") {
+            return gates::rzzGate(parameters.thetaRadians);
         }
 
         if (gateName == "SWAP") {
@@ -2886,10 +3272,11 @@ namespace quantum_sim::gui {
 
     void GuiApplication::resetEditorTransientState() noexcept {
         pendingGate_.reset();
-        pendingRotationAngleRadians_.reset();
+        pendingGateParameters_.reset();
         queuedControlledPlacement_.reset();
         queuedSingleQubitPlacement_.reset();
-        queuedSingleQubitRotationAngleRadians_.reset();
+        queuedSingleQubitParameters_.reset();
+        queuedTwoQubitParameters_.reset();
         queuedInstructionDeletion_.reset();
         queuedInstructionMove_.reset();
         presetAwaitingConfirmation_.reset();

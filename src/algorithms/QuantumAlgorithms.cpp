@@ -2,9 +2,15 @@
 
 #include "quantum_sim/gates/QuantumGates.hpp"
 
+#include <bit>
+#include <cmath>
+#include <cstdint>
 #include <limits>
 #include <numbers>
+#include <random>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 
 namespace {
     using quantum_sim::circuit::QuantumCircuit;
@@ -243,6 +249,66 @@ namespace {
             secondTarget,
             firstTarget
         );
+    }
+
+    [[nodiscard]] quantum_sim::math::ComplexVector statePreparationAxis(
+        const std::vector<double> &targetAmplitudes
+    ) {
+        std::vector<quantum_sim::math::Complex> axis;
+        axis.reserve(targetAmplitudes.size());
+
+        for (std::size_t index = 0U; index < targetAmplitudes.size(); ++index) {
+            axis.emplace_back(
+                (
+                    index == 0U
+                        ? 1.0
+                        : 0.0
+                ) -
+                targetAmplitudes[index],
+                0.0
+            );
+        }
+
+        return quantum_sim::math::ComplexVector{
+            std::move(axis)
+        }.normalized();
+    }
+
+    [[nodiscard]] quantum_sim::math::ComplexVector basisReflectionAxis(
+        const std::size_t stateCount,
+        const std::size_t markedState
+    ) {
+        std::vector<quantum_sim::math::Complex> axis(
+            stateCount,
+            quantum_sim::math::Complex{}
+        );
+
+        axis.at(markedState) =
+                quantum_sim::math::Complex{1.0, 0.0};
+
+        return quantum_sim::math::ComplexVector{
+            std::move(axis)
+        };
+    }
+
+    [[nodiscard]] quantum_sim::math::ComplexVector uniformReflectionAxis(
+        const std::size_t stateCount
+    ) {
+        const double amplitude =
+                1.0 /
+                std::sqrt(
+                    static_cast<double>(stateCount)
+                );
+
+        return quantum_sim::math::ComplexVector{
+            std::vector(
+                stateCount,
+                quantum_sim::math::Complex{
+                    amplitude,
+                    0.0
+                }
+            )
+        };
     }
 }
 
@@ -504,31 +570,57 @@ namespace quantum_sim::algorithms {
 
         circuit::QuantumCircuit circuit{qubitCount};
 
-        // Uniform preparation followed by a CZ oracle that marks |11⟩.
-        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
-        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
-        circuit.addTwoQubitGate(
-            "CZ",
-            gates::czGate(),
-            0,
-            1
-        );
+        for (std::size_t qubit = 0U; qubit < qubitCount; ++qubit) {
+            circuit.addSingleQubitGate(
+                "H",
+                gates::hadamardGate(),
+                qubit
+            );
+        }
 
-        // H-X-CZ-X-H is the two-qubit inversion-about-the-mean operator.
-        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
-        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
-        circuit.addSingleQubitGate("X", gates::xGate(), 0);
-        circuit.addSingleQubitGate("X", gates::xGate(), 1);
-        circuit.addTwoQubitGate(
-            "CZ",
-            gates::czGate(),
-            0,
-            1
-        );
-        circuit.addSingleQubitGate("X", gates::xGate(), 0);
-        circuit.addSingleQubitGate("X", gates::xGate(), 1);
-        circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
-        circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
+        const std::size_t stateCount =
+                std::size_t{1} << qubitCount;
+
+        const std::size_t markedState =
+                stateCount - 1U;
+
+        const std::size_t iterationCount =
+                std::max(
+                    std::size_t{1},
+                    static_cast<std::size_t>(
+                        std::floor(
+                            std::numbers::pi *
+                            std::sqrt(
+                                static_cast<double>(stateCount)
+                            ) /
+                            4.0
+                        )
+                    )
+                );
+
+        const math::ComplexVector oracleAxis =
+                basisReflectionAxis(
+                    stateCount,
+                    markedState
+                );
+
+        const math::ComplexVector diffusionAxis =
+                uniformReflectionAxis(
+                    stateCount
+                );
+
+        for (std::size_t iteration = 0U; iteration < iterationCount; ++iteration) {
+            circuit.addReflection(
+                "Oracle",
+                oracleAxis
+            );
+
+            // The sign differs from conventional diffusion only by a global phase.
+            circuit.addReflection(
+                "Diffuse",
+                diffusionAxis
+            );
+        }
 
         return circuit;
     }
@@ -1186,6 +1278,395 @@ namespace quantum_sim::algorithms {
 
         circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 1U);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0U);
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit wStateCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "A W state requires at least two qubits."
+        );
+
+        const std::size_t stateCount =
+                std::size_t{1} << qubitCount;
+
+        const double amplitude =
+                1.0 /
+                std::sqrt(
+                    static_cast<double>(qubitCount)
+                );
+
+        std::vector<double> targetAmplitudes(
+            stateCount,
+            0.0
+        );
+
+        for (std::size_t basisState = 0U; basisState < stateCount; ++basisState) {
+            if (std::popcount(basisState) == 1) {
+                targetAmplitudes[basisState] =
+                        amplitude;
+            }
+        }
+
+        circuit::QuantumCircuit circuit{qubitCount};
+        circuit.addReflection(
+            "W",
+            statePreparationAxis(targetAmplitudes)
+        );
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit dickeStateCircuit(
+        const std::size_t qubitCount,
+        const std::size_t excitationCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "A Dicke state requires at least two qubits."
+        );
+
+        if (
+            excitationCount == 0U ||
+            excitationCount > qubitCount
+        ) {
+            throw std::invalid_argument{
+                "Dicke excitation count must be between one and the register size."
+            };
+        }
+
+        const std::size_t stateCount =
+                std::size_t{1} << qubitCount;
+
+        std::size_t populatedStateCount{};
+
+        for (std::size_t basisState = 0U; basisState < stateCount; ++basisState) {
+            if (
+                std::popcount(basisState) ==
+                static_cast<int>(excitationCount)
+            ) {
+                ++populatedStateCount;
+            }
+        }
+
+        const double amplitude =
+                1.0 /
+                std::sqrt(
+                    static_cast<double>(
+                        populatedStateCount
+                    )
+                );
+
+        std::vector<double> targetAmplitudes(
+            stateCount,
+            0.0
+        );
+
+        for (std::size_t basisState = 0U; basisState < stateCount; ++basisState) {
+            if (
+                std::popcount(basisState) ==
+                static_cast<int>(excitationCount)
+            ) {
+                targetAmplitudes[basisState] =
+                        amplitude;
+            }
+        }
+
+        circuit::QuantumCircuit circuit{qubitCount};
+        circuit.addReflection(
+            "Dicke",
+            statePreparationAxis(targetAmplitudes)
+        );
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit graphStateCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "A graph state requires at least two qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        for (std::size_t qubit = 0U; qubit < qubitCount; ++qubit) {
+            circuit.addSingleQubitGate(
+                "H",
+                gates::hadamardGate(),
+                qubit
+            );
+        }
+
+        for (std::size_t qubit = 0U; qubit + 1U < qubitCount; ++qubit) {
+            circuit.addTwoQubitGate(
+                "CZ",
+                gates::czGate(),
+                qubit,
+                qubit + 1U
+            );
+        }
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit randomCircuit(
+        const std::size_t qubitCount,
+        const std::uint64_t seed,
+        const std::size_t layerCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            2U,
+            "A random circuit requires at least two qubits."
+        );
+
+        if (layerCount == 0U) {
+            throw std::invalid_argument{
+                "A random circuit requires at least one layer."
+            };
+        }
+
+        std::mt19937_64 randomEngine{seed};
+
+        std::uniform_real_distribution<double> angleDistribution{
+            -std::numbers::pi,
+            std::numbers::pi
+        };
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        for (std::size_t layer = 0U; layer < layerCount; ++layer) {
+            for (std::size_t qubit = 0U; qubit < qubitCount; ++qubit) {
+                const double ryAngle =
+                        angleDistribution(randomEngine);
+
+                const double rzAngle =
+                        angleDistribution(randomEngine);
+
+                circuit.addSingleQubitGate(
+                    "Ry",
+                    gates::ryGate(ryAngle),
+                    qubit,
+                    ryAngle
+                );
+
+                circuit.addSingleQubitGate(
+                    "Rz",
+                    gates::rzGate(rzAngle),
+                    qubit,
+                    rzAngle
+                );
+            }
+
+            for (std::size_t edge = 0U; edge < qubitCount; ++edge) {
+                const std::size_t control =
+                        (
+                            edge +
+                            layer
+                        ) %
+                        qubitCount;
+
+                const std::size_t target =
+                        (
+                            control +
+                            1U
+                        ) %
+                        qubitCount;
+
+                circuit.addTwoQubitGate(
+                    "CX",
+                    gates::cxGate(),
+                    control,
+                    target
+                );
+            }
+        }
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit weightedStatePreparationCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            1U,
+            "Weighted state preparation requires at least one qubit."
+        );
+
+        const std::size_t stateCount =
+                std::size_t{1} << qubitCount;
+
+        std::vector<double> weights(
+            stateCount,
+            0.0
+        );
+
+        double totalWeight{};
+
+        for (std::size_t state = 0U; state < stateCount; ++state) {
+            const double weight =
+                    1.0 +
+                    static_cast<double>(
+                        (
+                            state * 37U +
+                            11U
+                        ) %
+                        97U
+                    );
+
+            weights[state] = weight;
+            totalWeight += weight;
+        }
+
+        std::vector<double> targetAmplitudes(
+            stateCount,
+            0.0
+        );
+
+        for (std::size_t state = 0U; state < stateCount; ++state) {
+            targetAmplitudes[state] =
+                    std::sqrt(
+                        weights[state] /
+                        totalWeight
+                    );
+        }
+
+        circuit::QuantumCircuit circuit{qubitCount};
+        circuit.addReflection(
+            "Weighted",
+            statePreparationAxis(targetAmplitudes)
+        );
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit bitFlipCodeCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            3U,
+            "The bit-flip code requires three qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        constexpr double inputAngle =
+                std::numbers::pi / 3.0;
+
+        circuit.addSingleQubitGate(
+            "Ry",
+            gates::ryGate(inputAngle),
+            0U,
+            inputAngle
+        );
+
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 1U);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 2U);
+        circuit.addSingleQubitGate("X", gates::xGate(), 1U);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 1U);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 2U);
+        appendToffoli(circuit, 1U, 2U, 0U);
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit steaneCodeCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            7U,
+            "The Steane code requires seven qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        for (const std::size_t pivot : {0U, 1U, 3U}) {
+            circuit.addSingleQubitGate(
+                "H",
+                gates::hadamardGate(),
+                pivot
+            );
+        }
+
+        for (const auto [control, target] : {
+            std::pair{0U, 2U},
+            std::pair{0U, 4U},
+            std::pair{0U, 6U},
+            std::pair{1U, 2U},
+            std::pair{1U, 5U},
+            std::pair{1U, 6U},
+            std::pair{3U, 4U},
+            std::pair{3U, 5U},
+            std::pair{3U, 6U}
+        }) {
+            circuit.addTwoQubitGate(
+                "CX",
+                gates::cxGate(),
+                control,
+                target
+            );
+        }
+
+        return circuit;
+    }
+
+    circuit::QuantumCircuit shorCodeCircuit(
+        const std::size_t qubitCount
+    ) {
+        requireMinimumQubitCount(
+            qubitCount,
+            9U,
+            "The Shor code requires nine qubits."
+        );
+
+        circuit::QuantumCircuit circuit{qubitCount};
+
+        constexpr double inputAngle =
+                0.37 *
+                std::numbers::pi;
+
+        circuit.addSingleQubitGate(
+            "Ry",
+            gates::ryGate(inputAngle),
+            0U,
+            inputAngle
+        );
+
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 3U);
+        circuit.addTwoQubitGate("CX", gates::cxGate(), 0U, 6U);
+
+        for (const std::size_t leader : {0U, 3U, 6U}) {
+            circuit.addSingleQubitGate(
+                "H",
+                gates::hadamardGate(),
+                leader
+            );
+
+            circuit.addTwoQubitGate(
+                "CX",
+                gates::cxGate(),
+                leader,
+                leader + 1U
+            );
+
+            circuit.addTwoQubitGate(
+                "CX",
+                gates::cxGate(),
+                leader,
+                leader + 2U
+            );
+        }
 
         return circuit;
     }

@@ -25,7 +25,8 @@ namespace quantum_sim::circuit {
     enum class CircuitInstructionKind {
         SingleQubit,
         TwoQubit,
-        FullRegister
+        FullRegister,
+        Reflection
     };
 
     /**
@@ -86,6 +87,7 @@ namespace quantum_sim::circuit {
          * @param gate 4x4 unitary matrix.
          * @param firstQubit Control or first gate operand.
          * @param secondQubit Target or second gate operand.
+         * @param angleRadians Optional parameter angle retained for UI inspection.
          * @throws std::invalid_argument if the qubits match or gate is invalid.
          * @throws std::out_of_range if either qubit is outside the circuit.
          */
@@ -93,7 +95,26 @@ namespace quantum_sim::circuit {
             std::string name,
             math::ComplexMatrix gate,
             std::size_t firstQubit,
-            std::size_t secondQubit
+            std::size_t secondQubit,
+            std::optional<double> angleRadians = std::nullopt
+        );
+
+        /**
+         * Appends a compact full-state Householder reflection.
+         *
+         * The reflection is evaluated in O(2^n) time and memory rather than
+         * materializing an O(4^n) full-register matrix.
+         *
+         * @param name Display name for the operation.
+         * @param normalizedAxis Unit state-vector axis defining I - 2|u><u|.
+         * @param displayQubit Qubit row used to display the operation.
+         * @throws std::invalid_argument if the axis size or normalization is invalid.
+         * @throws std::out_of_range if displayQubit is outside the circuit.
+         */
+        void addReflection(
+            std::string name,
+            math::ComplexVector normalizedAxis,
+            std::size_t displayQubit = 0U
         );
 
         /**
@@ -227,6 +248,7 @@ namespace quantum_sim::circuit {
          * @param gate 4x4 unitary matrix in first/second local basis order.
          * @param firstQubit Control or first gate operand.
          * @param secondQubit Target or second gate operand.
+         * @param angleRadians Optional parameter angle retained for UI inspection.
          * @throws std::invalid_argument if the qubits match or gate is invalid.
          * @throws std::out_of_range if either qubit is outside the circuit.
          */
@@ -235,7 +257,8 @@ namespace quantum_sim::circuit {
             std::string name,
             math::ComplexMatrix gate,
             std::size_t firstQubit,
-            std::size_t secondQubit
+            std::size_t secondQubit,
+            std::optional<double> angleRadians = std::nullopt
         );
 
         /**
@@ -265,6 +288,13 @@ namespace quantum_sim::circuit {
             math::ComplexMatrix gate;
             std::size_t firstQubit;
             std::size_t secondQubit;
+            std::optional<double> angleRadians;
+        };
+
+        struct ReflectionInstruction {
+            std::string name;
+            math::ComplexVector normalizedAxis;
+            std::size_t displayQubit;
         };
 
         struct FullRegisterInstruction {
@@ -277,7 +307,8 @@ namespace quantum_sim::circuit {
         using Instruction = std::variant<
             SingleQubitInstruction,
             TwoQubitInstruction,
-            FullRegisterInstruction
+            FullRegisterInstruction,
+            ReflectionInstruction
         >;
 
         std::size_t qubitCount_;

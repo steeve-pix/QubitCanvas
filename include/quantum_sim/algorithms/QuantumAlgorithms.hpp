@@ -2,6 +2,7 @@
 
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include <cstddef>
+#include <cstdint>
 
 namespace quantum_sim::algorithms {
     /**
@@ -55,13 +56,11 @@ namespace quantum_sim::algorithms {
     );
 
     /**
-     * Builds the canonical two-qubit Grover search for the marked state |11⟩.
-     * in the leading two qubits.
-     *
-     * Additional register qubits remain in their initial state.
+     * Builds a register-wide Grover search.
+     * The oracle marks |11...1> across the complete selected register.
      *
      * @param qubitCount Total register size. Must be at least 2.
-     * @return Circuit with one phase-oracle and diffusion iteration on q0/q1.
+     * @return Circuit with near-optimal register-wide oracle/diffusion iterations.
      * @throws std::invalid_argument if qubitCount is less than 2.
      */
     [[nodiscard]] circuit::QuantumCircuit groverSearchCircuit(
@@ -294,6 +293,104 @@ namespace quantum_sim::algorithms {
      */
     [[nodiscard]] circuit::QuantumCircuit superdenseCodingCircuit(
         std::size_t qubitCount = 2U
+    );
+
+    /**
+     * Prepares the register-wide W state with one shared excitation.
+     *
+     * @param qubitCount Number of qubits. Must be at least 2.
+     * @return Compact state-preparation circuit for an equal superposition of
+     *         all basis states whose Hamming weight is one.
+     * @throws std::invalid_argument if qubitCount is less than 2.
+     */
+    [[nodiscard]] circuit::QuantumCircuit wStateCircuit(
+        std::size_t qubitCount
+    );
+
+    /**
+     * Prepares a symmetric Dicke state with a fixed excitation count.
+     *
+     * @param qubitCount Number of qubits. Must be at least 2.
+     * @param excitationCount Number of one bits in every populated basis state.
+     * @return Compact state-preparation circuit with equal non-zero amplitudes.
+     * @throws std::invalid_argument if the excitation count is zero or exceeds
+     *         qubitCount.
+     */
+    [[nodiscard]] circuit::QuantumCircuit dickeStateCircuit(
+        std::size_t qubitCount,
+        std::size_t excitationCount = 2U
+    );
+
+    /**
+     * Builds a one-dimensional graph/cluster state across the register.
+     *
+     * @param qubitCount Number of graph vertices. Must be at least 2.
+     * @return Hadamard preparation followed by CZ edges between neighbors.
+     * @throws std::invalid_argument if qubitCount is less than 2.
+     */
+    [[nodiscard]] circuit::QuantumCircuit graphStateCircuit(
+        std::size_t qubitCount
+    );
+
+    /**
+     * Builds a reproducible pseudo-random hardware-efficient circuit.
+     *
+     * Each layer applies random Ry/Rz angles followed by a staggered ring of
+     * controlled-X gates, producing intentionally uneven probabilities.
+     *
+     * @param qubitCount Register size. Must be at least 2.
+     * @param seed Seed controlling all generated angles.
+     * @param layerCount Number of rotation and entanglement layers.
+     * @return Deterministic circuit for the supplied seed.
+     * @throws std::invalid_argument if qubitCount is less than 2 or layerCount is zero.
+     */
+    [[nodiscard]] circuit::QuantumCircuit randomCircuit(
+        std::size_t qubitCount,
+        std::uint64_t seed,
+        std::size_t layerCount = 4U
+    );
+
+    /**
+     * Prepares a deterministic non-uniform probability distribution.
+     *
+     * @param qubitCount Register size. Must be at least 1.
+     * @return Compact state preparation whose basis-state probabilities differ.
+     */
+    [[nodiscard]] circuit::QuantumCircuit weightedStatePreparationCircuit(
+        std::size_t qubitCount
+    );
+
+    /**
+     * Demonstrates three-qubit repetition-code encoding and correction.
+     *
+     * @param qubitCount Total register size. Must be at least 3.
+     * @return Circuit encoding q0, injecting a bit flip, and coherently decoding it.
+     * @throws std::invalid_argument if qubitCount is less than 3.
+     */
+    [[nodiscard]] circuit::QuantumCircuit bitFlipCodeCircuit(
+        std::size_t qubitCount = 3U
+    );
+
+    /**
+     * Prepares the logical zero state of the seven-qubit Steane code.
+     *
+     * @param qubitCount Total register size. Must be at least 7.
+     * @return Stabilizer encoding circuit on q0 through q6.
+     * @throws std::invalid_argument if qubitCount is less than 7.
+     */
+    [[nodiscard]] circuit::QuantumCircuit steaneCodeCircuit(
+        std::size_t qubitCount = 7U
+    );
+
+    /**
+     * Encodes one prepared qubit with the nine-qubit Shor code.
+     *
+     * @param qubitCount Total register size. Must be at least 9.
+     * @return Phase- and bit-flip repetition encoding on q0 through q8.
+     * @throws std::invalid_argument if qubitCount is less than 9.
+     */
+    [[nodiscard]] circuit::QuantumCircuit shorCodeCircuit(
+        std::size_t qubitCount = 9U
     );
 
     /**

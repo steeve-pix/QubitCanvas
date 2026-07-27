@@ -183,6 +183,48 @@ namespace quantum_sim::quantum {
         };
     }
 
+    QuantumRegister QuantumRegister::applyReflection(
+        const math::ComplexVector &normalizedAxis
+    ) const {
+        if (normalizedAxis.size() != stateCount()) {
+            throw std::invalid_argument{
+                "Reflection axis size must match the register state count."
+            };
+        }
+
+        if (!normalizedAxis.isNormalized()) {
+            throw std::invalid_argument{
+                "Reflection axis must be normalized."
+            };
+        }
+
+        const math::Complex overlap =
+                normalizedAxis.innerProduct(amplitudes_);
+
+        std::vector<math::Complex> transformed;
+        transformed.reserve(stateCount());
+
+        // (I - 2|u><u|)|psi> needs one inner product and one linear pass.
+        for (std::size_t index = 0U; index < stateCount(); ++index) {
+            const math::Complex projected =
+                    normalizedAxis.at(index) *
+                    overlap;
+
+            const math::Complex &source =
+                    amplitudes_.at(index);
+
+            transformed.emplace_back(
+                source.real() - 2.0 * projected.real(),
+                source.imaginary() - 2.0 * projected.imaginary()
+            );
+        }
+
+        return QuantumRegister{
+            qubitCount_,
+            math::ComplexVector{std::move(transformed)}
+        };
+    }
+
     double QuantumRegister::probability(std::size_t stateIndex) const {
         return amplitude(stateIndex).magnitudeSquared();
     }
