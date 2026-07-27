@@ -6,6 +6,7 @@
 #define GLFW_INCLUDE_NONE
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
+#include <array>
 #include <stdexcept>
 #include <algorithm>
 #include <cmath>
@@ -1618,79 +1619,259 @@ namespace quantum_sim::gui {
             }
         };
 
-        scriptButton(
-            "Bell",
-            CircuitPreset::Bell,
-            "Entangles q0 and q1; extra qubits remain in |0\xE2\x9F\xA9.",
-            false
-        );
-        scriptButton(
-            "Plus register",
-            CircuitPreset::PlusRegister,
-            "Creates a uniform superposition across the selected register.",
-            true
-            );
-        scriptButton(
-            "GHZ",
-            CircuitPreset::Ghz,
-            "Entangles the complete selected register.",
-            false
-        );
-        scriptButton(
-            "QFT",
-            CircuitPreset::Qft,
-            "Builds a Fourier phase history across the selected register.",
-            true
-        );
-        scriptButton(
-            "iQFT",
-            CircuitPreset::InverseQft,
-            "Builds the exact inverse QFT across the selected register.",
-            false
-        );
-        scriptButton(
-            "Grover",
-            CircuitPreset::Grover,
-            "Searches |11\xE2\x9F\xA9 on q0/q1; extra qubits remain in |0\xE2\x9F\xA9.",
-            true
-        );
-        scriptButton(
-            "Deutsch-J",
-            CircuitPreset::DeutschJozsa,
-            "Uses n-1 inputs and one ancilla for a balanced parity oracle.",
-            false
-            );scriptButton(
+        struct AlgorithmEntry {
+            const char *label;
+            CircuitPreset preset;
+            const char *description;
+        };
+
+        static constexpr std::array<AlgorithmEntry, 12U> firstPage{{
+            {
+                "Bell",
+                CircuitPreset::Bell,
+                "Entangles q0 and q1; extra qubits remain in |0\xE2\x9F\xA9."
+            },
+            {
+                "Plus register",
+                CircuitPreset::PlusRegister,
+                "Creates a uniform superposition across the selected register."
+            },
+            {
+                "GHZ",
+                CircuitPreset::Ghz,
+                "Entangles the complete selected register."
+            },
+            {
+                "QFT",
+                CircuitPreset::Qft,
+                "Builds a Fourier phase history across the selected register."
+            },
+            {
+                "iQFT",
+                CircuitPreset::InverseQft,
+                "Builds the exact inverse QFT across the selected register."
+            },
+            {
+                "Grover",
+                CircuitPreset::Grover,
+                "Searches |11\xE2\x9F\xA9 on q0/q1; extra qubits remain in |0\xE2\x9F\xA9."
+            },
+            {
+                "Deutsch-J",
+                CircuitPreset::DeutschJozsa,
+                "Uses n-1 inputs and one ancilla for a balanced parity oracle."
+            },
+            {
                 "Kickback",
                 CircuitPreset::Kickback,
-                "Uses q0/q1 to expose phase kickback; extra qubits remain in |0\xE2\x9F\xA9.",
-                true
+                "Uses q0/q1 to expose phase kickback; extra qubits remain in |0\xE2\x9F\xA9."
+            },
+            {
+                "Toffoli",
+                CircuitPreset::Toffoli,
+                "Runs a decomposed CCX on q0-q2; extra qubits remain in |0\xE2\x9F\xA9."
+            },
+            {
+                "Bernstein",
+                CircuitPreset::BernsteinVazirani,
+                "Recovers an alternating hidden string across n-1 inputs."
+            },
+            {
+                "Teleport",
+                CircuitPreset::Teleportation,
+                "Teleports from q0 to q2; extra qubits remain in |0\xE2\x9F\xA9."
+            },
+            {
+                "Scramble",
+                CircuitPreset::Scramble,
+                "Applies a mixed-gate stress test to the selected register."
+            }
+        }};
+
+        static constexpr std::array<AlgorithmEntry, 10U> secondPage{{
+            {
+                "Simon",
+                CircuitPreset::Simon,
+                "Finds hidden period 11 using a two-to-one parity oracle."
+            },
+            {
+                "Shor",
+                CircuitPreset::Shor,
+                "Compiled order finding for a = 4 mod 15, whose period is 2."
+            },
+            {
+                "QPE",
+                CircuitPreset::Qpe,
+                "Performs two-bit phase estimation for eigenphase 1/4."
+            },
+            {
+                "VQE",
+                CircuitPreset::Vqe,
+                "Runs a fixed two-qubit variational ansatz without a classical optimizer."
+            },
+            {
+                "QAOA",
+                CircuitPreset::Qaoa,
+                "Applies one Max-Cut cost and mixer layer across the selected register."
+            },
+            {
+                "HHL",
+                CircuitPreset::Hhl,
+                "Demonstrates coherent solving for a fixed 2x2 linear system."
+            },
+            {
+                "SWAP Test",
+                CircuitPreset::SwapTest,
+                "Estimates overlap between |+\xE2\x9F\xA9 and |1\xE2\x9F\xA9 using a controlled SWAP."
+            },
+            {
+                "Quantum Walk",
+                CircuitPreset::QuantumWalk,
+                "Runs two coined walk steps on a four-position cycle."
+            },
+            {
+                "BB84",
+                CircuitPreset::Bb84,
+                "Shows one matched and one mismatched preparation basis."
+            },
+            {
+                "Superdense",
+                CircuitPreset::Superdense,
+                "Encodes and decodes classical message 11 through one Bell pair."
+            }
+        }};
+
+        constexpr std::size_t pageCount =
+                2U;
+
+        algorithmPage_ =
+                std::min(
+                    algorithmPage_,
+                    pageCount - 1U
                 );
-        scriptButton(
-            "Toffoli",
-            CircuitPreset::Toffoli,
-            "Runs a decomposed CCX on q0-q2; extra qubits remain in |0\xE2\x9F\xA9.",
-            false
+
+        const float rowSpacing =
+                ImGui::GetStyle().ItemSpacing.y;
+
+        const float catalogHeight =
+                6.0F * 42.0F +
+                5.0F * rowSpacing;
+
+        ImGui::BeginChild(
+            "AlgorithmCatalog",
+            ImVec2{0.0F, catalogHeight},
+            false,
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoScrollWithMouse
         );
 
-        scriptButton(
-            "Bernstein",
-            CircuitPreset::BernsteinVazirani,
-            "Recovers an alternating hidden string across n-1 inputs.",
-            true
-        );
-        scriptButton(
-            "Teleport",
-            CircuitPreset::Teleportation,
-            "Teleports from q0 to q2; extra qubits remain in |0\xE2\x9F\xA9.",
-            false
-        );
-        scriptButton(
-            "Scramble",
-            CircuitPreset::Scramble,
-            "Applies a mixed-gate stress test to the selected register.",
-            true
-        );
+        const auto drawPage =
+                [&](const auto &page) {
+            for (std::size_t index = 0U; index < page.size(); ++index) {
+                const AlgorithmEntry &entry =
+                        page[index];
 
+                scriptButton(
+                    entry.label,
+                    entry.preset,
+                    entry.description,
+                    index % 2U == 1U
+                );
+            }
+        };
+
+        if (algorithmPage_ == 0U) {
+            drawPage(firstPage);
+        } else {
+            drawPage(secondPage);
+        }
+
+        ImGui::EndChild();
+
+        if (
+            ImGui::BeginTable(
+                "AlgorithmPageControls",
+                3,
+                ImGuiTableFlags_SizingStretchSame
+            )
+        ) {
+            ImGui::TableNextColumn();
+
+            const bool firstAlgorithmPage =
+                    algorithmPage_ == 0U;
+
+            if (firstAlgorithmPage) {
+                ImGui::BeginDisabled();
+            }
+
+            if (ImGui::Button("<##PreviousAlgorithmPage", ImVec2{-1.0F, 0.0F})) {
+                --algorithmPage_;
+            }
+
+            if (firstAlgorithmPage) {
+                ImGui::EndDisabled();
+            }
+
+            if (
+                ImGui::IsItemHovered(
+                    ImGuiHoveredFlags_DelayShort |
+                    ImGuiHoveredFlags_AllowWhenDisabled
+                )
+            ) {
+                ImGui::SetTooltip("Previous algorithm page");
+            }
+
+            ImGui::TableNextColumn();
+
+            const std::string pageLabel =
+                    std::to_string(algorithmPage_ + 1U) +
+                    " / " +
+                    std::to_string(pageCount);
+
+            const float pageLabelOffset =
+                    std::max(
+                        0.0F,
+                        (
+                            ImGui::GetContentRegionAvail().x -
+                            ImGui::CalcTextSize(pageLabel.c_str()).x
+                        ) * 0.5F
+                    );
+
+            ImGui::SetCursorPosX(
+                ImGui::GetCursorPosX() +
+                pageLabelOffset
+            );
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(pageLabel.c_str());
+
+            ImGui::TableNextColumn();
+
+            const bool lastAlgorithmPage =
+                    algorithmPage_ + 1U >= pageCount;
+
+            if (lastAlgorithmPage) {
+                ImGui::BeginDisabled();
+            }
+
+            if (ImGui::Button(">##NextAlgorithmPage", ImVec2{-1.0F, 0.0F})) {
+                ++algorithmPage_;
+            }
+
+            if (lastAlgorithmPage) {
+                ImGui::EndDisabled();
+            }
+
+            if (
+                ImGui::IsItemHovered(
+                    ImGuiHoveredFlags_DelayShort |
+                    ImGuiHoveredFlags_AllowWhenDisabled
+                )
+            ) {
+                ImGui::SetTooltip("Next algorithm page");
+            }
+
+            ImGui::EndTable();
+        }
     }
 
     void GuiApplication::applyPlayback(
@@ -1846,6 +2027,46 @@ namespace quantum_sim::gui {
             return algorithms::scrambleCircuit(qubitCount);
         }
 
+        if (preset == CircuitPreset::Simon) {
+            return algorithms::simonCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Shor) {
+            return algorithms::shorPeriodFindingCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Qpe) {
+            return algorithms::quantumPhaseEstimationCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Vqe) {
+            return algorithms::vqeAnsatzCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Qaoa) {
+            return algorithms::qaoaMaxCutCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Hhl) {
+            return algorithms::hhlDemoCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::SwapTest) {
+            return algorithms::swapTestCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::QuantumWalk) {
+            return algorithms::quantumWalkCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Bb84) {
+            return algorithms::bb84DemoCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Superdense) {
+            return algorithms::superdenseCodingCircuit(qubitCount);
+        }
+
         throw std::invalid_argument{
             "Unsupported circuit preset."
         };
@@ -1859,16 +2080,31 @@ namespace quantum_sim::gui {
             preset == CircuitPreset::Grover ||
             preset == CircuitPreset::DeutschJozsa ||
             preset == CircuitPreset::BernsteinVazirani ||
-            preset == CircuitPreset::Kickback
+            preset == CircuitPreset::Kickback ||
+            preset == CircuitPreset::Vqe ||
+            preset == CircuitPreset::Qaoa ||
+            preset == CircuitPreset::Bb84 ||
+            preset == CircuitPreset::Superdense
         ) {
             return 2;
         }
 
         if (
             preset == CircuitPreset::Toffoli ||
-            preset == CircuitPreset::Teleportation
+            preset == CircuitPreset::Teleportation ||
+            preset == CircuitPreset::Qpe ||
+            preset == CircuitPreset::SwapTest ||
+            preset == CircuitPreset::QuantumWalk
         ) {
             return 3;
+        }
+
+        if (
+            preset == CircuitPreset::Simon ||
+            preset == CircuitPreset::Shor ||
+            preset == CircuitPreset::Hhl
+        ) {
+            return 4;
         }
 
         return 1;
