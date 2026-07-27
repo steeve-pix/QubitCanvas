@@ -64,6 +64,8 @@ intensity, phase in radians, real component, and imaginary component.
 
 Circuit step `0` shows an identity gate on every qubit and represents the
 untouched initial register before any instruction executes.
+The application opens there, and every built-in circuit selection returns
+there in a paused state before playback begins.
 
 ## Gate Library
 
