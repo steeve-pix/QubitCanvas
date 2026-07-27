@@ -87,6 +87,7 @@ enable_project_warnings(qubit_canvas_core)
 
 # Graphical interface library
 add_library(qubit_canvas_gui STATIC
+        src/gui/GateNotation.cpp
         src/gui/QuantumNotation.cpp
         src/gui/GuiApplication.cpp
         src/gui/panels/InspectorPanel.cpp

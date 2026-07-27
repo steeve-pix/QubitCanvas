@@ -7,6 +7,7 @@
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/gui/GateNotation.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
@@ -21,6 +22,8 @@
 #include <numbers>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "quantum_sim/debug/DebuggerSession.hpp"
@@ -63,6 +66,42 @@ namespace {
     }
 } //
 int main() {
+    const std::vector<std::string_view> builtInGateNames{
+        "H", "X", "Y", "Z", "S", "Sdg", "T", "Tdg", "SX", "SXdg",
+        "P", "U", "Rx", "Ry", "Rz",
+        "CX", "CY", "CZ", "SWAP", "iSWAP",
+        "CP", "CRx", "CRy", "CRz",
+        "RXX", "RYY", "RZZ",
+        "CH", "CS", "CSdg", "CT", "CTdg",
+        "DCX", "ECR", "sqrtSWAP", "fSim",
+        "CCX", "CSWAP"
+    };
+
+    std::unordered_set<std::string> circuitGateLabels;
+
+    for (const std::string_view gateName : builtInGateNames) {
+        circuitGateLabels.emplace(
+            quantum_sim::gui::gate_notation::circuitLabel(
+                gateName
+            )
+        );
+    }
+
+    check(
+        circuitGateLabels.size() == builtInGateNames.size(),
+        "Every built-in gate has a unique circuit label"
+    );
+
+    check(
+        quantum_sim::gui::gate_notation::circuitLabel("CS") == "CS" &&
+        quantum_sim::gui::gate_notation::circuitLabel("CSdg") ==
+            "CS\xE2\x80\xA0" &&
+        quantum_sim::gui::gate_notation::circuitLabel("CT") == "CT" &&
+        quantum_sim::gui::gate_notation::circuitLabel("CTdg") ==
+            "CT\xE2\x80\xA0",
+        "Controlled phase and dagger labels remain visually distinct"
+    );
+
     // Regression coverage for debugger snapshots on a non-trivial entangling circuit.
     const QuantumCircuit circuit =
             quantum_sim::algorithms::ghzStateCircuit();

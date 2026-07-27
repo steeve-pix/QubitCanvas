@@ -136,8 +136,10 @@ contains custom edits.
 Compact `SW`, `iSW`, and `√SW` badges distinguish exchange variants without
 obscuring their crossed paths. Placed-gate hover cards identify every operand
 and explain the behavior of controlled, exchange, and interaction gates.
-Controlled phase targets retain their inverse notation on the circuit:
-`CS`/`CS†` and `CT`/`CT†` are visually distinct during placement and execution.
+One canonical notation table keeps every built-in circuit identity unique.
+Controlled targets retain their complete names (`CX`, `CRx`, `CS†`, `CT†`),
+interaction boxes use `RXX`/`RYY`/`RZZ`, and three-qubit operations use
+`CCX`/`CSW`. The same notation is used during placement and execution.
 `CCX` and `CSWAP` use a three-click placement flow and render as genuine
 three-wire circuit operations. Their compact 8x8 matrices execute directly
 against eight-amplitude blocks without expansion to the full register.
