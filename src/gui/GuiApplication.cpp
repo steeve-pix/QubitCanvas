@@ -810,7 +810,7 @@ namespace quantum_sim::gui {
             framebufferWidth,
             framebufferHeight,
             selectedDensityLayer_,
-            heatAmount_,
+            densityVolumeHeatAmount_,
             densityVolumeCamera_
         );
 
@@ -1474,38 +1474,6 @@ namespace quantum_sim::gui {
             true
         );
 
-        ImGui::Spacing();
-        ImGui::SeparatorText("P Coloring");
-
-        const float modeWidth =
-                (ImGui::GetContentRegionAvail().x -
-                 ImGui::GetStyle().ItemSpacing.x) * 0.5F;
-
-        if (ImGui::Button("Layer Stack", ImVec2{modeWidth, 0.0F})) {
-            if (canvasMode_ != CanvasMode::LayerStack) {
-                canvasMode_ = CanvasMode::LayerStack;
-                densityVolumeCameraFramePending_ = true;
-            }
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Floor Field", ImVec2{modeWidth, 0.0F})) {
-            if (canvasMode_ != CanvasMode::FloorField) {
-                canvasMode_ = CanvasMode::FloorField;
-                densityVolumeCameraFramePending_ = true;
-            }
-        }
-
-        ImGui::TextDisabled("Heat");
-        ImGui::SetNextItemWidth(-1.0F);
-        ImGui::SliderFloat(
-            "##Heat",
-            &heatAmount_,
-            0.35F,
-            1.35F,
-            "%.2f"
-        );
     }
 
     void GuiApplication::applyPlayback(
