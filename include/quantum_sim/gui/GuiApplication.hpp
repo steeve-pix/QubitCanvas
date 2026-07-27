@@ -122,7 +122,6 @@ namespace quantum_sim::gui {
         std::optional<double> queuedSingleQubitRotationAngleRadians_;
         std::optional<std::size_t> queuedInstructionDeletion_;
         std::optional<CircuitPreset> queuedPreset_;
-        bool queuedPresetShouldResumePlayback_{false};
         std::vector<circuit::QuantumCircuit> undoHistory_;
         std::vector<circuit::QuantumCircuit> redoHistory_;
         std::mt19937 randomEngine_{std::random_device{}()};
@@ -208,11 +207,6 @@ namespace quantum_sim::gui {
         void drawDensityVolumeViewport(const ImVec2 &position, const ImVec2 &size);
 
         /**
-         * Opens rich demo traces at a settled mid-history frame.
-         */
-        void settleDebuggerPreview();
-
-        /**
          * Draws playback, scrub, view-mode, and sampling controls.
          *
          * @param session Debugger session controlled by the top bar.
@@ -244,9 +238,11 @@ namespace quantum_sim::gui {
          * Replaces the editable circuit with one of the built-in presets.
          *
          * @param preset Preset to load.
-         * @param settlePreview True to open a paused mid-history preview.
+         *
+         * Loading always pauses playback and displays step zero so the
+         * untouched initial register is visible before any gate executes.
          */
-        void loadPreset(CircuitPreset preset, bool settlePreview);
+        void loadPreset(CircuitPreset preset);
 
         /**
          * Applies a preset queued by the previous frame before snapshots are created.
