@@ -13,7 +13,7 @@ namespace quantum_sim::gui::density_volume {
         constexpr float maximumFloorHeight = 4.4F;
         constexpr float maximumFloorColorMagnitude = 0.52F;
         constexpr float solidVisibilityThreshold = 1.0e-4F;
-        constexpr float roundedRadius = 0.22F;
+        constexpr float roundedRadius = 0.12F;
         constexpr std::size_t roundedSegments = 4U;
 
         [[nodiscard]] float clamp01(const float value) noexcept {
