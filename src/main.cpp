@@ -1,0 +1,155 @@
+#include "quantum_sim/circuit/QuantumCircuit.hpp"
+#include "quantum_sim/quantum/QuantumRegister.hpp"
+#include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
+#include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/gui/GuiApplication.hpp"
+
+#include <cstddef>
+#include <filesystem>
+#include <iostream>
+#include <numbers>
+#include <random>
+#include <stdexcept>
+#include <cctype>
+
+int readAlgorithmChoice();
+
+char readRotationAxis();
+
+double readRotationAngle();
+
+int readRotationInitialState();
+
+quantum_sim::quantum::QuantumRegister createRotationInitialState(const int choice) {
+    const double amplitude =
+            1.0 / std::sqrt(2.0);
+
+    switch (choice) {
+        case 1: return quantum_sim::quantum::QuantumRegister::basisState(1, 0);
+        case 2: return quantum_sim::quantum::QuantumRegister::basisState(1, 1);
+        case 3:
+            return quantum_sim::quantum::QuantumRegister{
+                1,
+                quantum_sim::math::ComplexVector{
+                    std::vector{
+                        quantum_sim::math::Complex{amplitude, 0.0},
+                        quantum_sim::math::Complex{amplitude, 0.0}
+                    }
+                }
+            };
+
+        case 4:
+            return quantum_sim::quantum::QuantumRegister{
+                1,
+                quantum_sim::math::ComplexVector{
+                    std::vector{
+                        quantum_sim::math::Complex{amplitude, 0.0},
+                        quantum_sim::math::Complex{-amplitude, 0.0}
+                    }
+                }
+            };
+
+        default:
+            throw std::invalid_argument{
+                "Unsupported rotation initial state."
+            };
+    }
+}
+
+int main(const int argumentCount, char *arguments[]) {
+    using quantum_sim::circuit::QuantumCircuit;
+    using quantum_sim::quantum::QuantumRegister;
+
+    try {
+        if (argumentCount > 0 && arguments[0] != nullptr) {
+            const std::filesystem::path executablePath =
+                    std::filesystem::absolute(arguments[0]);
+
+            if (executablePath.has_parent_path()) {
+                std::filesystem::current_path(
+                    executablePath.parent_path()
+                );
+            }
+        }
+
+        // Start the GUI with a visually interesting circuit instead of prompting
+        // through the console. Users can switch presets inside the app.
+        QuantumCircuit circuit =
+                quantum_sim::algorithms::qftCircuit(4);
+
+        // Presets start from |000...⟩ so the trace is deterministic and easy to inspect.
+        const QuantumRegister initialState =
+                QuantumRegister::basisState(
+                    circuit.qubitCount(),
+                    0
+                );
+
+        quantum_sim::gui::GuiApplication application{circuit, initialState};
+        application.run();
+    } catch (const std::exception &error) {
+        std::cerr
+                << "QubitCanvas failed to start: "
+                << error.what()
+                << '\n';
+
+        return 1;
+    }
+
+    return 0;
+}
+
+
+int readAlgorithmChoice() {
+    std::cout
+            << "Choose a quantum demonstration:\n"
+            << "1. Bell state\n"
+            << "2. Equal superposition\n"
+            << "3. GHZ state\n"
+            << "4. Rotation playground\n"
+            << "Choice: ";
+
+    int choice{};
+    std::cin >> choice;
+
+    return choice;
+}
+
+char readRotationAxis() {
+    std::cout
+            << "\nChoose a rotation axis:\n"
+            << "x. Rx\n"
+            << "y. Ry\n"
+            << "z. Rz\n"
+            << "Choice: ";
+
+    char axis{};
+    std::cin >> axis;
+
+    return static_cast<char>(
+        std::tolower(static_cast<unsigned char>(axis))
+    );
+}
+
+double readRotationAngle() {
+    std::cout << "Enter the rotation angle in radians: ";
+
+    double angleRadians{};
+    std::cin >> angleRadians;
+
+    return angleRadians;
+}
+
+int readRotationInitialState() {
+    std::cout
+            << "\nChoose the initial qubit state:\n"
+            << "1. |0\xE2\x9F\xA9\n"
+            << "2. |1\xE2\x9F\xA9\n"
+            << "3. |+\xE2\x9F\xA9\n"
+            << "4. |-\xE2\x9F\xA9\n"
+            << "Choice: ";
+
+    int choice{};
+    std::cin >> choice;
+
+    return choice;
+}
