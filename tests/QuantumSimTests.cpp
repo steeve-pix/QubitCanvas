@@ -776,6 +776,8 @@ int main() {
             densityStack.layers.size() &&
         historyScene.layerEndGhostCounts.size() ==
             densityStack.layers.size() &&
+        historyScene.layerCenters.size() ==
+            densityStack.layers.size() &&
         historyScene.layerEndInstanceCounts.at(1U) == 5U &&
         historyScene.layerEndGhostCounts.at(1U) == 3U,
         "Density Volume history separates solid values from small-matrix edge ghosts"
@@ -786,10 +788,16 @@ int main() {
         hadamardPeak != nullptr &&
         dormantCell != nullptr &&
         nextLayerPeak != nullptr &&
-        initialPeak->center.x < hadamardPeak->center.x &&
+        initialPeak->center.y < hadamardPeak->center.y &&
+        approximatelyEqual(initialPeak->center.x, hadamardPeak->center.x) &&
         approximatelyEqual(initialPeak->center.z, hadamardPeak->center.z) &&
-        nextLayerPeak->center.x - initialPeak->center.x >
-            (nextLayerPeak->size.x + initialPeak->size.x) * 0.5F &&
+        nextLayerPeak->center.y - initialPeak->center.y >
+            (nextLayerPeak->size.y + initialPeak->size.y) * 0.5F &&
+        approximatelyEqual(
+            historyScene.layerCenters.at(1U).y -
+                historyScene.layerCenters.at(0U).y,
+            historyScene.layerSpacing
+        ) &&
         initialPeak->emissive > dormantCell->emissive &&
         approximatelyEqual(
             initialPeak->size.x,
@@ -803,7 +811,7 @@ int main() {
             initialPeak->size.x,
             nextLayerPeak->size.x
         ),
-        "Density Volume layers advance on X with separated fixed-size cubes"
+        "Density Volume layers advance on Y with separated fixed-size cubes"
     );
 
     const quantum_sim::gui::density_volume::VoxelGeometry roundedCube =
@@ -1668,6 +1676,7 @@ int main() {
     quantum_sim::gui::density_volume::CameraController densityCamera;
     densityCamera.frameScene(
         quantum_sim::gui::density_volume::Vector3{0.0F, 0.0F, 0.0F},
+        4.0F,
         4.0F
     );
     densityCamera.orbit(80.0F, -25.0F);
@@ -1680,6 +1689,7 @@ int main() {
 
     densityCamera.updateSceneBounds(
         quantum_sim::gui::density_volume::Vector3{6.0F, 2.0F, -3.0F},
+        4.0F,
         12.0F
     );
 
@@ -1715,15 +1725,20 @@ int main() {
     quantum_sim::gui::density_volume::CameraController automaticCamera;
     automaticCamera.frameScene(
         quantum_sim::gui::density_volume::Vector3{0.0F, 0.0F, 0.0F},
+        4.0F,
         4.0F
     );
 
     const auto initialAutomaticView =
             automaticCamera.viewMatrix();
 
+    const float initialAutomaticDistance =
+            automaticCamera.orbitDistance();
+
     automaticCamera.updateSceneBounds(
-        quantum_sim::gui::density_volume::Vector3{5.0F, 0.0F, 0.0F},
-        9.0F
+        quantum_sim::gui::density_volume::Vector3{0.0F, 5.0F, 0.0F},
+        4.0F,
+        12.0F
     );
 
     automaticCamera.update(0.1F);
@@ -1736,8 +1751,13 @@ int main() {
             [](const float left, const float right) {
                 return approximatelyEqual(left, right, 1e-6);
             }
+        ) &&
+        approximatelyEqual(
+            automaticCamera.orbitDistance(),
+            initialAutomaticDistance,
+            1e-6
         ),
-        "Untouched playback camera follows expanding scene bounds"
+        "Untouched playback camera follows the new layer without zooming backward"
     );
 
     if (failures == 0) {

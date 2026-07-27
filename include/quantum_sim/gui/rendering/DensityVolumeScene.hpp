@@ -65,6 +65,7 @@ namespace quantum_sim::gui::density_volume {
         std::vector<Selection> pickRecords;
         std::vector<std::size_t> layerEndInstanceCounts;
         std::vector<std::size_t> layerEndGhostCounts;
+        std::vector<Vector3> layerCenters;
         Vector3 center;
         float radius{1.0F};
         float matrixSpan{1.0F};
@@ -99,14 +100,14 @@ namespace quantum_sim::gui::density_volume {
     class SceneBuilder {
     public:
         /**
-         * Builds either the complete horizontal history or one floor matrix.
+         * Builds either the complete vertical history or one floor matrix.
          *
          * Layer-stack mode creates fixed rounded cubes only for numerically
          * visible cells. Exact small matrices retain faint edge-only ghosts for
          * near-zero cells; bucketed large matrices omit those ghosts to avoid
-         * visual and GPU noise. Layers advance along X while every matrix stays
-         * a square Y-Z slab. Floor-field mode keeps the selected matrix on the
-         * X-Z plane and maps magnitude to cube height.
+         * visual and GPU noise. Layers advance upward along Y while every
+         * matrix remains a square X-Z slab. Floor-field mode keeps the selected
+         * matrix on the X-Z plane and maps magnitude to cube height.
          *
          * @param stack Shared numerical density history.
          * @param selectedLayer Selected debugger layer.
