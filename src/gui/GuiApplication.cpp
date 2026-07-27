@@ -40,7 +40,8 @@ namespace {
                gateName == "CRz" ||
                gateName == "RXX" ||
                gateName == "RYY" ||
-               gateName == "RZZ";
+               gateName == "RZZ" ||
+               gateName == "fSim";
     }
 
     [[nodiscard]] bool isControlledGate(
@@ -49,6 +50,11 @@ namespace {
         return gateName == "CX" ||
                gateName == "CY" ||
                gateName == "CZ" ||
+               gateName == "CH" ||
+               gateName == "CS" ||
+               gateName == "CSdg" ||
+               gateName == "CT" ||
+               gateName == "CTdg" ||
                gateName == "CP" ||
                gateName == "CRx" ||
                gateName == "CRy" ||
@@ -60,9 +66,20 @@ namespace {
     ) noexcept {
         return gateName == "SWAP" ||
                gateName == "iSWAP" ||
+               gateName == "sqrtSWAP" ||
+               gateName == "DCX" ||
+               gateName == "ECR" ||
+               gateName == "fSim" ||
                gateName == "RXX" ||
                gateName == "RYY" ||
                gateName == "RZZ";
+    }
+
+    [[nodiscard]] bool isThreeQubitGate(
+        const std::string_view gateName
+    ) noexcept {
+        return gateName == "CCX" ||
+               gateName == "CSWAP";
     }
 
     [[nodiscard]] bool writeFramebufferPpm(
@@ -134,10 +151,10 @@ namespace quantum_sim::gui {
         rebuildDensityVolume();
 
         if (launchOptions_.algorithmPage.has_value()) {
-            algorithmPage_ =
+                algorithmPage_ =
                     std::min(
                         launchOptions_.algorithmPage.value(),
-                        std::size_t{2}
+                        std::size_t{3}
                     );
         }
 
@@ -423,10 +440,39 @@ namespace quantum_sim::gui {
                 const bool hasFirstQubit =
                         circuitRenderer_.hasPendingControlQubit();
 
+                const std::size_t selectedOperandCount =
+                        circuitRenderer_.placementOperandCount();
+
                 const bool isSwapFamily =
                         isSymmetricTwoQubitGate(gateName);
 
-                if (isSwapFamily) {
+                if (isThreeQubitGate(gateName)) {
+                    const char *prompt =
+                            selectedOperandCount == 0U
+                                ? (
+                                    gateName == "CCX"
+                                        ? "choose first control"
+                                        : "choose control"
+                                )
+                                : selectedOperandCount == 1U
+                                    ? (
+                                        gateName == "CCX"
+                                            ? "choose second control"
+                                            : "choose first swap qubit"
+                                    )
+                                    : (
+                                        gateName == "CCX"
+                                            ? "choose target"
+                                            : "choose second swap qubit"
+                                    );
+
+                    ImGui::TextColored(
+                        ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
+                        "Placement mode: %s - %s",
+                        gateName.c_str(),
+                        prompt
+                    );
+                } else if (isSwapFamily) {
                     ImGui::TextColored(
                         ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
                         hasFirstQubit
@@ -478,6 +524,17 @@ namespace quantum_sim::gui {
                             "\xCF\x86 %s  \xCE\xBB %s",
                             phiText.c_str(),
                             lambdaText.c_str()
+                        );
+                    } else if (gateName == "fSim") {
+                        const std::string phiText =
+                                notation::formatAngleMeasurement(
+                                    pendingGateParameters_->phiRadians
+                                );
+
+                        ImGui::SameLine();
+                        ImGui::TextDisabled(
+                            "\xCF\x86 %s",
+                            phiText.c_str()
                         );
                     }
                 }
@@ -922,6 +979,14 @@ namespace quantum_sim::gui {
                         pendingGateParameters_;
             }
 
+            const auto threeQubitPlacement =
+                    circuitRenderer_.consumeCompletedThreeQubitPlacement();
+
+            if (threeQubitPlacement.has_value()) {
+                queuedThreeQubitPlacement_ =
+                        threeQubitPlacement;
+            }
+
             const auto selectedInstructionIndex =
                     circuitRenderer_.selectedInstructionIndex();
 
@@ -949,7 +1014,9 @@ namespace quantum_sim::gui {
                                 instruction.targetQubit.has_value()
                                     ? instruction.targetQubit
                                     : (
-                                        instruction.secondaryTargetQubit.has_value()
+                                        instruction.tertiaryTargetQubit.has_value()
+                                            ? instruction.tertiaryTargetQubit
+                                            : instruction.secondaryTargetQubit.has_value()
                                             ? instruction.secondaryTargetQubit
                                             : instruction.controlQubit
                                     );
@@ -2189,8 +2256,51 @@ namespace quantum_sim::gui {
             }
         }};
 
+        static constexpr std::array<AlgorithmEntry, 8U> fourthPage{{
+            {
+                "Phase-flip Code",
+                CircuitPreset::PhaseFlipCode,
+                "Encodes in the Hadamard basis, injects a Z error, and coherently corrects it."
+            },
+            {
+                "Five-qubit Code",
+                CircuitPreset::FiveQubitCode,
+                "Prepares the exact logical-zero state of the perfect [[5,1,3]] code."
+            },
+            {
+                "Quantum Count",
+                CircuitPreset::QuantumCounting,
+                "Counts one marked state in a two-qubit Grover search space."
+            },
+            {
+                "Amplitude Est.",
+                CircuitPreset::AmplitudeEstimation,
+                "Estimates a fixed 30% prepared probability with three counting qubits."
+            },
+            {
+                "Ripple Adder",
+                CircuitPreset::RippleCarryAdder,
+                "Reversibly demonstrates the two-bit addition 1 + 2 = 3."
+            },
+            {
+                "Draper Adder",
+                CircuitPreset::DraperAdder,
+                "Performs the same addition through controlled Fourier phases."
+            },
+            {
+                "IQP Sample",
+                CircuitPreset::Iqp,
+                "Runs commuting phase interactions for an uneven sampling distribution."
+            },
+            {
+                "Surface Check",
+                CircuitPreset::SurfaceCode,
+                "Extracts one stabilizer syndrome from a correlated 3x3 data patch."
+            }
+        }};
+
         constexpr std::size_t pageCount =
-                3U;
+                4U;
 
         algorithmPage_ =
                 std::min(
@@ -2232,8 +2342,10 @@ namespace quantum_sim::gui {
             drawPage(firstPage);
         } else if (algorithmPage_ == 1U) {
             drawPage(secondPage);
-        } else {
+        } else if (algorithmPage_ == 2U) {
             drawPage(thirdPage);
+        } else {
+            drawPage(fourthPage);
         }
 
         ImGui::EndChild();
@@ -2656,6 +2768,38 @@ namespace quantum_sim::gui {
             return algorithms::shorCodeCircuit(qubitCount);
         }
 
+        if (preset == CircuitPreset::PhaseFlipCode) {
+            return algorithms::phaseFlipCodeCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::FiveQubitCode) {
+            return algorithms::fiveQubitCodeCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::QuantumCounting) {
+            return algorithms::quantumCountingCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::AmplitudeEstimation) {
+            return algorithms::amplitudeEstimationCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::RippleCarryAdder) {
+            return algorithms::rippleCarryAdderCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::DraperAdder) {
+            return algorithms::draperAdderCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::Iqp) {
+            return algorithms::iqpCircuit(qubitCount);
+        }
+
+        if (preset == CircuitPreset::SurfaceCode) {
+            return algorithms::surfaceCodeStabilizerCircuit(qubitCount);
+        }
+
         throw std::invalid_argument{
             "Unsupported circuit preset."
         };
@@ -2677,7 +2821,8 @@ namespace quantum_sim::gui {
             preset == CircuitPreset::WState ||
             preset == CircuitPreset::DickeState ||
             preset == CircuitPreset::GraphState ||
-            preset == CircuitPreset::RandomCircuit
+            preset == CircuitPreset::RandomCircuit ||
+            preset == CircuitPreset::Iqp
         ) {
             return 2;
         }
@@ -2688,7 +2833,8 @@ namespace quantum_sim::gui {
             preset == CircuitPreset::Qpe ||
             preset == CircuitPreset::SwapTest ||
             preset == CircuitPreset::QuantumWalk ||
-            preset == CircuitPreset::BitFlipCode
+            preset == CircuitPreset::BitFlipCode ||
+            preset == CircuitPreset::PhaseFlipCode
         ) {
             return 3;
         }
@@ -2696,9 +2842,19 @@ namespace quantum_sim::gui {
         if (
             preset == CircuitPreset::Simon ||
             preset == CircuitPreset::Shor ||
-            preset == CircuitPreset::Hhl
+            preset == CircuitPreset::Hhl ||
+            preset == CircuitPreset::AmplitudeEstimation ||
+            preset == CircuitPreset::RippleCarryAdder ||
+            preset == CircuitPreset::DraperAdder
         ) {
             return 4;
+        }
+
+        if (
+            preset == CircuitPreset::FiveQubitCode ||
+            preset == CircuitPreset::QuantumCounting
+        ) {
+            return 5;
         }
 
         if (preset == CircuitPreset::SteaneCode) {
@@ -2707,6 +2863,10 @@ namespace quantum_sim::gui {
 
         if (preset == CircuitPreset::ShorCode) {
             return 9;
+        }
+
+        if (preset == CircuitPreset::SurfaceCode) {
+            return 10;
         }
 
         return 1;
@@ -3010,6 +3170,49 @@ namespace quantum_sim::gui {
             circuitRenderer_.continuePlacementAfter(
                 instructionIndex
             );
+        } else if (queuedThreeQubitPlacement_.has_value()) {
+            const std::string &gateName =
+                    queuedThreeQubitPlacement_->gateName;
+
+            const std::size_t firstQubit =
+                    queuedThreeQubitPlacement_->firstQubit;
+
+            const std::size_t secondQubit =
+                    queuedThreeQubitPlacement_->secondQubit;
+
+            const std::size_t thirdQubit =
+                    queuedThreeQubitPlacement_->thirdQubit;
+
+            const std::size_t instructionIndex =
+                    std::min(
+                        queuedThreeQubitPlacement_->instructionIndex,
+                        circuit_.instructionCount()
+                    );
+
+            recordEditorForUndo();
+
+            circuit_.insertThreeQubitGate(
+                instructionIndex,
+                gateName,
+                createThreeQubitGateMatrix(gateName),
+                firstQubit,
+                secondQubit,
+                thirdQubit
+            );
+
+            queuedThreeQubitPlacement_.reset();
+            circuitHasUnsavedEdits_ = true;
+            inspectorPanel_.focusQubit(thirdQubit);
+
+            rebuildDebuggerAfterCircuitEdit(
+                instructionIndex,
+                instructionIndex + 1U
+            );
+
+            circuitRenderer_.clearSelection();
+            circuitRenderer_.continuePlacementAfter(
+                instructionIndex
+            );
         } else if (queuedControlledPlacement_.has_value()) {
             const std::string &gateName =
                     queuedControlledPlacement_->gateName;
@@ -3181,6 +3384,26 @@ namespace quantum_sim::gui {
             return gates::czGate();
         }
 
+        if (gateName == "CH") {
+            return gates::chGate();
+        }
+
+        if (gateName == "CS") {
+            return gates::csGate();
+        }
+
+        if (gateName == "CSdg") {
+            return gates::csDaggerGate();
+        }
+
+        if (gateName == "CT") {
+            return gates::ctGate();
+        }
+
+        if (gateName == "CTdg") {
+            return gates::ctDaggerGate();
+        }
+
         if (gateName == "CP") {
             return gates::controlledPhaseGate(
                 parameters.thetaRadians
@@ -3211,6 +3434,25 @@ namespace quantum_sim::gui {
             return gates::rzzGate(parameters.thetaRadians);
         }
 
+        if (gateName == "DCX") {
+            return gates::dcxGate();
+        }
+
+        if (gateName == "ECR") {
+            return gates::ecrGate();
+        }
+
+        if (gateName == "sqrtSWAP") {
+            return gates::squareRootSwapGate();
+        }
+
+        if (gateName == "fSim") {
+            return gates::fSimGate(
+                parameters.thetaRadians,
+                parameters.phiRadians
+            );
+        }
+
         if (gateName == "SWAP") {
             return gates::swapGate();
         }
@@ -3222,6 +3464,23 @@ namespace quantum_sim::gui {
         throw std::invalid_argument(
             "Unsupported controlled gate: " + gateName
         );
+    }
+
+    math::ComplexMatrix GuiApplication::createThreeQubitGateMatrix(
+        const std::string &gateName
+    ) {
+        if (gateName == "CCX") {
+            return gates::ccxGate();
+        }
+
+        if (gateName == "CSWAP") {
+            return gates::cSwapGate();
+        }
+
+        throw std::invalid_argument{
+            "Unsupported three-qubit gate: " +
+            gateName
+        };
     }
 
 
@@ -3274,6 +3533,7 @@ namespace quantum_sim::gui {
         pendingGate_.reset();
         pendingGateParameters_.reset();
         queuedControlledPlacement_.reset();
+        queuedThreeQubitPlacement_.reset();
         queuedSingleQubitPlacement_.reset();
         queuedSingleQubitParameters_.reset();
         queuedTwoQubitParameters_.reset();

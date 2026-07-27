@@ -56,15 +56,31 @@ namespace {
         return gateName == "CX" ||
                gateName == "CY" ||
                gateName == "CZ" ||
+               gateName == "CH" ||
+               gateName == "CS" ||
+               gateName == "CSdg" ||
+               gateName == "CT" ||
+               gateName == "CTdg" ||
                gateName == "CP" ||
                gateName == "CRx" ||
                gateName == "CRy" ||
                gateName == "CRz" ||
                gateName == "SWAP" ||
                gateName == "iSWAP" ||
+               gateName == "sqrtSWAP" ||
+               gateName == "DCX" ||
+               gateName == "ECR" ||
+               gateName == "fSim" ||
                gateName == "RXX" ||
                gateName == "RYY" ||
                gateName == "RZZ";
+    }
+
+    [[nodiscard]] bool isThreeQubitGateName(
+        const std::string &gateName
+    ) noexcept {
+        return gateName == "CCX" ||
+               gateName == "CSWAP";
     }
 
     [[nodiscard]] bool isInteractionGateName(
@@ -72,7 +88,10 @@ namespace {
     ) noexcept {
         return gateName == "RXX" ||
                gateName == "RYY" ||
-               gateName == "RZZ";
+               gateName == "RZZ" ||
+               gateName == "DCX" ||
+               gateName == "ECR" ||
+               gateName == "fSim";
     }
 
     [[nodiscard]] const char *twoQubitTargetLabel(
@@ -86,6 +105,15 @@ namespace {
         }
         if (gateName == "CZ") {
             return "Z";
+        }
+        if (gateName == "CH") {
+            return "H";
+        }
+        if (gateName == "CS" || gateName == "CSdg") {
+            return "S";
+        }
+        if (gateName == "CT" || gateName == "CTdg") {
+            return "T";
         }
         if (gateName == "CP") {
             return "P";
@@ -107,6 +135,15 @@ namespace {
         }
         if (gateName == "RZZ") {
             return "Z";
+        }
+        if (gateName == "DCX") {
+            return "X";
+        }
+        if (gateName == "ECR") {
+            return "E";
+        }
+        if (gateName == "fSim") {
+            return "f";
         }
 
         return "?";
@@ -183,8 +220,13 @@ namespace quantum_sim::gui {
 
         const bool controlledPlacement =
                 placementModeActive &&
-                isTwoQubitGateName(
-                    pendingGate.value()
+                (
+                    isTwoQubitGateName(
+                        pendingGate.value()
+                    ) ||
+                    isThreeQubitGateName(
+                        pendingGate.value()
+                    )
                 );
 
         if (controlledPlacement) {
@@ -195,6 +237,7 @@ namespace quantum_sim::gui {
             pendingControlledGateName_.reset();
             pendingControlQubit_.reset();
             pendingTargetQubit_.reset();
+            pendingThirdQubit_.reset();
         }
 
         const bool singleQubitPlacement =
@@ -721,6 +764,10 @@ namespace quantum_sim::gui {
                 const bool isSelectedTarget =
                         pendingTargetQubit_.has_value() &&
                         pendingTargetQubit_.value() == qubit;
+
+                const bool isSelectedThird =
+                        pendingThirdQubit_.has_value() &&
+                        pendingThirdQubit_.value() == qubit;
                 const float y =
                         firstWireY +
                         effectiveWireSpacing_ *
@@ -753,6 +800,11 @@ namespace quantum_sim::gui {
                 const bool choosingTarget =
                         pendingControlQubit_.has_value();
 
+                const bool threeQubitPlacement =
+                        isThreeQubitGateName(
+                            pendingGate.value()
+                        );
+
                 const char *targetPreviewLabel =
                         twoQubitTargetLabel(
                             pendingGate.value()
@@ -764,7 +816,24 @@ namespace quantum_sim::gui {
                         );
 
                 const char *previewLabel =
-                        symmetricInteraction
+                        threeQubitPlacement
+                            ? (
+                                pendingGate.value() == "CCX"
+                                    ? (
+                                        pendingTargetQubit_.has_value() &&
+                                        !isSelectedControl &&
+                                        !isSelectedTarget
+                                            ? "X"
+                                            : "C"
+                                    )
+                                    : (
+                                        pendingControlQubit_.has_value() &&
+                                        !isSelectedControl
+                                            ? "S"
+                                            : "C"
+                                    )
+                            )
+                            : symmetricInteraction
                             ? targetPreviewLabel
                             : choosingTarget
                             ? isSelectedControl
@@ -795,6 +864,22 @@ namespace quantum_sim::gui {
                         // Clicking the first qubit again cancels that half of placement.
                         pendingControlQubit_.reset();
                         pendingTargetQubit_.reset();
+                        pendingThirdQubit_.reset();
+                    } else if (
+                        threeQubitPlacement &&
+                        !pendingTargetQubit_.has_value()
+                    ) {
+                        pendingTargetQubit_ =
+                                qubit;
+                    } else if (
+                        threeQubitPlacement &&
+                        isSelectedTarget
+                    ) {
+                        pendingTargetQubit_.reset();
+                        pendingThirdQubit_.reset();
+                    } else if (threeQubitPlacement) {
+                        pendingThirdQubit_ =
+                                qubit;
                     } else {
                         // Second click chooses the target/second qubit.
                         pendingTargetQubit_ =
@@ -805,7 +890,8 @@ namespace quantum_sim::gui {
                 if (
                     hovered ||
                     isSelectedControl ||
-                    isSelectedTarget
+                    isSelectedTarget ||
+                    isSelectedThird
                 ) {
                     drawList->AddLine(
                         ImVec2{wireStartX, y},
@@ -821,7 +907,8 @@ namespace quantum_sim::gui {
                         false,
                         hovered,
                         isSelectedControl ||
-                            isSelectedTarget,
+                            isSelectedTarget ||
+                            isSelectedThird,
                         true
                     );
                 } else {
@@ -1163,6 +1250,252 @@ namespace quantum_sim::gui {
                         : style_.controlledGateColor;
 
             // -----------------------------------------------------
+            // Compact three-qubit gates such as CCX and CSWAP
+            // -----------------------------------------------------
+
+            if (
+                instruction.controlQubit.has_value() &&
+                instruction.secondaryTargetQubit.has_value() &&
+                instruction.tertiaryTargetQubit.has_value()
+            ) {
+                const float firstY =
+                        firstWireY +
+                        effectiveWireSpacing_ *
+                        static_cast<float>(
+                            instruction.controlQubit.value()
+                        );
+
+                const float secondY =
+                        firstWireY +
+                        effectiveWireSpacing_ *
+                        static_cast<float>(
+                            instruction.secondaryTargetQubit.value()
+                        );
+
+                const float thirdY =
+                        firstWireY +
+                        effectiveWireSpacing_ *
+                        static_cast<float>(
+                            instruction.tertiaryTargetQubit.value()
+                        );
+
+                const float minimumY =
+                        std::min({
+                            firstY,
+                            secondY,
+                            thirdY
+                        });
+
+                const float maximumY =
+                        std::max({
+                            firstY,
+                            secondY,
+                            thirdY
+                        });
+
+                const ImVec2 hitMinimum{
+                    x -
+                    style_.gateHalfWidth -
+                    style_.selectedGateOutlinePadding,
+                    minimumY -
+                    style_.gateHalfHeight -
+                    style_.selectedGateOutlinePadding
+                };
+
+                const ImVec2 hitMaximum{
+                    x +
+                    style_.gateHalfWidth +
+                    style_.selectedGateOutlinePadding,
+                    maximumY +
+                    style_.gateHalfHeight +
+                    style_.selectedGateOutlinePadding
+                };
+
+                const bool hovered =
+                        ImGui::IsWindowHovered() &&
+                        isPointInsideRect(
+                            mousePosition,
+                            hitMinimum,
+                            hitMaximum
+                        );
+
+                if (hovered) {
+                    ImGui::SetMouseCursor(
+                        ImGuiMouseCursor_Hand
+                    );
+                }
+
+                beginInstructionDrag(
+                    instructionIndex,
+                    hovered
+                );
+
+                const bool clicked =
+                        !placementModeActive &&
+                        hovered &&
+                        ImGui::IsMouseClicked(
+                            ImGuiMouseButton_Left
+                        );
+
+                const bool doubleClicked =
+                        !placementModeActive &&
+                        hovered &&
+                        ImGui::IsMouseDoubleClicked(
+                            ImGuiMouseButton_Left
+                        );
+
+                if (doubleClicked) {
+                    gateClickedThisFrame = true;
+                    selectedInstructionIndex_ =
+                            instructionIndex;
+                    requestedStepJumpNumber_ =
+                            instructionIndex + 1U;
+                } else if (clicked) {
+                    gateClickedThisFrame = true;
+
+                    if (
+                        selectedInstructionIndex_.has_value() &&
+                        selectedInstructionIndex_.value() ==
+                            instructionIndex
+                    ) {
+                        selectedInstructionIndex_.reset();
+                    } else {
+                        selectedInstructionIndex_ =
+                                instructionIndex;
+                    }
+                }
+
+                const bool selected =
+                        selectedInstructionIndex_.has_value() &&
+                        selectedInstructionIndex_.value() ==
+                            instructionIndex;
+
+                if (!highlighted && hovered) {
+                    gateColor =
+                            style_.hoveredControlledGateColor;
+                }
+
+                for (const float operandY : {firstY, secondY, thirdY}) {
+                    drawList->AddRectFilled(
+                        ImVec2{
+                            x - style_.symbolGapHalfWidth,
+                            operandY - style_.symbolGapHalfHeight
+                        },
+                        ImVec2{
+                            x + style_.symbolGapHalfWidth,
+                            operandY + style_.symbolGapHalfHeight
+                        },
+                        backgroundColor
+                    );
+                }
+
+                if (selected) {
+                    drawList->AddRect(
+                        hitMinimum,
+                        hitMaximum,
+                        style_.selectedGateOutlineColor,
+                        style_.selectedGateOutlineCornerRadius,
+                        0,
+                        style_.selectedGateOutlineThickness
+                    );
+                }
+
+                if (highlighted) {
+                    const int glowAlpha =
+                            static_cast<int>(
+                                style_.controlledGlowBaseAlpha +
+                                pulse *
+                                style_.controlledGlowPulseAlpha
+                            );
+
+                    drawList->AddLine(
+                        ImVec2{x, minimumY},
+                        ImVec2{x, maximumY},
+                        withAlpha(
+                            style_.controlledGlowColor,
+                            glowAlpha
+                        ),
+                        style_.controlledGlowLineThickness
+                    );
+                }
+
+                drawList->AddLine(
+                    ImVec2{x, minimumY},
+                    ImVec2{x, maximumY},
+                    gateColor,
+                    style_.controlledConnectionThickness
+                );
+
+                drawList->AddCircleFilled(
+                    ImVec2{x, firstY},
+                    style_.controlRadius,
+                    gateColor
+                );
+
+                if (instruction.name == "CCX") {
+                    drawList->AddCircleFilled(
+                        ImVec2{x, secondY},
+                        style_.controlRadius,
+                        gateColor
+                    );
+
+                    drawGate(
+                        drawList,
+                        ImVec2{x, thirdY},
+                        "X",
+                        highlighted,
+                        hovered,
+                        false,
+                        false
+                    );
+                } else {
+                    const float exchangeMinimumY =
+                            std::min(
+                                secondY,
+                                thirdY
+                            );
+
+                    const float exchangeMaximumY =
+                            std::max(
+                                secondY,
+                                thirdY
+                            );
+
+                    const float exchangeHalfWidth =
+                            style_.gateHalfWidth +
+                            5.0F;
+
+                    drawList->AddLine(
+                        ImVec2{
+                            x - exchangeHalfWidth,
+                            exchangeMinimumY
+                        },
+                        ImVec2{
+                            x + exchangeHalfWidth,
+                            exchangeMaximumY
+                        },
+                        gateColor,
+                        style_.controlledConnectionThickness
+                    );
+
+                    drawList->AddLine(
+                        ImVec2{
+                            x - exchangeHalfWidth,
+                            exchangeMaximumY
+                        },
+                        ImVec2{
+                            x + exchangeHalfWidth,
+                            exchangeMinimumY
+                        },
+                        gateColor,
+                        style_.controlledConnectionThickness
+                    );
+                }
+
+                continue;
+            }
+
+            // -----------------------------------------------------
             // Controlled gate such as CX
             // -----------------------------------------------------
 
@@ -1266,8 +1599,13 @@ namespace quantum_sim::gui {
                 const bool isISwap =
                         instruction.name == "iSWAP";
 
+                const bool isSqrtSwap =
+                        instruction.name == "sqrtSWAP";
+
                 const bool isSwapFamily =
-                        isSwap || isISwap;
+                        isSwap ||
+                        isISwap ||
+                        isSqrtSwap;
 
                 const bool isInteraction =
                         isInteractionGateName(
@@ -1412,11 +1750,14 @@ namespace quantum_sim::gui {
                         style_.controlledConnectionThickness
                     );
 
-                    if (isISwap) {
-                        constexpr const char *iSwapLabel = "(i)";
+                    if (isISwap || isSqrtSwap) {
+                        const char *swapLabel =
+                                isISwap
+                                    ? "(i)"
+                                    : "(\xE2\x88\x9A)";
 
-                        const ImVec2 iSwapLabelSize =
-                                ImGui::CalcTextSize(iSwapLabel);
+                        const ImVec2 swapLabelSize =
+                                ImGui::CalcTextSize(swapLabel);
 
                         const ImVec2 midpoint{
                             x,
@@ -1432,18 +1773,18 @@ namespace quantum_sim::gui {
                         drawList->AddRectFilled(
                             ImVec2{
                                 midpoint.x -
-                                iSwapLabelSize.x * 0.5F -
+                                swapLabelSize.x * 0.5F -
                                 labelPaddingX,
                                 midpoint.y -
-                                iSwapLabelSize.y * 0.5F -
+                                swapLabelSize.y * 0.5F -
                                 labelPaddingY
                             },
                             ImVec2{
                                 midpoint.x +
-                                iSwapLabelSize.x * 0.5F +
+                                swapLabelSize.x * 0.5F +
                                 labelPaddingX,
                                 midpoint.y +
-                                iSwapLabelSize.y * 0.5F +
+                                swapLabelSize.y * 0.5F +
                                 labelPaddingY
                             },
                             backgroundColor,
@@ -1453,12 +1794,12 @@ namespace quantum_sim::gui {
                         drawList->AddText(
                             ImVec2{
                                 midpoint.x -
-                                iSwapLabelSize.x * 0.5F,
+                                swapLabelSize.x * 0.5F,
                                 midpoint.y -
-                                iSwapLabelSize.y * 0.5F
+                                swapLabelSize.y * 0.5F
                             },
                             gateColor,
-                            iSwapLabel
+                            swapLabel
                         );
                     }
 
@@ -2072,6 +2413,7 @@ namespace quantum_sim::gui {
 
     std::optional<ControlledPlacement> CircuitRenderer::completedControlledPlacement() const noexcept {
         if (!pendingControlledGateName_.has_value() ||
+            isThreeQubitGateName(pendingControlledGateName_.value()) ||
             !pendingControlQubit_.has_value() ||
             !pendingTargetQubit_.has_value() ||
             !pendingInsertionIndex_.has_value()) {
@@ -2101,6 +2443,35 @@ namespace quantum_sim::gui {
         return placement;
     }
 
+    std::optional<ThreeQubitPlacement> CircuitRenderer::consumeCompletedThreeQubitPlacement() noexcept {
+        if (
+            !pendingControlledGateName_.has_value() ||
+            !isThreeQubitGateName(
+                pendingControlledGateName_.value()
+            ) ||
+            !pendingControlQubit_.has_value() ||
+            !pendingTargetQubit_.has_value() ||
+            !pendingThirdQubit_.has_value() ||
+            !pendingInsertionIndex_.has_value()
+        ) {
+            return std::nullopt;
+        }
+
+        const ThreeQubitPlacement placement{
+            pendingControlledGateName_.value(),
+            pendingControlQubit_.value(),
+            pendingTargetQubit_.value(),
+            pendingThirdQubit_.value(),
+            pendingInsertionIndex_.value()
+        };
+
+        pendingControlQubit_.reset();
+        pendingTargetQubit_.reset();
+        pendingThirdQubit_.reset();
+
+        return placement;
+    }
+
     std::optional<SingleQubitPlacement> CircuitRenderer::consumeCompletedSingleQubitPlacement() {
         if (!completedSingleQubitPlacement_.has_value()) {
             return std::nullopt;
@@ -2119,10 +2490,23 @@ namespace quantum_sim::gui {
         return pendingControlQubit_.has_value();
     }
 
+    std::size_t CircuitRenderer::placementOperandCount() const noexcept {
+        return static_cast<std::size_t>(
+                   pendingControlQubit_.has_value()
+               ) +
+               static_cast<std::size_t>(
+                   pendingTargetQubit_.has_value()
+               ) +
+               static_cast<std::size_t>(
+                   pendingThirdQubit_.has_value()
+               );
+    }
+
     void CircuitRenderer::cancelPlacement() noexcept {
         pendingControlledGateName_.reset();
         pendingControlQubit_.reset();
         pendingTargetQubit_.reset();
+        pendingThirdQubit_.reset();
         pendingInsertionIndex_.reset();
         insertionMouseXLock_.reset();
         completedSingleQubitPlacement_.reset();
@@ -2150,6 +2534,7 @@ namespace quantum_sim::gui {
 
         pendingControlQubit_.reset();
         pendingTargetQubit_.reset();
+        pendingThirdQubit_.reset();
         requestedFocusStepNumber_ =
                 insertedInstructionIndex + 1U;
     }

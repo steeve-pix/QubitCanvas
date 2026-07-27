@@ -81,11 +81,16 @@ there in a paused state before playback begins.
 | Core two-qubit | `CX`, `CY`, `CZ`, `SWAP`, `iSWAP` |
 | Parameterized controlled | `CP`, `CRx`, `CRy`, `CRz` |
 | Interaction rotations | `RXX`, `RYY`, `RZZ` |
+| Advanced controlled | `CH`, `CS`, `CSdg`, `CT`, `CTdg` |
+| Native and exchange | `DCX`, `ECR`, `sqrtSWAP`, `fSim` |
+| Three-qubit | `CCX`, `CSWAP` |
 
 The gate catalog uses compact previous/page/next controls. Core operations stay
-on page one, while parameterized and interaction gates stay on page two.
+on page one, parameterized and interaction gates stay on page two, and
+advanced hardware and three-qubit operations stay on page three.
 Angles are stored in radians and displayed as exact or decimal multiples of
 `π`. The universal `U` gate exposes independent `θ`, `φ`, and `λ` controls.
+`fSim` exposes independent `θ` exchange and `φ` conditional-phase controls.
 Detailed controls and hover readouts place the decimal radian value beside the
 π notation, for example `π/2 (1.571 rad)`. Hover a gate button to see its name,
 purpose, and unitary matrix; zero-valued entries are intentionally subdued so
@@ -121,6 +126,9 @@ contains custom edits.
 
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
 `iSWAP` uses the same path geometry with a centered `(i)` marker.
+`CCX` and `CSWAP` use a three-click placement flow and render as genuine
+three-wire circuit operations. Their compact 8x8 matrices execute directly
+against eight-amplitude blocks without expansion to the full register.
 
 ## Built-in Circuits
 
@@ -154,6 +162,14 @@ contains custom edits.
 - Three-qubit bit-flip error correction
 - Seven-qubit Steane logical-zero encoding
 - Nine-qubit Shor-code encoding
+- Three-qubit phase-flip error correction
+- Five-qubit perfect-code logical-zero preparation
+- Quantum counting with a three-qubit counting register
+- Quantum amplitude estimation for a fixed 30% probability
+- Two-bit ripple-carry addition
+- Two-bit Draper Fourier addition
+- Register-wide IQP sampling
+- Ten-qubit surface-code stabilizer demonstration
 
 The register slider controls the size of the next blank circuit or preset from
 1 to 10 qubits; it does not silently resize the circuit currently being edited.
@@ -209,8 +225,10 @@ regression checks:
 ```
 
 Supported capture presets are `qft`, `grover`, `w`, `dicke`, `graph`, `random`,
-`weighted`, `bit-flip`, `steane`, and `shor-code`. `--gate-page 2 --gate U`
-captures the parameterized gate catalog with `U` armed.
+`weighted`, `bit-flip`, `steane`, `shor-code`, `phase-flip`,
+`five-qubit-code`, `quantum-counting`, `amplitude-estimation`, `ripple-adder`,
+`draper-adder`, `iqp`, and `surface-code`. `--gate-page 3 --gate fSim`
+captures the advanced gate catalog with `fSim` armed.
 
 For a Visual Studio multi-configuration generator, the executable may instead
 be located at `build\Debug\qubit_canvas.exe`.
@@ -218,10 +236,11 @@ be located at `build\Debug\qubit_canvas.exe`.
 ## Numerical Behavior
 
 The simulation core stores the complete state vector, so its memory and
-execution cost scale exponentially with qubit count. Single-qubit and
-two-qubit instructions remain compact as 2x2 and 4x4 matrices and are applied
-directly to amplitude pairs or quartets. They therefore use O(2^n) execution
-memory instead of expanding every gate into an O(4^n) full-register matrix.
+execution cost scale exponentially with qubit count. Single-, two-, and
+three-qubit instructions remain compact as 2x2, 4x4, and 8x8 matrices and are
+applied directly to amplitude pairs, quartets, or octets. They therefore use
+O(2^n) execution memory instead of expanding every gate into an O(4^n)
+full-register matrix.
 State preparation and register-wide Grover use compact Householder reflections
 evaluated directly against the state vector, also in O(2^n) memory.
 The explicit full-register gate API remains available for custom unitaries

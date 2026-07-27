@@ -25,6 +25,7 @@ namespace quantum_sim::circuit {
     enum class CircuitInstructionKind {
         SingleQubit,
         TwoQubit,
+        ThreeQubit,
         FullRegister,
         Reflection
     };
@@ -38,6 +39,7 @@ namespace quantum_sim::circuit {
         std::optional<std::size_t> targetQubit;
         std::optional<std::size_t> controlQubit;
         std::optional<std::size_t> secondaryTargetQubit;
+        std::optional<std::size_t> tertiaryTargetQubit;
         std::optional<double> angleRadians;
     };
 
@@ -115,6 +117,25 @@ namespace quantum_sim::circuit {
             std::string name,
             math::ComplexVector normalizedAxis,
             std::size_t displayQubit = 0U
+        );
+
+        /**
+         * Appends a compact three-qubit instruction.
+         *
+         * @param name Display name for the gate.
+         * @param gate 8x8 unitary matrix in first/second/third local basis order.
+         * @param firstQubit First control or operand.
+         * @param secondQubit Second control or operand.
+         * @param thirdQubit Target or third operand.
+         * @throws std::invalid_argument if operands repeat or gate is invalid.
+         * @throws std::out_of_range if an operand is outside the circuit.
+         */
+        void addThreeQubitGate(
+            std::string name,
+            math::ComplexMatrix gate,
+            std::size_t firstQubit,
+            std::size_t secondQubit,
+            std::size_t thirdQubit
         );
 
         /**
@@ -262,6 +283,27 @@ namespace quantum_sim::circuit {
         );
 
         /**
+         * Inserts a compact three-qubit instruction before the requested index.
+         *
+         * @param instructionIndex Insert position; values past the end append.
+         * @param name Display name for the gate.
+         * @param gate 8x8 unitary matrix in first/second/third local basis order.
+         * @param firstQubit First control or operand.
+         * @param secondQubit Second control or operand.
+         * @param thirdQubit Target or third operand.
+         * @throws std::invalid_argument if operands repeat or gate is invalid.
+         * @throws std::out_of_range if an operand is outside the circuit.
+         */
+        void insertThreeQubitGate(
+            std::size_t instructionIndex,
+            std::string name,
+            math::ComplexMatrix gate,
+            std::size_t firstQubit,
+            std::size_t secondQubit,
+            std::size_t thirdQubit
+        );
+
+        /**
          * Inserts a two-qubit full-register instruction before the requested index.
          *
          * @param instructionIndex Insert position; values past the end append.
@@ -297,6 +339,14 @@ namespace quantum_sim::circuit {
             std::size_t displayQubit;
         };
 
+        struct ThreeQubitInstruction {
+            std::string name;
+            math::ComplexMatrix gate;
+            std::size_t firstQubit;
+            std::size_t secondQubit;
+            std::size_t thirdQubit;
+        };
+
         struct FullRegisterInstruction {
             std::string name;
             math::ComplexMatrix gate;
@@ -307,6 +357,7 @@ namespace quantum_sim::circuit {
         using Instruction = std::variant<
             SingleQubitInstruction,
             TwoQubitInstruction,
+            ThreeQubitInstruction,
             FullRegisterInstruction,
             ReflectionInstruction
         >;
