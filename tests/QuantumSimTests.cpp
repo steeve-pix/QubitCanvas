@@ -853,6 +853,20 @@ int main() {
         "Density Volume layers advance on Y with separated fixed-size cubes"
     );
 
+    check(
+        initialPeak != nullptr &&
+        nextLayerPeak != nullptr &&
+        historyScene.framingMinimum.x <=
+            initialPeak->center.x - initialPeak->size.x * 0.5F &&
+        historyScene.framingMinimum.y <=
+            initialPeak->center.y - initialPeak->size.y * 0.5F &&
+        historyScene.framingMaximum.y >=
+            nextLayerPeak->center.y + nextLayerPeak->size.y * 0.5F &&
+        historyScene.framingMaximum.z >=
+            nextLayerPeak->center.z + nextLayerPeak->size.z * 0.5F,
+        "Density Volume exposes complete history bounds for launch framing"
+    );
+
     const quantum_sim::gui::density_volume::VoxelGeometry roundedCube =
             quantum_sim::gui::density_volume::VoxelGeometryBuilder::buildRoundedCube();
 
@@ -1714,9 +1728,9 @@ int main() {
 
     quantum_sim::gui::density_volume::CameraController densityCamera;
     densityCamera.frameScene(
-        quantum_sim::gui::density_volume::Vector3{0.0F, 0.0F, 0.0F},
-        4.0F,
-        4.0F
+        quantum_sim::gui::density_volume::Vector3{-4.0F, -0.5F, -4.0F},
+        quantum_sim::gui::density_volume::Vector3{4.0F, 8.5F, 4.0F},
+        16.0F / 9.0F
     );
     densityCamera.orbit(80.0F, -25.0F);
     densityCamera.pan(12.0F, -6.0F);
@@ -1727,9 +1741,9 @@ int main() {
             densityCamera.viewMatrix();
 
     densityCamera.updateSceneBounds(
-        quantum_sim::gui::density_volume::Vector3{6.0F, 2.0F, -3.0F},
-        4.0F,
-        12.0F
+        quantum_sim::gui::density_volume::Vector3{-5.0F, -1.0F, -5.0F},
+        quantum_sim::gui::density_volume::Vector3{7.0F, 15.0F, 5.0F},
+        16.0F / 9.0F
     );
 
     const auto playbackUpdatedView =
@@ -1763,9 +1777,9 @@ int main() {
 
     quantum_sim::gui::density_volume::CameraController automaticCamera;
     automaticCamera.frameScene(
-        quantum_sim::gui::density_volume::Vector3{0.0F, 0.0F, 0.0F},
-        4.0F,
-        4.0F
+        quantum_sim::gui::density_volume::Vector3{-4.0F, -0.5F, -4.0F},
+        quantum_sim::gui::density_volume::Vector3{4.0F, 20.5F, 4.0F},
+        16.0F / 9.0F
     );
 
     const auto initialAutomaticView =
@@ -1775,15 +1789,15 @@ int main() {
             automaticCamera.orbitDistance();
 
     automaticCamera.updateSceneBounds(
-        quantum_sim::gui::density_volume::Vector3{0.0F, 5.0F, 0.0F},
-        4.0F,
-        12.0F
+        quantum_sim::gui::density_volume::Vector3{-4.0F, -0.5F, -4.0F},
+        quantum_sim::gui::density_volume::Vector3{4.0F, 20.5F, 4.0F},
+        16.0F / 9.0F
     );
 
     automaticCamera.update(0.1F);
 
     check(
-        !std::equal(
+        std::equal(
             initialAutomaticView.begin(),
             initialAutomaticView.end(),
             automaticCamera.viewMatrix().begin(),
@@ -1796,7 +1810,27 @@ int main() {
             initialAutomaticDistance,
             1e-6
         ),
-        "Untouched playback camera follows the new layer without zooming backward"
+        "Untouched playback keeps the complete planned history frame stable"
+    );
+
+    quantum_sim::gui::density_volume::CameraController wideViewportCamera;
+    wideViewportCamera.frameScene(
+        quantum_sim::gui::density_volume::Vector3{-20.0F, -2.0F, -4.0F},
+        quantum_sim::gui::density_volume::Vector3{20.0F, 2.0F, 4.0F},
+        16.0F / 9.0F
+    );
+
+    quantum_sim::gui::density_volume::CameraController narrowViewportCamera;
+    narrowViewportCamera.frameScene(
+        quantum_sim::gui::density_volume::Vector3{-20.0F, -2.0F, -4.0F},
+        quantum_sim::gui::density_volume::Vector3{20.0F, 2.0F, 4.0F},
+        0.75F
+    );
+
+    check(
+        narrowViewportCamera.orbitDistance() >
+            wideViewportCamera.orbitDistance(),
+        "Density camera fit accounts for narrow viewport aspect"
     );
 
     if (failures == 0) {
