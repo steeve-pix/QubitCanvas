@@ -135,8 +135,10 @@ contains custom edits.
 
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
 Compact `SW`, `iSW`, and `√SW` badges distinguish exchange variants without
-obscuring their crossed paths. Placed-gate hover cards identify every operand
-and explain the behavior of controlled, exchange, and interaction gates.
+obscuring their crossed paths. Long exchange routes open clean overpass gaps
+at unrelated wires, while `CSWAP` clears its complete target ports and stops
+the control stem at the center badge. Placed-gate hover cards identify every
+operand and explain the behavior of controlled, exchange, and interaction gates.
 One canonical notation table keeps every built-in circuit identity unique.
 Controlled targets retain their complete names (`CX`, `CRx`, `CS†`, `CT†`),
 interaction boxes use `RXX`/`RYY`/`RZZ`, and three-qubit operations use
@@ -242,7 +244,8 @@ regression checks:
 Supported capture presets are `qft`, `grover`, `w`, `dicke`, `graph`, `random`,
 `weighted`, `bit-flip`, `steane`, `shor-code`, `phase-flip`,
 `five-qubit-code`, `quantum-counting`, `amplitude-estimation`, `ripple-adder`,
-`draper-adder`, `iqp`, and `surface-code`. `--gate-page 3 --gate fSim`
+`draper-adder`, `iqp`, `surface-code`, and the `swap-routing` visual-regression
+scene (with six qubits). `--gate-page 3 --gate fSim`
 captures the advanced gate catalog with `fSim` armed.
 
 For a Visual Studio multi-configuration generator, the executable may instead

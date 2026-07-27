@@ -367,6 +367,70 @@ namespace {
         );
     }
 
+    void drawInsetLine(
+        ImDrawList *drawList,
+        const ImVec2 &start,
+        const ImVec2 &end,
+        const ImU32 color,
+        const float thickness,
+        const float endpointInset
+    ) {
+        const float deltaX = end.x - start.x;
+        const float deltaY = end.y - start.y;
+        const float length =
+                std::sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        if (length <= endpointInset * 2.0F) {
+            return;
+        }
+
+        const float insetRatio = endpointInset / length;
+
+        drawList->AddLine(
+            ImVec2{
+                start.x + deltaX * insetRatio,
+                start.y + deltaY * insetRatio
+            },
+            ImVec2{
+                end.x - deltaX * insetRatio,
+                end.y - deltaY * insetRatio
+            },
+            color,
+            thickness
+        );
+    }
+
+    void drawExchangePortJoins(
+        ImDrawList *drawList,
+        const ImVec2 &upperLeft,
+        const ImVec2 &upperRight,
+        const ImVec2 &lowerLeft,
+        const ImVec2 &lowerRight,
+        const ImU32 color,
+        const float thickness,
+        const float overlap
+    ) {
+        const float interiorOverlap = thickness * 0.5F;
+
+        for (const ImVec2 &port : {upperLeft, lowerLeft}) {
+            drawList->AddLine(
+                ImVec2{port.x - overlap, port.y},
+                ImVec2{port.x + interiorOverlap, port.y},
+                color,
+                thickness
+            );
+        }
+
+        for (const ImVec2 &port : {upperRight, lowerRight}) {
+            drawList->AddLine(
+                ImVec2{port.x - interiorOverlap, port.y},
+                ImVec2{port.x + overlap, port.y},
+                color,
+                thickness
+            );
+        }
+    }
+
     [[nodiscard]] bool isTwoQubitGateName(
         const std::string &gateName
     ) noexcept {
@@ -1547,6 +1611,21 @@ namespace quantum_sim::gui {
                             instruction.tertiaryTargetQubit.value()
                         );
 
+                const bool isControlledSwap =
+                        instruction.name == "CSWAP";
+
+                const float exchangeMinimumY =
+                        std::min(secondY, thirdY);
+
+                const float exchangeMaximumY =
+                        std::max(secondY, thirdY);
+
+                const float exchangeCenterY =
+                        (exchangeMinimumY + exchangeMaximumY) * 0.5F;
+
+                const float exchangeHalfWidth =
+                        style_.exchangePathHalfWidth;
+
                 const float minimumY =
                         std::min({
                             firstY,
@@ -1561,9 +1640,17 @@ namespace quantum_sim::gui {
                             thirdY
                         });
 
+                const float hitHalfWidth =
+                        isControlledSwap
+                            ? std::max(
+                                style_.gateHalfWidth,
+                                exchangeHalfWidth
+                            )
+                            : style_.gateHalfWidth;
+
                 const ImVec2 hitMinimum{
                     x -
-                    style_.gateHalfWidth -
+                    hitHalfWidth -
                     style_.selectedGateOutlinePadding,
                     minimumY -
                     style_.gateHalfHeight -
@@ -1572,7 +1659,7 @@ namespace quantum_sim::gui {
 
                 const ImVec2 hitMaximum{
                     x +
-                    style_.gateHalfWidth +
+                    hitHalfWidth +
                     style_.selectedGateOutlinePadding,
                     maximumY +
                     style_.gateHalfHeight +
@@ -1663,6 +1750,24 @@ namespace quantum_sim::gui {
                     );
                 }
 
+                if (isControlledSwap) {
+                    // Exchange paths own the complete target ports. Clearing
+                    // their full width prevents straight-wire stubs at each fork.
+                    for (const float targetY : {secondY, thirdY}) {
+                        drawList->AddRectFilled(
+                            ImVec2{
+                                x - exchangeHalfWidth,
+                                targetY - style_.symbolGapHalfHeight
+                            },
+                            ImVec2{
+                                x + exchangeHalfWidth,
+                                targetY + style_.symbolGapHalfHeight
+                            },
+                            backgroundColor
+                        );
+                    }
+                }
+
                 if (selected) {
                     drawList->AddRect(
                         hitMinimum,
@@ -1674,6 +1779,16 @@ namespace quantum_sim::gui {
                     );
                 }
 
+                const float connectionMinimumY =
+                        isControlledSwap
+                            ? std::min(firstY, exchangeCenterY)
+                            : minimumY;
+
+                const float connectionMaximumY =
+                        isControlledSwap
+                            ? std::max(firstY, exchangeCenterY)
+                            : maximumY;
+
                 if (highlighted) {
                     const int glowAlpha =
                             static_cast<int>(
@@ -1683,8 +1798,8 @@ namespace quantum_sim::gui {
                             );
 
                     drawList->AddLine(
-                        ImVec2{x, minimumY},
-                        ImVec2{x, maximumY},
+                        ImVec2{x, connectionMinimumY},
+                        ImVec2{x, connectionMaximumY},
                         withAlpha(
                             style_.controlledGlowColor,
                             glowAlpha
@@ -1694,8 +1809,8 @@ namespace quantum_sim::gui {
                 }
 
                 drawList->AddLine(
-                    ImVec2{x, minimumY},
-                    ImVec2{x, maximumY},
+                    ImVec2{x, connectionMinimumY},
+                    ImVec2{x, connectionMaximumY},
                     gateColor,
                     style_.controlledConnectionThickness
                 );
@@ -1727,56 +1842,126 @@ namespace quantum_sim::gui {
                         false
                     );
                 } else {
-                    const float exchangeMinimumY =
-                            std::min(
-                                secondY,
-                                thirdY
-                            );
+                    const ImVec2 upperLeft{
+                        x - exchangeHalfWidth,
+                        exchangeMinimumY
+                    };
 
-                    const float exchangeMaximumY =
-                            std::max(
-                                secondY,
-                                thirdY
-                            );
+                    const ImVec2 upperRight{
+                        x + exchangeHalfWidth,
+                        exchangeMinimumY
+                    };
 
-                    const float exchangeHalfWidth =
-                            style_.exchangePathHalfWidth;
+                    const ImVec2 lowerLeft{
+                        x - exchangeHalfWidth,
+                        exchangeMaximumY
+                    };
 
-                    drawList->AddLine(
-                        ImVec2{
-                            x - exchangeHalfWidth,
-                            exchangeMinimumY
-                        },
-                        ImVec2{
-                            x + exchangeHalfWidth,
-                            exchangeMaximumY
-                        },
+                    const ImVec2 lowerRight{
+                        x + exchangeHalfWidth,
+                        exchangeMaximumY
+                    };
+
+                    const auto drawExchangePaths =
+                            [&](const ImU32 color, const float thickness) {
+                        drawList->AddLine(
+                            upperLeft,
+                            lowerRight,
+                            color,
+                            thickness
+                        );
+
+                        drawList->AddLine(
+                            lowerLeft,
+                            upperRight,
+                            color,
+                            thickness
+                        );
+                    };
+
+                    const std::size_t secondQubit =
+                            instruction.secondaryTargetQubit.value();
+
+                    const std::size_t thirdQubit =
+                            instruction.tertiaryTargetQubit.value();
+
+                    const std::size_t targetSeparation =
+                            secondQubit > thirdQubit
+                                ? secondQubit - thirdQubit
+                                : thirdQubit - secondQubit;
+
+                    if (targetSeparation > 1U) {
+                        // Opaque underlays create clear overpasses where long
+                        // exchange paths cross unrelated qubit wires.
+                        drawInsetLine(
+                            drawList,
+                            upperLeft,
+                            lowerRight,
+                            backgroundColor,
+                            style_.exchangePathUnderlayThickness,
+                            style_.exchangePathUnderlayInset
+                        );
+
+                        drawInsetLine(
+                            drawList,
+                            lowerLeft,
+                            upperRight,
+                            backgroundColor,
+                            style_.exchangePathUnderlayThickness,
+                            style_.exchangePathUnderlayInset
+                        );
+                    }
+
+                    if (highlighted) {
+                        const int glowAlpha =
+                                static_cast<int>(
+                                    style_.controlledGlowBaseAlpha +
+                                    pulse *
+                                    style_.controlledGlowPulseAlpha
+                                );
+
+                        drawExchangePaths(
+                            withAlpha(
+                                style_.controlledGlowColor,
+                                glowAlpha
+                            ),
+                            style_.controlledGlowLineThickness
+                        );
+
+                        drawExchangePortJoins(
+                            drawList,
+                            upperLeft,
+                            upperRight,
+                            lowerLeft,
+                            lowerRight,
+                            withAlpha(
+                                style_.controlledGlowColor,
+                                glowAlpha
+                            ),
+                            style_.controlledGlowLineThickness,
+                            style_.exchangePortOverlap
+                        );
+                    }
+
+                    drawExchangePaths(
                         gateColor,
                         style_.controlledConnectionThickness
                     );
 
-                    drawList->AddLine(
-                        ImVec2{
-                            x - exchangeHalfWidth,
-                            exchangeMaximumY
-                        },
-                        ImVec2{
-                            x + exchangeHalfWidth,
-                            exchangeMinimumY
-                        },
+                    drawExchangePortJoins(
+                        drawList,
+                        upperLeft,
+                        upperRight,
+                        lowerLeft,
+                        lowerRight,
                         gateColor,
-                        style_.controlledConnectionThickness
+                        style_.controlledConnectionThickness,
+                        style_.exchangePortOverlap
                     );
 
                     drawExchangeBadge(
                         drawList,
-                        ImVec2{
-                            x,
-                            (
-                                exchangeMinimumY +
-                                exchangeMaximumY
-                            ) * 0.5F
-                        },
+                        ImVec2{x, exchangeCenterY},
                         gate_notation::exchangeBadge(
                             instruction.name
                         ).data(),
@@ -1969,12 +2154,12 @@ namespace quantum_sim::gui {
                     for (const float endpointY : {controlledMinY, controlledMaxY}) {
                         drawList->AddRectFilled(
                             ImVec2{
-                                x - exchangeHalfWidth - 1.0F,
+                                x - exchangeHalfWidth,
                                 endpointY -
                                 style_.symbolGapHalfHeight
                             },
                             ImVec2{
-                                x + exchangeHalfWidth + 1.0F,
+                                x + exchangeHalfWidth,
                                 endpointY +
                                 style_.symbolGapHalfHeight
                             },
@@ -1998,6 +2183,37 @@ namespace quantum_sim::gui {
                             thickness
                         );
                     };
+
+                    const std::size_t controlQubit =
+                            instruction.controlQubit.value();
+
+                    const std::size_t targetQubit =
+                            instruction.secondaryTargetQubit.value();
+
+                    const std::size_t targetSeparation =
+                            controlQubit > targetQubit
+                                ? controlQubit - targetQubit
+                                : targetQubit - controlQubit;
+
+                    if (targetSeparation > 1U) {
+                        drawInsetLine(
+                            drawList,
+                            upperLeft,
+                            lowerRight,
+                            backgroundColor,
+                            style_.exchangePathUnderlayThickness,
+                            style_.exchangePathUnderlayInset
+                        );
+
+                        drawInsetLine(
+                            drawList,
+                            lowerLeft,
+                            upperRight,
+                            backgroundColor,
+                            style_.exchangePathUnderlayThickness,
+                            style_.exchangePathUnderlayInset
+                        );
+                    }
 
                     if (selected) {
                         const float horizontalPadding =
@@ -2043,11 +2259,33 @@ namespace quantum_sim::gui {
                             glowColor,
                             style_.controlledGlowLineThickness
                         );
+
+                        drawExchangePortJoins(
+                            drawList,
+                            upperLeft,
+                            upperRight,
+                            lowerLeft,
+                            lowerRight,
+                            glowColor,
+                            style_.controlledGlowLineThickness,
+                            style_.exchangePortOverlap
+                        );
                     }
 
                     drawExchangePaths(
                         gateColor,
                         style_.controlledConnectionThickness
+                    );
+
+                    drawExchangePortJoins(
+                        drawList,
+                        upperLeft,
+                        upperRight,
+                        lowerLeft,
+                        lowerRight,
+                        gateColor,
+                        style_.controlledConnectionThickness,
+                        style_.exchangePortOverlap
                     );
 
                     drawExchangeBadge(
