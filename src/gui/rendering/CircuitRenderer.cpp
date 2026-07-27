@@ -425,11 +425,17 @@ namespace {
         if (gateName == "CH") {
             return "H";
         }
-        if (gateName == "CS" || gateName == "CSdg") {
+        if (gateName == "CS") {
             return "S";
         }
-        if (gateName == "CT" || gateName == "CTdg") {
+        if (gateName == "CSdg") {
+            return "S\xE2\x80\xA0";
+        }
+        if (gateName == "CT") {
             return "T";
+        }
+        if (gateName == "CTdg") {
+            return "T\xE2\x80\xA0";
         }
         if (gateName == "CP") {
             return "P";
