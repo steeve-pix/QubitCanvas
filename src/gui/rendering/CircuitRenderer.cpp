@@ -7,6 +7,7 @@
 #include <cmath>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace {
@@ -65,6 +66,303 @@ namespace {
             desiredHalfWidth,
             style.gateHalfWidth,
             style.maximumGateHalfWidth
+        );
+    }
+
+    [[nodiscard]] bool isInteractionGateName(
+        const std::string &gateName
+    ) noexcept;
+
+    [[nodiscard]] std::string_view gateBehavior(
+        const std::string &gateName
+    ) noexcept {
+        if (gateName == "H") {
+            return "Creates or removes an equal superposition.";
+        }
+        if (gateName == "X") {
+            return "Exchanges |0\xE2\x9F\xA9 and |1\xE2\x9F\xA9 like a quantum bit flip.";
+        }
+        if (gateName == "Y") {
+            return "Combines a bit flip with a phase change around the Y axis.";
+        }
+        if (gateName == "Z") {
+            return "Flips the phase of the |1\xE2\x9F\xA9 component.";
+        }
+        if (gateName == "S") {
+            return "Applies a quarter-turn phase to the |1\xE2\x9F\xA9 component.";
+        }
+        if (gateName == "Sdg") {
+            return "Reverses the quarter-turn phase applied by S.";
+        }
+        if (gateName == "T") {
+            return "Applies an eighth-turn phase to the |1\xE2\x9F\xA9 component.";
+        }
+        if (gateName == "Tdg") {
+            return "Reverses the eighth-turn phase applied by T.";
+        }
+        if (gateName == "SX") {
+            return "Performs half of an X rotation; applying it twice produces X.";
+        }
+        if (gateName == "SXdg") {
+            return "Reverses the half-X rotation applied by square-root X.";
+        }
+        if (gateName == "P") {
+            return "Applies the selected phase without changing basis probabilities.";
+        }
+        if (gateName == "U") {
+            return "Applies a general one-qubit rotation using three angles.";
+        }
+        if (gateName == "Rx") {
+            return "Rotates the qubit around the Bloch X axis.";
+        }
+        if (gateName == "Ry") {
+            return "Rotates the qubit around the Bloch Y axis.";
+        }
+        if (gateName == "Rz") {
+            return "Rotates the qubit around the Bloch Z axis.";
+        }
+        if (gateName == "SWAP") {
+            return "Exchanges the quantum states of the connected qubits.";
+        }
+        if (gateName == "iSWAP") {
+            return "Exchanges |01\xE2\x9F\xA9 and |10\xE2\x9F\xA9 while applying a phase of i.";
+        }
+        if (gateName == "sqrtSWAP") {
+            return "Performs a half exchange; applying it twice produces SWAP.";
+        }
+        if (gateName == "CSWAP") {
+            return "Exchanges the two targets only when the control is |1\xE2\x9F\xA9.";
+        }
+        if (gateName == "CCX") {
+            return "Flips the target only when both controls are |1\xE2\x9F\xA9.";
+        }
+        if (gateName == "DCX") {
+            return "Applies controlled-X in both directions.";
+        }
+        if (gateName == "ECR") {
+            return "Applies an echoed cross-resonance entangling operation.";
+        }
+        if (gateName == "fSim") {
+            return "Combines excitation exchange with a conditional phase.";
+        }
+        if (gateName == "RXX") {
+            return "Jointly rotates the pair through X tensor X coupling.";
+        }
+        if (gateName == "RYY") {
+            return "Jointly rotates the pair through Y tensor Y coupling.";
+        }
+        if (gateName == "RZZ") {
+            return "Applies a parity-dependent phase through Z tensor Z coupling.";
+        }
+        if (
+            gateName == "CX" ||
+            gateName == "CY" ||
+            gateName == "CZ" ||
+            gateName == "CH" ||
+            gateName == "CS" ||
+            gateName == "CSdg" ||
+            gateName == "CT" ||
+            gateName == "CTdg" ||
+            gateName == "CP" ||
+            gateName == "CRx" ||
+            gateName == "CRy" ||
+            gateName == "CRz"
+        ) {
+            return "Applies the target operation only when the control is |1\xE2\x9F\xA9.";
+        }
+
+        return {};
+    }
+
+    [[nodiscard]] std::string instructionOperands(
+        const quantum_sim::circuit::CircuitInstructionInfo &instruction
+    ) {
+        const auto qubitLabel =
+                [](const std::size_t qubit) {
+                    return "q" + std::to_string(qubit);
+                };
+
+        if (
+            instruction.controlQubit.has_value() &&
+            instruction.secondaryTargetQubit.has_value() &&
+            instruction.tertiaryTargetQubit.has_value()
+        ) {
+            if (instruction.name == "CSWAP") {
+                return "Control " +
+                       qubitLabel(instruction.controlQubit.value()) +
+                       "  |  Exchange " +
+                       qubitLabel(instruction.secondaryTargetQubit.value()) +
+                       " \xE2\x86\x94 " +
+                       qubitLabel(instruction.tertiaryTargetQubit.value());
+            }
+
+            return "Controls " +
+                   qubitLabel(instruction.controlQubit.value()) +
+                   ", " +
+                   qubitLabel(instruction.secondaryTargetQubit.value()) +
+                   "  |  Target " +
+                   qubitLabel(instruction.tertiaryTargetQubit.value());
+        }
+
+        if (
+            instruction.controlQubit.has_value() &&
+            instruction.secondaryTargetQubit.has_value()
+        ) {
+            const bool exchangeGate =
+                    instruction.name == "SWAP" ||
+                    instruction.name == "iSWAP" ||
+                    instruction.name == "sqrtSWAP";
+
+            if (exchangeGate) {
+                return "Exchange " +
+                       qubitLabel(instruction.controlQubit.value()) +
+                       " \xE2\x86\x94 " +
+                       qubitLabel(instruction.secondaryTargetQubit.value());
+            }
+
+            if (isInteractionGateName(instruction.name)) {
+                return "Pair " +
+                       qubitLabel(instruction.controlQubit.value()) +
+                       ", " +
+                       qubitLabel(instruction.secondaryTargetQubit.value());
+            }
+
+            return "Control " +
+                   qubitLabel(instruction.controlQubit.value()) +
+                   "  |  Target " +
+                   qubitLabel(instruction.secondaryTargetQubit.value());
+        }
+
+        if (instruction.targetQubit.has_value()) {
+            return "Target " +
+                   qubitLabel(instruction.targetQubit.value());
+        }
+
+        return "Full register";
+    }
+
+    void showInstructionTooltip(
+        const quantum_sim::circuit::CircuitInstructionInfo &instruction,
+        const std::size_t instructionIndex,
+        const std::size_t instructionCount
+    ) {
+        const std::string operands =
+                instructionOperands(instruction);
+
+        ImGui::BeginTooltip();
+        ImGui::TextColored(
+            ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
+            "%s",
+            instruction.name.c_str()
+        );
+        ImGui::SameLine();
+        ImGui::TextDisabled(
+            "step %zu/%zu",
+            instructionIndex + 1U,
+            instructionCount
+        );
+        ImGui::Separator();
+        ImGui::TextUnformatted(operands.c_str());
+
+        if (instruction.angleRadians.has_value()) {
+            const std::string angleText =
+                    quantum_sim::gui::notation::formatAngleMeasurement(
+                        instruction.angleRadians.value()
+                    );
+
+            ImGui::Text(
+                "Angle  %s",
+                angleText.c_str()
+            );
+        }
+
+        const std::string_view behavior =
+                gateBehavior(instruction.name);
+
+        if (!behavior.empty()) {
+            ImGui::Spacing();
+            ImGui::PushTextWrapPos(
+                ImGui::GetCursorPosX() +
+                ImGui::GetFontSize() * 32.0F
+            );
+            ImGui::TextUnformatted(
+                behavior.data(),
+                behavior.data() + behavior.size()
+            );
+            ImGui::PopTextWrapPos();
+        } else if (
+            instruction.kind ==
+            quantum_sim::circuit::CircuitInstructionKind::Reflection
+        ) {
+            ImGui::Spacing();
+            ImGui::TextUnformatted(
+                "Applies a reflection across the full register state space."
+            );
+        } else if (
+            instruction.kind ==
+            quantum_sim::circuit::CircuitInstructionKind::FullRegister
+        ) {
+            ImGui::Spacing();
+            ImGui::TextUnformatted(
+                "Applies one operation to the complete register."
+            );
+        }
+
+        ImGui::EndTooltip();
+    }
+
+    void drawExchangeBadge(
+        ImDrawList *drawList,
+        const ImVec2 &center,
+        const char *label,
+        const ImU32 backgroundColor,
+        const ImU32 foregroundColor,
+        const quantum_sim::gui::CircuitStyle &style
+    ) {
+        const ImVec2 labelSize =
+                ImGui::CalcTextSize(label);
+
+        const ImVec2 minimum{
+            center.x -
+            labelSize.x * 0.5F -
+            style.exchangeBadgePaddingX,
+            center.y -
+            labelSize.y * 0.5F -
+            style.exchangeBadgePaddingY
+        };
+
+        const ImVec2 maximum{
+            center.x +
+            labelSize.x * 0.5F +
+            style.exchangeBadgePaddingX,
+            center.y +
+            labelSize.y * 0.5F +
+            style.exchangeBadgePaddingY
+        };
+
+        drawList->AddRectFilled(
+            minimum,
+            maximum,
+            backgroundColor,
+            style.exchangeBadgeCornerRadius
+        );
+
+        drawList->AddRect(
+            minimum,
+            maximum,
+            foregroundColor,
+            style.exchangeBadgeCornerRadius,
+            0,
+            1.0F
+        );
+
+        drawList->AddText(
+            ImVec2{
+                center.x - labelSize.x * 0.5F,
+                center.y - labelSize.y * 0.5F
+            },
+            foregroundColor,
+            label
         );
     }
 
@@ -1229,27 +1527,11 @@ namespace quantum_sim::gui {
                     ImGuiMouseCursor_Hand
                 );
 
-                if (instruction.angleRadians.has_value()) {
-                    const std::string angleText =
-                            quantum_sim::gui::notation::formatAngleMeasurement(
-                                instruction.angleRadians.value()
-                            );
-
-                    ImGui::SetTooltip(
-                        "Step %zu of %zu\nGate: %s\nAngle: %s",
-                        instructionIndex + 1,
-                        instructions.size(),
-                        instruction.name.c_str(),
-                        angleText.c_str()
-                    );
-                } else {
-                    ImGui::SetTooltip(
-                        "Step %zu of %zu\nGate: %s",
-                        instructionIndex + 1,
-                        instructions.size(),
-                        instruction.name.c_str()
-                    );
-                }
+                showInstructionTooltip(
+                    instruction,
+                    instructionIndex,
+                    instructions.size()
+                );
             }
 
             // Short execution stem. It stops before the first wire.
@@ -1340,6 +1622,12 @@ namespace quantum_sim::gui {
                 if (hovered) {
                     ImGui::SetMouseCursor(
                         ImGuiMouseCursor_Hand
+                    );
+
+                    showInstructionTooltip(
+                        instruction,
+                        instructionIndex,
+                        instructions.size()
                     );
                 }
 
@@ -1480,8 +1768,7 @@ namespace quantum_sim::gui {
                             );
 
                     const float exchangeHalfWidth =
-                            style_.gateHalfWidth +
-                            5.0F;
+                            style_.exchangePathHalfWidth;
 
                     drawList->AddLine(
                         ImVec2{
@@ -1507,6 +1794,21 @@ namespace quantum_sim::gui {
                         },
                         gateColor,
                         style_.controlledConnectionThickness
+                    );
+
+                    drawExchangeBadge(
+                        drawList,
+                        ImVec2{
+                            x,
+                            (
+                                exchangeMinimumY +
+                                exchangeMaximumY
+                            ) * 0.5F
+                        },
+                        "SW",
+                        backgroundColor,
+                        gateColor,
+                        style_
                     );
                 }
 
@@ -1570,6 +1872,12 @@ namespace quantum_sim::gui {
                 if (hovered) {
                     ImGui::SetMouseCursor(
                         ImGuiMouseCursor_Hand
+                    );
+
+                    showInstructionTooltip(
+                        instruction,
+                        instructionIndex,
+                        instructions.size()
                     );
                 }
 
@@ -1661,7 +1969,7 @@ namespace quantum_sim::gui {
 
                 if (isSwapFamily) {
                     const float exchangeHalfWidth =
-                            style_.gateHalfWidth + 5.0F;
+                            style_.exchangePathHalfWidth;
 
                     const ImVec2 upperLeft{
                         x - exchangeHalfWidth,
@@ -1768,58 +2076,28 @@ namespace quantum_sim::gui {
                         style_.controlledConnectionThickness
                     );
 
-                    if (isISwap || isSqrtSwap) {
-                        const char *swapLabel =
-                                isISwap
-                                    ? "(i)"
-                                    : "(\xE2\x88\x9A)";
+                    const char *swapLabel =
+                            isISwap
+                                ? "iSW"
+                                : isSqrtSwap
+                                      ? "\xE2\x88\x9A"
+                                        "SW"
+                                      : "SW";
 
-                        const ImVec2 swapLabelSize =
-                                ImGui::CalcTextSize(swapLabel);
-
-                        const ImVec2 midpoint{
+                    drawExchangeBadge(
+                        drawList,
+                        ImVec2{
                             x,
                             (
                                 controlledMinY +
                                 controlledMaxY
                             ) * 0.5F
-                        };
-
-                        constexpr float labelPaddingX = 4.0F;
-                        constexpr float labelPaddingY = 2.0F;
-
-                        drawList->AddRectFilled(
-                            ImVec2{
-                                midpoint.x -
-                                swapLabelSize.x * 0.5F -
-                                labelPaddingX,
-                                midpoint.y -
-                                swapLabelSize.y * 0.5F -
-                                labelPaddingY
-                            },
-                            ImVec2{
-                                midpoint.x +
-                                swapLabelSize.x * 0.5F +
-                                labelPaddingX,
-                                midpoint.y +
-                                swapLabelSize.y * 0.5F +
-                                labelPaddingY
-                            },
-                            backgroundColor,
-                            style_.gateCornerRadius
-                        );
-
-                        drawList->AddText(
-                            ImVec2{
-                                midpoint.x -
-                                swapLabelSize.x * 0.5F,
-                                midpoint.y -
-                                swapLabelSize.y * 0.5F
-                            },
-                            gateColor,
-                            swapLabel
-                        );
-                    }
+                        },
+                        swapLabel,
+                        backgroundColor,
+                        gateColor,
+                        style_
+                    );
 
                     continue;
                 }
@@ -2180,23 +2458,11 @@ namespace quantum_sim::gui {
                     ImGuiMouseCursor_Hand
                 );
 
-                if (instruction.angleRadians.has_value()) {
-                    const std::string angleText =
-                            quantum_sim::gui::notation::formatAngleMeasurement(
-                                instruction.angleRadians.value()
-                            );
-
-                    ImGui::SetTooltip(
-                        "%s\nAngle: %s",
-                        instruction.name.c_str(),
-                        angleText.c_str()
-                    );
-                } else {
-                    ImGui::SetTooltip(
-                        "%s",
-                        instruction.name.c_str()
-                    );
-                }
+                showInstructionTooltip(
+                    instruction,
+                    instructionIndex,
+                    instructions.size()
+                );
             }
 
             beginInstructionDrag(
