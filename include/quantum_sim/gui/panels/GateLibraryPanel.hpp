@@ -107,7 +107,10 @@ namespace quantum_sim::gui {
         void drawGateCategory(const char *title, const GateDescriptor *gates, std::size_t gateCount);
 
         /**
-         * Draws the radians slider and common-angle shortcuts for rotation gates.
+         * Draws the pi-coefficient slider and common-angle shortcuts.
+         *
+         * The control presents angles as multiples of pi while preserving the
+         * internal radian value consumed by the quantum gate implementation.
          */
         void drawRotationAngleControl();
 
