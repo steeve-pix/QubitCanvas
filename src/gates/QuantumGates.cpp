@@ -5,6 +5,35 @@
 #include <stdexcept>
 #include <limits>
 
+namespace {
+    [[nodiscard]] quantum_sim::math::Complex phase(
+        const double angleRadians
+    ) {
+        return quantum_sim::math::Complex{
+            std::cos(angleRadians),
+            std::sin(angleRadians)
+        };
+    }
+
+    [[nodiscard]] quantum_sim::math::ComplexMatrix controlledGate(
+        const quantum_sim::math::ComplexMatrix &targetGate
+    ) {
+        using quantum_sim::math::Complex;
+        using quantum_sim::math::ComplexMatrix;
+
+        return ComplexMatrix{
+            4,
+            4,
+            std::vector{
+                Complex{1.0, 0.0}, Complex{}, Complex{}, Complex{},
+                Complex{}, Complex{1.0, 0.0}, Complex{}, Complex{},
+                Complex{}, Complex{}, targetGate.at(0U, 0U), targetGate.at(0U, 1U),
+                Complex{}, Complex{}, targetGate.at(1U, 0U), targetGate.at(1U, 1U)
+            }
+        };
+    }
+}
+
 namespace quantum_sim::gates {
     math::ComplexMatrix xGate() {
         // X swaps the |0⟩ and |1⟩ amplitudes.
@@ -159,6 +188,86 @@ namespace quantum_sim::gates {
         };
     }
 
+    math::ComplexMatrix sxGate() {
+        return math::ComplexMatrix{
+            2,
+            2,
+            std::vector{
+                math::Complex{0.5, 0.5},
+                math::Complex{0.5, -0.5},
+                math::Complex{0.5, -0.5},
+                math::Complex{0.5, 0.5}
+            }
+        };
+    }
+
+    math::ComplexMatrix sxDaggerGate() {
+        return math::ComplexMatrix{
+            2,
+            2,
+            std::vector{
+                math::Complex{0.5, -0.5},
+                math::Complex{0.5, 0.5},
+                math::Complex{0.5, 0.5},
+                math::Complex{0.5, -0.5}
+            }
+        };
+    }
+
+    math::ComplexMatrix phaseGate(const double angleRadians) {
+        return math::ComplexMatrix{
+            2,
+            2,
+            std::vector{
+                math::Complex{1.0, 0.0},
+                math::Complex{},
+                math::Complex{},
+                phase(angleRadians)
+            }
+        };
+    }
+
+    math::ComplexMatrix uGate(
+        const double thetaRadians,
+        const double phiRadians,
+        const double lambdaRadians
+    ) {
+        const double cosine =
+                std::cos(thetaRadians * 0.5);
+
+        const double sine =
+                std::sin(thetaRadians * 0.5);
+
+        const math::Complex phiPhase =
+                phase(phiRadians);
+
+        const math::Complex lambdaPhase =
+                phase(lambdaRadians);
+
+        const math::Complex combinedPhase =
+                phase(phiRadians + lambdaRadians);
+
+        return math::ComplexMatrix{
+            2,
+            2,
+            std::vector{
+                math::Complex{cosine, 0.0},
+                math::Complex{
+                    -lambdaPhase.real() * sine,
+                    -lambdaPhase.imaginary() * sine
+                },
+                math::Complex{
+                    phiPhase.real() * sine,
+                    phiPhase.imaginary() * sine
+                },
+                math::Complex{
+                    combinedPhase.real() * cosine,
+                    combinedPhase.imaginary() * cosine
+                }
+            }
+        };
+    }
+
     math::ComplexMatrix hadamardGate() {
         // 1/sqrt(2) keeps the Hadamard columns normalized.
         double invSqrt2 = 1.0 / std::sqrt(2.0);
@@ -250,6 +359,96 @@ namespace quantum_sim::gates {
                 math::Complex{},
                 math::Complex{},
                 math::Complex{-1.0, 0.0}
+            }
+        };
+    }
+
+    math::ComplexMatrix controlledPhaseGate(
+        const double angleRadians
+    ) {
+        return controlledGate(
+            phaseGate(angleRadians)
+        );
+    }
+
+    math::ComplexMatrix crxGate(const double angleRadians) {
+        return controlledGate(
+            rxGate(angleRadians)
+        );
+    }
+
+    math::ComplexMatrix cryGate(const double angleRadians) {
+        return controlledGate(
+            ryGate(angleRadians)
+        );
+    }
+
+    math::ComplexMatrix crzGate(const double angleRadians) {
+        return controlledGate(
+            rzGate(angleRadians)
+        );
+    }
+
+    math::ComplexMatrix rxxGate(const double angleRadians) {
+        const double cosine =
+                std::cos(angleRadians * 0.5);
+
+        const double sine =
+                std::sin(angleRadians * 0.5);
+
+        const math::Complex diagonal{cosine, 0.0};
+        const math::Complex coupling{0.0, -sine};
+
+        return math::ComplexMatrix{
+            4,
+            4,
+            std::vector{
+                diagonal, math::Complex{}, math::Complex{}, coupling,
+                math::Complex{}, diagonal, coupling, math::Complex{},
+                math::Complex{}, coupling, diagonal, math::Complex{},
+                coupling, math::Complex{}, math::Complex{}, diagonal
+            }
+        };
+    }
+
+    math::ComplexMatrix ryyGate(const double angleRadians) {
+        const double cosine =
+                std::cos(angleRadians * 0.5);
+
+        const double sine =
+                std::sin(angleRadians * 0.5);
+
+        const math::Complex diagonal{cosine, 0.0};
+        const math::Complex positiveCoupling{0.0, sine};
+        const math::Complex negativeCoupling{0.0, -sine};
+
+        return math::ComplexMatrix{
+            4,
+            4,
+            std::vector{
+                diagonal, math::Complex{}, math::Complex{}, positiveCoupling,
+                math::Complex{}, diagonal, negativeCoupling, math::Complex{},
+                math::Complex{}, negativeCoupling, diagonal, math::Complex{},
+                positiveCoupling, math::Complex{}, math::Complex{}, diagonal
+            }
+        };
+    }
+
+    math::ComplexMatrix rzzGate(const double angleRadians) {
+        const math::Complex evenPhase =
+                phase(-angleRadians * 0.5);
+
+        const math::Complex oddPhase =
+                phase(angleRadians * 0.5);
+
+        return math::ComplexMatrix{
+            4,
+            4,
+            std::vector{
+                evenPhase, math::Complex{}, math::Complex{}, math::Complex{},
+                math::Complex{}, oddPhase, math::Complex{}, math::Complex{},
+                math::Complex{}, math::Complex{}, oddPhase, math::Complex{},
+                math::Complex{}, math::Complex{}, math::Complex{}, evenPhase
             }
         };
     }

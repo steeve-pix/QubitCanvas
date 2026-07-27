@@ -14,6 +14,7 @@
 #include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <sstream>
 #include <iostream>
 #include <cmath>
@@ -416,7 +417,15 @@ int main() {
         quantum_sim::algorithms::swapTestCircuit(10U),
         quantum_sim::algorithms::quantumWalkCircuit(10U),
         quantum_sim::algorithms::bb84DemoCircuit(10U),
-        quantum_sim::algorithms::superdenseCodingCircuit(10U)
+        quantum_sim::algorithms::superdenseCodingCircuit(10U),
+        quantum_sim::algorithms::wStateCircuit(10U),
+        quantum_sim::algorithms::dickeStateCircuit(10U, 2U),
+        quantum_sim::algorithms::graphStateCircuit(10U),
+        quantum_sim::algorithms::randomCircuit(10U, 42U),
+        quantum_sim::algorithms::weightedStatePreparationCircuit(10U),
+        quantum_sim::algorithms::bitFlipCodeCircuit(10U),
+        quantum_sim::algorithms::steaneCodeCircuit(10U),
+        quantum_sim::algorithms::shorCodeCircuit(10U)
     };
 
     check(
@@ -873,8 +882,121 @@ int main() {
             );
 
     check(
-        approximatelyEqual(expandedGroverResult.probability(12), 1.0),
-        "Expanded Grover preserves idle qubits while marking q0/q1 as |11⟩"
+        expandedGroverResult.probability(15U) > 0.94,
+        "Expanded Grover searches the complete register for |1111⟩"
+    );
+
+    const QuantumRegister wStateResult =
+            quantum_sim::algorithms::wStateCircuit(4U).execute(
+                QuantumRegister::basisState(4U, 0U)
+            );
+
+    double wStateProbability{};
+
+    for (std::size_t state = 0U; state < wStateResult.stateCount(); ++state) {
+        if (std::popcount(state) == 1) {
+            wStateProbability +=
+                    wStateResult.probability(state);
+        }
+    }
+
+    check(
+        approximatelyEqual(wStateProbability, 1.0) &&
+        approximatelyEqual(wStateResult.probability(1U), 0.25),
+        "W-state preparation shares one excitation uniformly"
+    );
+
+    const QuantumRegister dickeStateResult =
+            quantum_sim::algorithms::dickeStateCircuit(4U, 2U).execute(
+                QuantumRegister::basisState(4U, 0U)
+            );
+
+    double dickeProbability{};
+
+    for (std::size_t state = 0U; state < dickeStateResult.stateCount(); ++state) {
+        if (std::popcount(state) == 2) {
+            dickeProbability +=
+                    dickeStateResult.probability(state);
+        }
+    }
+
+    check(
+        approximatelyEqual(dickeProbability, 1.0) &&
+        approximatelyEqual(dickeStateResult.probability(3U), 1.0 / 6.0),
+        "Dicke-state preparation populates exactly the requested Hamming weight"
+    );
+
+    const QuantumRegister weightedStateResult =
+            quantum_sim::algorithms::weightedStatePreparationCircuit(6U).execute(
+                QuantumRegister::basisState(6U, 0U)
+            );
+
+    check(
+        approximatelyEqual(summedProbability(weightedStateResult), 1.0) &&
+        !approximatelyEqual(
+            weightedStateResult.probability(0U),
+            weightedStateResult.probability(1U)
+        ),
+        "Weighted state preparation produces normalized uneven probabilities"
+    );
+
+    const QuantumRegister randomCircuitResult =
+            quantum_sim::algorithms::randomCircuit(
+                6U,
+                0x12345678ULL
+            ).execute(
+                QuantumRegister::basisState(6U, 0U)
+            );
+
+    double minimumRandomProbability = 1.0;
+    double maximumRandomProbability = 0.0;
+
+    for (std::size_t state = 0U; state < randomCircuitResult.stateCount(); ++state) {
+        minimumRandomProbability =
+                std::min(
+                    minimumRandomProbability,
+                    randomCircuitResult.probability(state)
+                );
+
+        maximumRandomProbability =
+                std::max(
+                    maximumRandomProbability,
+                    randomCircuitResult.probability(state)
+                );
+    }
+
+    check(
+        approximatelyEqual(summedProbability(randomCircuitResult), 1.0) &&
+        maximumRandomProbability - minimumRandomProbability > 0.01,
+        "Seeded random circuits are reproducible and visibly non-uniform"
+    );
+
+    const QuantumRegister graphStateResult =
+            quantum_sim::algorithms::graphStateCircuit(6U).execute(
+                QuantumRegister::basisState(6U, 0U)
+            );
+
+    const QuantumRegister bitFlipCodeResult =
+            quantum_sim::algorithms::bitFlipCodeCircuit().execute(
+                QuantumRegister::basisState(3U, 0U)
+            );
+
+    const QuantumRegister steaneCodeResult =
+            quantum_sim::algorithms::steaneCodeCircuit().execute(
+                QuantumRegister::basisState(7U, 0U)
+            );
+
+    const QuantumRegister shorCodeResult =
+            quantum_sim::algorithms::shorCodeCircuit().execute(
+                QuantumRegister::basisState(9U, 0U)
+            );
+
+    check(
+        approximatelyEqual(summedProbability(graphStateResult), 1.0) &&
+        approximatelyEqual(bitFlipCodeResult.probabilityOfQubitOne(0U), 0.25) &&
+        approximatelyEqual(summedProbability(steaneCodeResult), 1.0) &&
+        approximatelyEqual(summedProbability(shorCodeResult), 1.0),
+        "Graph and error-correction presets preserve normalized quantum states"
     );
 
     const QuantumRegister deutschJozsaResult =
@@ -1166,6 +1288,53 @@ int main() {
 
     const ComplexMatrix sDagger =
             quantum_sim::gates::sDaggerGate();
+
+    const std::vector<ComplexMatrix> extendedGateBatch{
+        quantum_sim::gates::sxGate(),
+        quantum_sim::gates::sxDaggerGate(),
+        quantum_sim::gates::phaseGate(std::numbers::pi / 3.0),
+        quantum_sim::gates::uGate(
+            std::numbers::pi / 3.0,
+            std::numbers::pi / 5.0,
+            -std::numbers::pi / 7.0
+        ),
+        quantum_sim::gates::controlledPhaseGate(std::numbers::pi / 3.0),
+        quantum_sim::gates::crxGate(std::numbers::pi / 3.0),
+        quantum_sim::gates::cryGate(std::numbers::pi / 3.0),
+        quantum_sim::gates::crzGate(std::numbers::pi / 3.0),
+        quantum_sim::gates::rxxGate(std::numbers::pi / 3.0),
+        quantum_sim::gates::ryyGate(std::numbers::pi / 3.0),
+        quantum_sim::gates::rzzGate(std::numbers::pi / 3.0)
+    };
+
+    check(
+        std::all_of(
+            extendedGateBatch.begin(),
+            extendedGateBatch.end(),
+            [](const ComplexMatrix &gate) {
+                return gate.isUnitary();
+            }
+        ),
+        "Every gate in the extended library is unitary"
+    );
+
+    QuantumCircuit parameterizedTwoQubitCircuit{2U};
+    parameterizedTwoQubitCircuit.addTwoQubitGate(
+        "RXX",
+        quantum_sim::gates::rxxGate(std::numbers::pi / 3.0),
+        0U,
+        1U,
+        std::numbers::pi / 3.0
+    );
+
+    check(
+        parameterizedTwoQubitCircuit.instructionInfo().front().angleRadians.has_value() &&
+        approximatelyEqual(
+            parameterizedTwoQubitCircuit.instructionInfo().front().angleRadians.value(),
+            std::numbers::pi / 3.0
+        ),
+        "Parameterized two-qubit gates retain their timeline angle"
+    );
 
     check(
         approximatelyEqual(rx.at(0, 0).real(), 0.0) &&

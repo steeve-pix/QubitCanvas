@@ -15,6 +15,15 @@ namespace quantum_sim::gui {
     };
 
     /**
+     * Parameter values captured when a parameterized gate is placed.
+     */
+    struct GateParameters {
+        double thetaRadians{1.5707963267948966};
+        double phiRadians{1.0471975511965976};
+        double lambdaRadians{-0.7853981633974483};
+    };
+
+    /**
      * Left-side palette that lets the user choose gates for circuit placement.
      */
     class GateLibraryPanel {
@@ -49,9 +58,23 @@ namespace quantum_sim::gui {
         [[nodiscard]] const std::optional<std::string> &selectedGate() const noexcept;
 
         /**
-         * @return Rotation angle captured for newly selected Rx, Ry, or Rz gates.
+         * @return Current theta, phi, and lambda values for gate placement.
          */
-        [[nodiscard]] double rotationAngleRadians() const noexcept;
+        [[nodiscard]] GateParameters gateParameters() const noexcept;
+
+        /**
+         * Selects a zero-based gate catalog page.
+         *
+         * Values past the last page are clamped.
+         *
+         * @param pageIndex Requested catalog page.
+         */
+        void setPage(std::size_t pageIndex) noexcept;
+
+        /**
+         * @return Zero-based gate catalog page currently displayed.
+         */
+        [[nodiscard]] std::size_t page() const noexcept;
 
         /**
          * Keeps one gate visibly armed in the palette.
@@ -80,6 +103,9 @@ namespace quantum_sim::gui {
         std::optional<std::string> selectedGate_;
         bool selectionChanged_{false};
         float rotationAngleRadians_{1.57079632679F};
+        float phiAngleRadians_{1.0471975512F};
+        float lambdaAngleRadians_{-0.7853981634F};
+        std::size_t gatePage_{0U};
 
         /**
          * Draws one square gate button and its matrix preview tooltip.
@@ -123,7 +149,11 @@ namespace quantum_sim::gui {
          * The control presents angles as multiples of pi while preserving the
          * internal radian value consumed by the quantum gate implementation.
          */
-        void drawRotationAngleControl();
+        void drawParameterizedControls();
 
+        /**
+         * Draws previous/page/next controls for the compact gate catalog.
+         */
+        void drawPageControls();
     };
 }

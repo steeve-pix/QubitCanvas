@@ -14,10 +14,25 @@
 #include <vector>
 
 namespace {
-    [[nodiscard]] bool isRotationGate(const std::string_view gateName) noexcept {
+    [[nodiscard]] bool usesTheta(const std::string_view gateName) noexcept {
         return gateName == "Rx" ||
                gateName == "Ry" ||
-               gateName == "Rz";
+               gateName == "Rz" ||
+               gateName == "P" ||
+               gateName == "U" ||
+               gateName == "CP" ||
+               gateName == "CRx" ||
+               gateName == "CRy" ||
+               gateName == "CRz" ||
+               gateName == "RXX" ||
+               gateName == "RYY" ||
+               gateName == "RZZ";
+    }
+
+    [[nodiscard]] bool usesThreeAngles(
+        const std::string_view gateName
+    ) noexcept {
+        return gateName == "U";
     }
 
     [[nodiscard]] const char *gateTitle(const std::string_view gateName) {
@@ -45,6 +60,18 @@ namespace {
         if (gateName == "Tdg") {
             return "PHASE-T DAGGER";
         }
+        if (gateName == "SX") {
+            return "SQUARE ROOT X";
+        }
+        if (gateName == "SXdg") {
+            return "SQUARE ROOT X DAGGER";
+        }
+        if (gateName == "P") {
+            return "PHASE";
+        }
+        if (gateName == "U") {
+            return "UNIVERSAL U";
+        }
         if (gateName == "Rx") {
             return "ROTATION-X";
         }
@@ -63,6 +90,27 @@ namespace {
         if (gateName == "CZ") {
             return "CONTROLLED-Z";
         }
+        if (gateName == "CP") {
+            return "CONTROLLED-PHASE";
+        }
+        if (gateName == "CRx") {
+            return "CONTROLLED ROTATION-X";
+        }
+        if (gateName == "CRy") {
+            return "CONTROLLED ROTATION-Y";
+        }
+        if (gateName == "CRz") {
+            return "CONTROLLED ROTATION-Z";
+        }
+        if (gateName == "RXX") {
+            return "XX INTERACTION";
+        }
+        if (gateName == "RYY") {
+            return "YY INTERACTION";
+        }
+        if (gateName == "RZZ") {
+            return "ZZ INTERACTION";
+        }
         if (gateName == "SWAP") {
             return "SWAP";
         }
@@ -75,7 +123,7 @@ namespace {
 
     [[nodiscard]] quantum_sim::math::ComplexMatrix gateMatrix(
         const std::string_view gateName,
-        const double rotationAngleRadians
+        const quantum_sim::gui::GateParameters &parameters
     ) {
         using namespace quantum_sim;
 
@@ -103,14 +151,30 @@ namespace {
         if (gateName == "Tdg") {
             return gates::tDaggerGate();
         }
+        if (gateName == "SX") {
+            return gates::sxGate();
+        }
+        if (gateName == "SXdg") {
+            return gates::sxDaggerGate();
+        }
+        if (gateName == "P") {
+            return gates::phaseGate(parameters.thetaRadians);
+        }
+        if (gateName == "U") {
+            return gates::uGate(
+                parameters.thetaRadians,
+                parameters.phiRadians,
+                parameters.lambdaRadians
+            );
+        }
         if (gateName == "Rx") {
-            return gates::rxGate(rotationAngleRadians);
+            return gates::rxGate(parameters.thetaRadians);
         }
         if (gateName == "Ry") {
-            return gates::ryGate(rotationAngleRadians);
+            return gates::ryGate(parameters.thetaRadians);
         }
         if (gateName == "Rz") {
-            return gates::rzGate(rotationAngleRadians);
+            return gates::rzGate(parameters.thetaRadians);
         }
         if (gateName == "CX") {
             return gates::cxGate();
@@ -120,6 +184,29 @@ namespace {
         }
         if (gateName == "CZ") {
             return gates::czGate();
+        }
+        if (gateName == "CP") {
+            return gates::controlledPhaseGate(
+                parameters.thetaRadians
+            );
+        }
+        if (gateName == "CRx") {
+            return gates::crxGate(parameters.thetaRadians);
+        }
+        if (gateName == "CRy") {
+            return gates::cryGate(parameters.thetaRadians);
+        }
+        if (gateName == "CRz") {
+            return gates::crzGate(parameters.thetaRadians);
+        }
+        if (gateName == "RXX") {
+            return gates::rxxGate(parameters.thetaRadians);
+        }
+        if (gateName == "RYY") {
+            return gates::ryyGate(parameters.thetaRadians);
+        }
+        if (gateName == "RZZ") {
+            return gates::rzzGate(parameters.thetaRadians);
         }
         if (gateName == "SWAP") {
             return gates::swapGate();
@@ -173,12 +260,20 @@ namespace {
             return "T\xE2\x80\xA0";
         }
 
+        if (gateName == "SX") {
+            return "\xE2\x88\x9A""X";
+        }
+
+        if (gateName == "SXdg") {
+            return "\xE2\x88\x9A""X\xE2\x80\xA0";
+        }
+
         return gateName.data();
     }
 }
 
 namespace quantum_sim::gui {
-    constexpr GateDescriptor singleQubitGates[] = {
+    constexpr GateDescriptor coreSingleQubitGates[] = {
         {
             "H",
             "Hadamard gate: creates or removes equal superposition."
@@ -212,10 +307,26 @@ namespace quantum_sim::gui {
             "Tdg",
             "Inverse T gate: rotates the |1\xE2\x9F\xA9 phase by -\xCF\x80/4 radians. "
             "It cancels T and is used in decompositions such as Toffoli."
+        },
+        {
+            "SX",
+            "Square-root X: two applications equal one Pauli-X flip."
+        },
+        {
+            "SXdg",
+            "Inverse square-root X: reverses SX and rotates in the opposite direction."
         }
     };
 
-    constexpr GateDescriptor rotationGates[] = {
+    constexpr GateDescriptor parameterizedSingleQubitGates[] = {
+        {
+            "P",
+            "Phase gate: applies exp(i theta) to |1\xE2\x9F\xA9 without changing probability."
+        },
+        {
+            "U",
+            "Universal gate: represents any one-qubit unitary using theta, phi, and lambda."
+        },
         {
             "Rx",
             "Rx gate: rotates around the Bloch X axis by the selected angle."
@@ -230,7 +341,7 @@ namespace quantum_sim::gui {
         }
     };
 
-    constexpr GateDescriptor controlledGates[] = {
+    constexpr GateDescriptor coreTwoQubitGates[] = {
         {
             "CX",
             "Controlled-X gate: flips the target when the control is |1\xE2\x9F\xA9."
@@ -253,6 +364,40 @@ namespace quantum_sim::gui {
         }
     };
 
+    constexpr GateDescriptor parameterizedControlledGates[] = {
+        {
+            "CP",
+            "Controlled phase: applies exp(i theta) only when both qubits are |1\xE2\x9F\xA9."
+        },
+        {
+            "CRx",
+            "Controlled Rx: rotates the target around X only when the control is |1\xE2\x9F\xA9."
+        },
+        {
+            "CRy",
+            "Controlled Ry: rotates the target around Y only when the control is |1\xE2\x9F\xA9."
+        },
+        {
+            "CRz",
+            "Controlled Rz: rotates the target around Z only when the control is |1\xE2\x9F\xA9."
+        }
+    };
+
+    constexpr GateDescriptor interactionGates[] = {
+        {
+            "RXX",
+            "XX interaction: jointly rotates two qubits through the X tensor X coupling."
+        },
+        {
+            "RYY",
+            "YY interaction: jointly rotates two qubits through the Y tensor Y coupling."
+        },
+        {
+            "RZZ",
+            "ZZ interaction: adds parity-dependent phase through the Z tensor Z coupling."
+        }
+    };
+
     GateLibraryPanel::GateLibraryPanel(GateLibraryStyle style)
         : style_{std::move(style)} {
     }
@@ -266,24 +411,60 @@ namespace quantum_sim::gui {
     }
 
     void GateLibraryPanel::draw() {
-        // Gate groups remain compact; angle controls appear only while useful.
-        drawGateCategory("Single-qubit gates", singleQubitGates, std::size(singleQubitGates));
+        gatePage_ =
+                std::min(
+                    gatePage_,
+                    std::size_t{1}
+                );
 
-        ImGui::Spacing();
+        if (gatePage_ == 0U) {
+            drawGateCategory(
+                "Core single-qubit",
+                coreSingleQubitGates,
+                std::size(coreSingleQubitGates)
+            );
 
-        drawGateCategory("Rotation gates", rotationGates, std::size(rotationGates));
+            ImGui::Spacing();
+
+            drawGateCategory(
+                "Core two-qubit",
+                coreTwoQubitGates,
+                std::size(coreTwoQubitGates)
+            );
+        } else {
+            drawGateCategory(
+                "Parameterized single-qubit",
+                parameterizedSingleQubitGates,
+                std::size(parameterizedSingleQubitGates)
+            );
+
+            ImGui::Spacing();
+
+            drawGateCategory(
+                "Parameterized controlled",
+                parameterizedControlledGates,
+                std::size(parameterizedControlledGates)
+            );
+
+            ImGui::Spacing();
+
+            drawGateCategory(
+                "Two-qubit interactions",
+                interactionGates,
+                std::size(interactionGates)
+            );
+        }
 
         if (
             selectedGate_.has_value() &&
-            isRotationGate(selectedGate_.value())
+            usesTheta(selectedGate_.value())
         ) {
             ImGui::Spacing();
-            drawRotationAngleControl();
+            drawParameterizedControls();
         }
 
         ImGui::Spacing();
-
-        drawGateCategory("Controlled gates", controlledGates, std::size(controlledGates));
+        drawPageControls();
 
     }
 
@@ -346,16 +527,22 @@ namespace quantum_sim::gui {
         const math::ComplexMatrix matrix =
                 gateMatrix(
                     gateName,
-                    rotationAngleRadians_
+                    gateParameters()
                 );
 
         const bool hadamard =
                 gateName == "H";
 
+        const bool squareRootX =
+                gateName == "SX" ||
+                gateName == "SXdg";
+
         const double displayMultiplier =
                 hadamard
                     ? std::numbers::sqrt2
-                    : 1.0;
+                    : squareRootX
+                        ? 2.0
+                        : 1.0;
 
         const std::vector<std::vector<std::string> > matrixCells =
                 formattedMatrixCells(
@@ -444,7 +631,7 @@ namespace quantum_sim::gui {
             gateTitle(gateName)
         );
 
-        if (isRotationGate(gateName)) {
+        if (usesTheta(gateName)) {
             const std::string angleText =
                     notation::formatAngleMeasurement(
                         rotationAngleRadians_
@@ -456,8 +643,34 @@ namespace quantum_sim::gui {
             );
         }
 
+        if (usesThreeAngles(gateName)) {
+            const std::string phiText =
+                    notation::formatAngleMeasurement(
+                        phiAngleRadians_
+                    );
+
+            const std::string lambdaText =
+                    notation::formatAngleMeasurement(
+                        lambdaAngleRadians_
+                    );
+
+            ImGui::TextDisabled(
+                "\xCF\x86 = %s",
+                phiText.c_str()
+            );
+
+            ImGui::TextDisabled(
+                "\xCE\xBB = %s",
+                lambdaText.c_str()
+            );
+        }
+
         if (hadamard) {
             ImGui::TextDisabled("factor 1/\xE2\x88\x9A""2");
+        }
+
+        if (squareRootX) {
+            ImGui::TextDisabled("factor 1/2");
         }
 
         ImGui::Spacing();
@@ -600,8 +813,26 @@ namespace quantum_sim::gui {
         return selectedGate_;
     }
 
-    double GateLibraryPanel::rotationAngleRadians() const noexcept {
-        return static_cast<double>(rotationAngleRadians_);
+    GateParameters GateLibraryPanel::gateParameters() const noexcept {
+        return GateParameters{
+            static_cast<double>(rotationAngleRadians_),
+            static_cast<double>(phiAngleRadians_),
+            static_cast<double>(lambdaAngleRadians_)
+        };
+    }
+
+    void GateLibraryPanel::setPage(
+        const std::size_t pageIndex
+    ) noexcept {
+        gatePage_ =
+                std::min(
+                    pageIndex,
+                    std::size_t{1}
+                );
+    }
+
+    std::size_t GateLibraryPanel::page() const noexcept {
+        return gatePage_;
     }
 
     void GateLibraryPanel::selectGate(std::string gateName) {
@@ -628,38 +859,69 @@ namespace quantum_sim::gui {
         return selectedGate_;
     }
 
-    void GateLibraryPanel::drawRotationAngleControl() {
-        ImGui::TextDisabled("Rotation angle");
-        ImGui::SetNextItemWidth(-1.0F);
+    void GateLibraryPanel::drawParameterizedControls() {
+        const auto drawAngle =
+                [](
+                    const char *label,
+                    const char *identifier,
+                    float &angleRadians
+                ) {
+            ImGui::TextDisabled("%s", label);
+            ImGui::SetNextItemWidth(-1.0F);
 
-        float anglePi =
-                rotationAngleRadians_ /
-                std::numbers::pi_v<float>;
+            float anglePi =
+                    angleRadians /
+                    std::numbers::pi_v<float>;
+
+            if (
+                ImGui::SliderFloat(
+                    identifier,
+                    &anglePi,
+                    -1.0F,
+                    1.0F,
+                    "%.2f\xCF\x80",
+                    ImGuiSliderFlags_AlwaysClamp
+                )
+            ) {
+                angleRadians =
+                        anglePi *
+                        std::numbers::pi_v<float>;
+            }
+
+            const std::string exactAngle =
+                    notation::formatAngleMeasurement(
+                        angleRadians
+                    );
+
+            ImGui::TextDisabled(
+                "%s = %s",
+                label,
+                exactAngle.c_str()
+            );
+        };
+
+        drawAngle(
+            "\xCE\xB8",
+            "##ThetaAnglePi",
+            rotationAngleRadians_
+        );
 
         if (
-            ImGui::SliderFloat(
-                "##RotationAnglePi",
-                &anglePi,
-                -1.0F,
-                1.0F,
-                "%.2f\xCF\x80",
-                ImGuiSliderFlags_AlwaysClamp
-            )
+            selectedGate_.has_value() &&
+            usesThreeAngles(selectedGate_.value())
         ) {
-            rotationAngleRadians_ =
-                    anglePi *
-                    std::numbers::pi_v<float>;
+            drawAngle(
+                "\xCF\x86",
+                "##PhiAnglePi",
+                phiAngleRadians_
+            );
+
+            drawAngle(
+                "\xCE\xBB",
+                "##LambdaAnglePi",
+                lambdaAngleRadians_
+            );
         }
-
-        const std::string exactAngle =
-                notation::formatAngleMeasurement(
-                    rotationAngleRadians_
-                );
-
-        ImGui::TextDisabled(
-            "\xCE\xB8 = %s",
-            exactAngle.c_str()
-        );
 
         const float availableWidth =
                 ImGui::GetContentRegionAvail().x;
@@ -688,5 +950,96 @@ namespace quantum_sim::gui {
             rotationAngleRadians_ =
                     std::numbers::pi_v<float>;
         }
+    }
+
+    void GateLibraryPanel::drawPageControls() {
+        constexpr std::size_t pageCount = 2U;
+
+        if (
+            !ImGui::BeginTable(
+                "GatePageControls",
+                3,
+                ImGuiTableFlags_SizingStretchSame
+            )
+        ) {
+            return;
+        }
+
+        ImGui::TableNextColumn();
+
+        const bool firstPage =
+                gatePage_ == 0U;
+
+        if (firstPage) {
+            ImGui::BeginDisabled();
+        }
+
+        if (ImGui::Button("<##PreviousGatePage", ImVec2{-1.0F, 0.0F})) {
+            --gatePage_;
+        }
+
+        if (firstPage) {
+            ImGui::EndDisabled();
+        }
+
+        if (
+            ImGui::IsItemHovered(
+                ImGuiHoveredFlags_DelayShort |
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )
+        ) {
+            ImGui::SetTooltip("Previous gate page");
+        }
+
+        ImGui::TableNextColumn();
+
+        const std::string label =
+                std::to_string(gatePage_ + 1U) +
+                " / " +
+                std::to_string(pageCount);
+
+        const float offset =
+                std::max(
+                    0.0F,
+                    (
+                        ImGui::GetContentRegionAvail().x -
+                        ImGui::CalcTextSize(label.c_str()).x
+                    ) * 0.5F
+                );
+
+        ImGui::SetCursorPosX(
+            ImGui::GetCursorPosX() +
+            offset
+        );
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(label.c_str());
+
+        ImGui::TableNextColumn();
+
+        const bool lastPage =
+                gatePage_ + 1U >= pageCount;
+
+        if (lastPage) {
+            ImGui::BeginDisabled();
+        }
+
+        if (ImGui::Button(">##NextGatePage", ImVec2{-1.0F, 0.0F})) {
+            ++gatePage_;
+        }
+
+        if (lastPage) {
+            ImGui::EndDisabled();
+        }
+
+        if (
+            ImGui::IsItemHovered(
+                ImGuiHoveredFlags_DelayShort |
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )
+        ) {
+            ImGui::SetTooltip("Next gate page");
+        }
+
+        ImGui::EndTable();
     }
 }
