@@ -33,7 +33,17 @@ namespace quantum_sim::gui {
         Toffoli,
         Kickback,
         Teleportation,
-        Scramble
+        Scramble,
+        Simon,
+        Shor,
+        Qpe,
+        Vqe,
+        Qaoa,
+        Hhl,
+        SwapTest,
+        QuantumWalk,
+        Bb84,
+        Superdense
     };
 
     /**
@@ -128,6 +138,7 @@ namespace quantum_sim::gui {
         std::mt19937 randomEngine_{std::random_device{}()};
         CanvasMode canvasMode_{CanvasMode::LayerStack};
         int presetQubitCount_{4};
+        std::size_t algorithmPage_{0U};
         bool playbackPaused_{true};
         double nextAutoStepAt_{0.0};
         /**

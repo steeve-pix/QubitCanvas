@@ -48,6 +48,18 @@ namespace {
             ++failures;
         }
     }
+
+    [[nodiscard]] double summedProbability(
+        const QuantumRegister &state
+    ) {
+        double total{};
+
+        for (std::size_t basisState = 0U; basisState < state.stateCount(); ++basisState) {
+            total += state.probability(basisState);
+        }
+
+        return total;
+    }
 } //
 int main() {
     // Regression coverage for debugger snapshots on a non-trivial entangling circuit.
@@ -394,7 +406,17 @@ int main() {
         quantum_sim::algorithms::toffoliDemoCircuit(10U),
         quantum_sim::algorithms::phaseKickbackCircuit(10U),
         quantum_sim::algorithms::teleportationCircuit(10U),
-        quantum_sim::algorithms::scrambleCircuit(10U)
+        quantum_sim::algorithms::scrambleCircuit(10U),
+        quantum_sim::algorithms::simonCircuit(10U),
+        quantum_sim::algorithms::shorPeriodFindingCircuit(10U),
+        quantum_sim::algorithms::quantumPhaseEstimationCircuit(10U),
+        quantum_sim::algorithms::vqeAnsatzCircuit(10U),
+        quantum_sim::algorithms::qaoaMaxCutCircuit(10U),
+        quantum_sim::algorithms::hhlDemoCircuit(10U),
+        quantum_sim::algorithms::swapTestCircuit(10U),
+        quantum_sim::algorithms::quantumWalkCircuit(10U),
+        quantum_sim::algorithms::bb84DemoCircuit(10U),
+        quantum_sim::algorithms::superdenseCodingCircuit(10U)
     };
 
     check(
@@ -431,7 +453,17 @@ int main() {
         quantum_sim::algorithms::toffoliDemoCircuit(4).qubitCount() == 4U &&
         quantum_sim::algorithms::phaseKickbackCircuit(4).qubitCount() == 4U &&
         quantum_sim::algorithms::teleportationCircuit(4).qubitCount() == 4U &&
-        quantum_sim::algorithms::scrambleCircuit(4).qubitCount() == 4U,
+        quantum_sim::algorithms::scrambleCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::simonCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::shorPeriodFindingCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::quantumPhaseEstimationCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::vqeAnsatzCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::qaoaMaxCutCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::hhlDemoCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::swapTestCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::quantumWalkCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::bb84DemoCircuit(4).qubitCount() == 4U &&
+        quantum_sim::algorithms::superdenseCodingCircuit(4).qubitCount() == 4U,
         "Every built-in algorithm honors the selected register size"
     );
 
@@ -984,6 +1016,137 @@ int main() {
             expectedTeleportedOneImaginary
         ),
         "Coherent teleportation preserves the prepared state's relative phase"
+    );
+
+    const QuantumRegister simonResult =
+            quantum_sim::algorithms::simonCircuit().execute(
+                QuantumRegister::basisState(4U, 0U)
+            );
+
+    double validSimonProbability{};
+
+    for (std::size_t basisState = 0U; basisState < simonResult.stateCount(); ++basisState) {
+        const std::size_t inputMeasurement =
+                basisState >> 2U;
+
+        if (inputMeasurement == 0U || inputMeasurement == 3U) {
+            validSimonProbability +=
+                    simonResult.probability(basisState);
+        }
+    }
+
+    check(
+        approximatelyEqual(validSimonProbability, 1.0),
+        "Simon emits only measurements orthogonal to hidden period 11"
+    );
+
+    const QuantumRegister shorResult =
+            quantum_sim::algorithms::shorPeriodFindingCircuit().execute(
+                QuantumRegister::basisState(4U, 0U)
+            );
+
+    double validShorProbability{};
+
+    for (std::size_t basisState = 0U; basisState < shorResult.stateCount(); ++basisState) {
+        const std::size_t countingMeasurement =
+                basisState >> 1U;
+
+        if (countingMeasurement == 0U || countingMeasurement == 4U) {
+            validShorProbability +=
+                    shorResult.probability(basisState);
+        }
+    }
+
+    check(
+        approximatelyEqual(validShorProbability, 1.0),
+        "Compiled Shor period finding resolves period two"
+    );
+
+    const QuantumRegister phaseEstimationResult =
+            quantum_sim::algorithms::quantumPhaseEstimationCircuit().execute(
+                QuantumRegister::basisState(3U, 0U)
+            );
+
+    check(
+        approximatelyEqual(phaseEstimationResult.probability(3U), 1.0),
+        "QPE resolves eigenphase one quarter as counting result 01"
+    );
+
+    const QuantumRegister vqeResult =
+            quantum_sim::algorithms::vqeAnsatzCircuit().execute(
+                QuantumRegister::basisState(2U, 0U)
+            );
+
+    const QuantumRegister qaoaResult =
+            quantum_sim::algorithms::qaoaMaxCutCircuit().execute(
+                QuantumRegister::basisState(3U, 0U)
+            );
+
+    const QuantumRegister hhlResult =
+            quantum_sim::algorithms::hhlDemoCircuit().execute(
+                QuantumRegister::basisState(4U, 0U)
+            );
+
+    const QuantumRegister quantumWalkResult =
+            quantum_sim::algorithms::quantumWalkCircuit().execute(
+                QuantumRegister::basisState(3U, 0U)
+            );
+
+    check(
+        approximatelyEqual(summedProbability(vqeResult), 1.0) &&
+        approximatelyEqual(summedProbability(qaoaResult), 1.0) &&
+        approximatelyEqual(summedProbability(hhlResult), 1.0) &&
+        approximatelyEqual(summedProbability(quantumWalkResult), 1.0),
+        "Parameterized VQE, QAOA, HHL, and quantum-walk demos remain normalized"
+    );
+
+    const QuantumRegister swapTestResult =
+            quantum_sim::algorithms::swapTestCircuit().execute(
+                QuantumRegister::basisState(3U, 0U)
+            );
+
+    check(
+        approximatelyEqual(
+            swapTestResult.probabilityOfQubitZero(0U),
+            0.75
+        ),
+        "SWAP test reports the expected overlap between plus and one states"
+    );
+
+    const QuantumRegister bb84Result =
+            quantum_sim::algorithms::bb84DemoCircuit().execute(
+                QuantumRegister::basisState(2U, 0U)
+            );
+
+    check(
+        approximatelyEqual(bb84Result.probabilityOfQubitOne(0U), 1.0) &&
+        approximatelyEqual(bb84Result.probabilityOfQubitOne(1U), 0.5),
+        "BB84 separates matching-basis certainty from mismatched-basis randomness"
+    );
+
+    const QuantumRegister superdenseResult =
+            quantum_sim::algorithms::superdenseCodingCircuit().execute(
+                QuantumRegister::basisState(2U, 0U)
+            );
+
+    check(
+        approximatelyEqual(superdenseResult.probability(3U), 1.0),
+        "Superdense coding decodes classical message 11"
+    );
+
+    bool rejectedUndersizedSimon = false;
+
+    try {
+        static_cast<void>(
+            quantum_sim::algorithms::simonCircuit(3U)
+        );
+    } catch (const std::invalid_argument &) {
+        rejectedUndersizedSimon = true;
+    }
+
+    check(
+        rejectedUndersizedSimon,
+        "Simon rejects registers below its four-qubit minimum"
     );
 
     const double halfTurn =
