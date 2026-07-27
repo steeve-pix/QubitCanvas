@@ -233,13 +233,13 @@ namespace quantum_sim::gui::density_volume {
                     0.5F;
 
             for (const DensityLayer &layer : stack.layers) {
-                const float layerY =
+                const float layerX =
                         static_cast<float>(layer.index) *
                         layerGap;
 
                 const Vector3 layerCenter{
+                    layerX,
                     0.0F,
-                    layerY,
                     0.0F
                 };
 
@@ -258,11 +258,11 @@ namespace quantum_sim::gui::density_volume {
                             );
 
                     const Vector3 center{
+                        layerX,
+                        halfMatrix -
+                            static_cast<float>(cell.row) *
+                            cellPitch,
                         static_cast<float>(cell.column) *
-                            cellPitch -
-                            halfMatrix,
-                        layerY,
-                        static_cast<float>(cell.row) *
                             cellPitch -
                             halfMatrix
                     };
@@ -302,26 +302,26 @@ namespace quantum_sim::gui::density_volume {
                 );
             }
 
-            const float historyHeight =
+            const float historyWidth =
                     static_cast<float>(stack.layers.size() - 1U) *
                     layerGap +
                     cubeSide;
 
             scene.center = Vector3{
+                (historyWidth - cubeSide) * 0.5F,
                 0.0F,
-                (historyHeight - cubeSide) * 0.5F,
                 0.0F
             };
 
             scene.framingMinimum = Vector3{
-                -span * 0.5F,
                 -cubeSide * 0.5F,
+                -span * 0.5F,
                 -span * 0.5F
             };
 
             scene.framingMaximum = Vector3{
+                historyWidth - cubeSide * 0.5F,
                 span * 0.5F,
-                historyHeight - cubeSide * 0.5F,
                 span * 0.5F
             };
 
@@ -331,18 +331,21 @@ namespace quantum_sim::gui::density_volume {
 
             scene.radius =
                     std::sqrt(
-                        std::pow(historyHeight * 0.5F, 2.0F) +
+                        std::pow(historyWidth * 0.5F, 2.0F) +
                         std::pow(span * 0.5F, 2.0F) * 2.0F
                     ) * 1.08F;
 
             scene.groundCenter = Vector3{
-                0.0F,
-                -cubeSide * 0.5F - cellPitch * 0.22F,
+                (historyWidth - cubeSide) * 0.5F,
+                -span * 0.5F - cubeSide * 0.5F - cellPitch * 0.22F,
                 0.0F
             };
 
             scene.groundHalfExtentX =
-                    span * 0.78F;
+                    std::max(
+                        historyWidth * 0.58F,
+                        span * 0.78F
+                    );
 
             scene.groundHalfExtentZ =
                     span * 0.78F;
