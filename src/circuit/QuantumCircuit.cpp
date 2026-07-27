@@ -153,18 +153,46 @@ namespace quantum_sim::circuit {
         return counts;
     }
 
-    std::vector<TraceStep> QuantumCircuit::executeWithTrace(const quantum::QuantumRegister &initialState) const {
-        if (initialState.qubitCount() != qubitCount_) {
+    std::vector<TraceStep> QuantumCircuit::executeWithTrace(
+        const quantum::QuantumRegister &initialState
+    ) const {
+        return executeWithTraceFrom(initialState, 0U);
+    }
+
+    std::vector<TraceStep> QuantumCircuit::executeWithTraceFrom(
+        const quantum::QuantumRegister &stateBeforeFirstInstruction,
+        const std::size_t firstInstructionIndex
+    ) const {
+        if (stateBeforeFirstInstruction.qubitCount() != qubitCount_) {
             throw std::invalid_argument{"Register qubit count must match the circuit qubit count."};
         }
 
-        quantum::QuantumRegister currentState = initialState;
+        if (firstInstructionIndex > instructions_.size()) {
+            throw std::out_of_range{
+                "First trace instruction index is outside the circuit."
+            };
+        }
+
+        quantum::QuantumRegister currentState =
+                stateBeforeFirstInstruction;
+
         std::vector<TraceStep> trace;
-        trace.reserve(instructions_.size());
+        trace.reserve(
+            instructions_.size() - firstInstructionIndex
+        );
 
         // The trace records the state after each instruction so the debugger can
         // show both before/after state without re-executing the circuit per frame.
-        for (const Instruction &instruction: instructions_) {
+        for (
+            auto instructionIterator =
+                    instructions_.begin() +
+                    static_cast<std::ptrdiff_t>(firstInstructionIndex);
+            instructionIterator != instructions_.end();
+            ++instructionIterator
+        ) {
+            const Instruction &instruction =
+                    *instructionIterator;
+
             std::visit([&currentState,&trace]<typename T0>(const T0 &actualInstruction) {
                 using InstructionType = std::decay_t<T0>;
 
@@ -292,6 +320,35 @@ namespace quantum_sim::circuit {
         }
 
         instructions_.erase(instructions_.begin() + static_cast<ptrdiff_t>(index));
+
+        return true;
+    }
+
+    bool QuantumCircuit::moveInstruction(
+        const std::size_t fromIndex,
+        const std::size_t toIndex
+    ) {
+        if (
+            fromIndex >= instructions_.size() ||
+            toIndex >= instructions_.size() ||
+            fromIndex == toIndex
+        ) {
+            return false;
+        }
+
+        Instruction movedInstruction =
+                std::move(instructions_[fromIndex]);
+
+        instructions_.erase(
+            instructions_.begin() +
+            static_cast<std::ptrdiff_t>(fromIndex)
+        );
+
+        instructions_.insert(
+            instructions_.begin() +
+            static_cast<std::ptrdiff_t>(toIndex),
+            std::move(movedInstruction)
+        );
 
         return true;
     }

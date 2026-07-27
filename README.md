@@ -10,7 +10,8 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 
 ## Highlights
 
-- Editable multi-qubit circuit with gate selection, undo, redo, and deletion.
+- Editable multi-qubit circuit with repeated placement, insertion, drag
+  reordering, selection, undo, redo, and deletion.
 - Step-by-step debugger with play, pause, restart, scrub, and sampling controls.
 - Synchronized circuit, density-matrix, probability, and Bloch-sphere views.
 - Hover documentation with matrices for every gate in the gate library.
@@ -83,6 +84,21 @@ intentionally subdued so the matrix structure scans quickly.
 
 `Escape` cancels an active gate placement. `Space` toggles playback whenever a
 text field is not accepting input.
+
+Gate placement stays armed after a successful insertion so the same operation
+can be applied repeatedly without returning to the library. The `H`, `X`, `Y`,
+`Z`, `S`, and `T` keys arm their matching gates directly. Single-qubit targets
+and both endpoints of controlled gates receive an on-canvas preview before the
+operation is committed.
+
+The circuit toolbar provides fit and zoom controls, an authoring-focused layout
+that temporarily hides the visualizers, and an optional Follow edits mode that
+shows the state after each manual edit. Existing gates can be dragged to a new
+timeline position or moved one step with the adjacent arrow controls. Manual
+edits rebuild only the affected debugger and density-history suffix.
+
+`SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
+`iSWAP` uses the same path geometry with a centered `(i)` marker.
 
 ## Built-in Circuits
 

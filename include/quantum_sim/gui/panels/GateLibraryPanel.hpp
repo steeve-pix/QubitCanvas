@@ -54,6 +54,16 @@ namespace quantum_sim::gui {
         [[nodiscard]] double rotationAngleRadians() const noexcept;
 
         /**
+         * Keeps one gate visibly armed in the palette.
+         *
+         * This is used by keyboard shortcuts and repeated placement. It does
+         * not emit a second click event through consumeSelectedGate().
+         *
+         * @param gateName Gate display name to arm.
+         */
+        void selectGate(std::string gateName);
+
+        /**
          * Clears any selected gate.
          */
         void clearSelection() noexcept;
@@ -68,6 +78,7 @@ namespace quantum_sim::gui {
     private:
         GateLibraryStyle style_;
         std::optional<std::string> selectedGate_;
+        bool selectionChanged_{false};
         float rotationAngleRadians_{1.57079632679F};
 
         /**

@@ -128,6 +128,23 @@ namespace quantum_sim::debug {
         void rebuild(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState);
 
         /**
+         * Recomputes only the trace suffix affected by a circuit edit.
+         *
+         * Existing trace entries before firstChangedInstruction must still
+         * describe the supplied circuit. Invalid prefix requests automatically
+         * fall back to a complete rebuild.
+         *
+         * @param circuit Edited circuit.
+         * @param initialState Register used as the trace start.
+         * @param firstChangedInstruction Earliest changed instruction index.
+         */
+        void rebuildFrom(
+            const circuit::QuantumCircuit &circuit,
+            const quantum::QuantumRegister &initialState,
+            std::size_t firstChangedInstruction
+        );
+
+        /**
          * @return True when the trace contains at least one step.
          */
         [[nodiscard]] bool hasSteps() const noexcept;

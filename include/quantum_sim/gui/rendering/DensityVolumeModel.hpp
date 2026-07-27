@@ -95,5 +95,20 @@ namespace quantum_sim::gui::density_volume {
             const debug::DebuggerSession &session,
             std::size_t maximumDimension = 16U
         );
+
+        /**
+         * Preserves unaffected density layers and rebuilds only an edited suffix.
+         *
+         * @param stack Existing stack whose layers before the edited instruction remain valid.
+         * @param session Updated debugger trace.
+         * @param firstChangedInstruction Earliest edited instruction index.
+         * @param maximumDimension Largest square matrix dimension to generate.
+         */
+        static void rebuildFrom(
+            DensityStack &stack,
+            const debug::DebuggerSession &session,
+            std::size_t firstChangedInstruction,
+            std::size_t maximumDimension = 16U
+        );
     };
 }

@@ -176,6 +176,154 @@ int main() {
         "Manual ten-qubit placement inserts and executes a compact two-qubit gate"
     );
 
+    QuantumCircuit reorderedCircuit{1U};
+    reorderedCircuit.addSingleQubitGate(
+        "H",
+        quantum_sim::gates::hadamardGate(),
+        0U
+    );
+    reorderedCircuit.addSingleQubitGate(
+        "Z",
+        quantum_sim::gates::zGate(),
+        0U
+    );
+
+    const bool instructionMoved =
+            reorderedCircuit.moveInstruction(1U, 0U);
+
+    const auto reorderedInstructions =
+            reorderedCircuit.instructionInfo();
+
+    const QuantumRegister reorderedResult =
+            reorderedCircuit.execute(
+                QuantumRegister::basisState(1U, 0U)
+            );
+
+    check(
+        instructionMoved &&
+        reorderedInstructions.front().name == "Z" &&
+        reorderedInstructions.back().name == "H" &&
+        reorderedResult.amplitude(1U).real() > 0.0,
+        "Circuit instruction movement preserves gate data and changes execution order"
+    );
+
+    QuantumCircuit incrementallyEditedCircuit{1U};
+    incrementallyEditedCircuit.addSingleQubitGate(
+        "H",
+        quantum_sim::gates::hadamardGate(),
+        0U
+    );
+    incrementallyEditedCircuit.addSingleQubitGate(
+        "S",
+        quantum_sim::gates::sGate(),
+        0U
+    );
+
+    const QuantumRegister incrementalInitialState =
+            QuantumRegister::basisState(1U, 0U);
+
+    quantum_sim::debug::DebuggerSession incrementalSession{
+        incrementallyEditedCircuit,
+        incrementalInitialState
+    };
+
+    const Complex preservedPrefixAmplitude =
+            incrementalSession.stepAt(0U).state.amplitude(1U);
+
+    incrementallyEditedCircuit.insertSingleQubitGate(
+        1U,
+        "X",
+        quantum_sim::gates::xGate(),
+        0U
+    );
+
+    incrementalSession.rebuildFrom(
+        incrementallyEditedCircuit,
+        incrementalInitialState,
+        1U
+    );
+
+    const QuantumRegister incrementalExpectedResult =
+            incrementallyEditedCircuit.execute(
+                incrementalInitialState
+            );
+
+    check(
+        incrementalSession.stepCount() == 3U &&
+        approximatelyEqual(
+            incrementalSession.stepAt(0U).state.amplitude(1U).real(),
+            preservedPrefixAmplitude.real()
+        ) &&
+        approximatelyEqual(
+            incrementalSession.stepAt(0U).state.amplitude(1U).imaginary(),
+            preservedPrefixAmplitude.imaginary()
+        ) &&
+        approximatelyEqual(
+            incrementalSession.stepAt(2U).state.amplitude(0U).real(),
+            incrementalExpectedResult.amplitude(0U).real()
+        ) &&
+        approximatelyEqual(
+            incrementalSession.stepAt(2U).state.amplitude(0U).imaginary(),
+            incrementalExpectedResult.amplitude(0U).imaginary()
+        ) &&
+        approximatelyEqual(
+            incrementalSession.stepAt(2U).state.amplitude(1U).real(),
+            incrementalExpectedResult.amplitude(1U).real()
+        ) &&
+        approximatelyEqual(
+            incrementalSession.stepAt(2U).state.amplitude(1U).imaginary(),
+            incrementalExpectedResult.amplitude(1U).imaginary()
+        ),
+        "Debugger suffix rebuild preserves the valid prefix and matches full execution"
+    );
+
+    quantum_sim::gui::density_volume::DensityStack incrementalDensityStack =
+            quantum_sim::gui::density_volume::DensityModel::build(
+                incrementalSession,
+                16U
+            );
+
+    incrementallyEditedCircuit.addSingleQubitGate(
+        "T",
+        quantum_sim::gates::tGate(),
+        0U
+    );
+
+    incrementalSession.rebuildFrom(
+        incrementallyEditedCircuit,
+        incrementalInitialState,
+        3U
+    );
+
+    quantum_sim::gui::density_volume::DensityModel::rebuildFrom(
+        incrementalDensityStack,
+        incrementalSession,
+        3U,
+        16U
+    );
+
+    const auto fullyRebuiltDensityStack =
+            quantum_sim::gui::density_volume::DensityModel::build(
+                incrementalSession,
+                16U
+            );
+
+    check(
+        incrementalDensityStack.fingerprint ==
+            fullyRebuiltDensityStack.fingerprint &&
+        incrementalDensityStack.layers.size() ==
+            fullyRebuiltDensityStack.layers.size() &&
+        approximatelyEqual(
+            incrementalDensityStack.layers.back().cellAt(0U, 1U).real,
+            fullyRebuiltDensityStack.layers.back().cellAt(0U, 1U).real
+        ) &&
+        approximatelyEqual(
+            incrementalDensityStack.layers.back().cellAt(0U, 1U).imaginary,
+            fullyRebuiltDensityStack.layers.back().cellAt(0U, 1U).imaginary
+        ),
+        "Density history suffix rebuild matches a complete numerical rebuild"
+    );
+
     const QuantumCircuit tenQubitQft =
             quantum_sim::algorithms::qftCircuit(10U);
 
