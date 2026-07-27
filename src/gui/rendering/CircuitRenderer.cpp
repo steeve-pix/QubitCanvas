@@ -50,6 +50,24 @@ namespace {
                point.y <= maximum.y;
     }
 
+    [[nodiscard]] float gateHalfWidthForLabel(
+        const quantum_sim::gui::CircuitStyle &style,
+        const std::string &label
+    ) {
+        const float desiredHalfWidth =
+                ImGui::CalcTextSize(
+                    label.c_str()
+                ).x *
+                0.5F +
+                style.gateLabelPaddingX;
+
+        return std::clamp(
+            desiredHalfWidth,
+            style.gateHalfWidth,
+            style.maximumGateHalfWidth
+        );
+    }
+
     [[nodiscard]] bool isTwoQubitGateName(
         const std::string &gateName
     ) noexcept {
@@ -2131,9 +2149,15 @@ namespace quantum_sim::gui {
 
             const float y = firstWireY + effectiveWireSpacing_ * static_cast<float>(instruction.targetQubit.value());
 
+            const float gateHalfWidth =
+                    gateHalfWidthForLabel(
+                        style_,
+                        instruction.name
+                    );
+
             drawList->AddRectFilled(
-                ImVec2{x - style_.wireGapHalfWidth, y - style_.wireGapHalfHeight},
-                ImVec2{x + style_.wireGapHalfWidth, y + style_.wireGapHalfHeight},
+                ImVec2{x - gateHalfWidth - 1.0F, y - style_.wireGapHalfHeight},
+                ImVec2{x + gateHalfWidth + 1.0F, y + style_.wireGapHalfHeight},
                 backgroundColor
             );
 
@@ -2142,11 +2166,11 @@ namespace quantum_sim::gui {
                     isPointInsideRect(
                         mousePosition,
                         ImVec2{
-                            x - style_.gateHalfWidth,
+                            x - gateHalfWidth,
                             y - style_.gateHalfHeight
                         },
                         ImVec2{
-                            x + style_.gateHalfWidth,
+                            x + gateHalfWidth,
                             y + style_.gateHalfHeight
                         }
                     );
@@ -2166,6 +2190,11 @@ namespace quantum_sim::gui {
                         "%s\nAngle: %s",
                         instruction.name.c_str(),
                         angleText.c_str()
+                    );
+                } else {
+                    ImGui::SetTooltip(
+                        "%s",
+                        instruction.name.c_str()
                     );
                 }
             }
@@ -2591,12 +2620,18 @@ namespace quantum_sim::gui {
                                    const bool highlighted, const bool hovered, const bool selected,
                                    bool placementPreview
     ) {
+        const float gateHalfWidth =
+                gateHalfWidthForLabel(
+                    style_,
+                    label
+                );
+
         const ImVec2 topLeft{
-            center.x - style_.gateHalfWidth,
+            center.x - gateHalfWidth,
             center.y - style_.gateHalfHeight
         };
         const ImVec2 bottomRight{
-            center.x + style_.gateHalfWidth,
+            center.x + gateHalfWidth,
             center.y + style_.gateHalfHeight
         };
 
@@ -2703,9 +2738,10 @@ namespace quantum_sim::gui {
         const float availableTextWidth =
                 std::max(
                     1.0F,
-                    style_.gateHalfWidth *
+                    gateHalfWidth *
                     2.0F -
-                    6.0F
+                    style_.gateLabelPaddingX *
+                    2.0F
                 );
 
         const float textScale =
