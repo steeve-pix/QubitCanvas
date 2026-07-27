@@ -1,4 +1,5 @@
 #include "quantum_sim/gui/rendering/CircuitRenderer.hpp"
+#include "quantum_sim/gui/GateNotation.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 
 #include "imgui.h"
@@ -410,66 +411,6 @@ namespace {
                gateName == "fSim";
     }
 
-    [[nodiscard]] const char *twoQubitTargetLabel(
-        const std::string &gateName
-    ) noexcept {
-        if (gateName == "CX") {
-            return "X";
-        }
-        if (gateName == "CY") {
-            return "Y";
-        }
-        if (gateName == "CZ") {
-            return "Z";
-        }
-        if (gateName == "CH") {
-            return "H";
-        }
-        if (gateName == "CS") {
-            return "S";
-        }
-        if (gateName == "CSdg") {
-            return "S\xE2\x80\xA0";
-        }
-        if (gateName == "CT") {
-            return "T";
-        }
-        if (gateName == "CTdg") {
-            return "T\xE2\x80\xA0";
-        }
-        if (gateName == "CP") {
-            return "P";
-        }
-        if (gateName == "CRx") {
-            return "Rx";
-        }
-        if (gateName == "CRy") {
-            return "Ry";
-        }
-        if (gateName == "CRz") {
-            return "Rz";
-        }
-        if (gateName == "RXX") {
-            return "X";
-        }
-        if (gateName == "RYY") {
-            return "Y";
-        }
-        if (gateName == "RZZ") {
-            return "Z";
-        }
-        if (gateName == "DCX") {
-            return "X";
-        }
-        if (gateName == "ECR") {
-            return "E";
-        }
-        if (gateName == "fSim") {
-            return "f";
-        }
-
-        return "?";
-    }
 }
 
 namespace quantum_sim::gui {
@@ -995,7 +936,11 @@ namespace quantum_sim::gui {
                     drawGate(
                         drawList,
                         ImVec2{placementX, y},
-                        pendingGate.value(),
+                        std::string{
+                            gate_notation::circuitLabel(
+                                pendingGate.value()
+                            )
+                        },
                         false,
                         true,
                         false,
@@ -1127,8 +1072,8 @@ namespace quantum_sim::gui {
                             pendingGate.value()
                         );
 
-                const char *targetPreviewLabel =
-                        twoQubitTargetLabel(
+                const std::string_view targetPreviewLabel =
+                        gate_notation::circuitLabel(
                             pendingGate.value()
                         );
 
@@ -1137,30 +1082,47 @@ namespace quantum_sim::gui {
                             pendingGate.value()
                         );
 
+                const bool exchangePlacement =
+                        pendingGate.value() == "SWAP" ||
+                        pendingGate.value() == "iSWAP" ||
+                        pendingGate.value() == "sqrtSWAP";
+
                 const char *previewLabel =
                         threeQubitPlacement
                             ? (
                                 pendingGate.value() == "CCX"
                                     ? (
-                                        pendingTargetQubit_.has_value() &&
-                                        !isSelectedControl &&
-                                        !isSelectedTarget
-                                            ? "X"
-                                            : "C"
+                                        isSelectedControl ||
+                                        !pendingControlQubit_.has_value()
+                                            ? "C1"
+                                            : isSelectedTarget ||
+                                              !pendingTargetQubit_.has_value()
+                                                  ? "C2"
+                                                  : "CCX"
                                     )
                                     : (
-                                        pendingControlQubit_.has_value() &&
-                                        !isSelectedControl
-                                            ? "S"
-                                            : "C"
+                                        isSelectedControl ||
+                                        !pendingControlQubit_.has_value()
+                                            ? "C"
+                                            : isSelectedTarget ||
+                                              !pendingTargetQubit_.has_value()
+                                                  ? "SW1"
+                                                  : "SW2"
                                     )
                             )
+                            : exchangePlacement
+                            ? (
+                                isSelectedControl ||
+                                !pendingControlQubit_.has_value()
+                                    ? "SW1"
+                                    : "SW2"
+                            )
                             : symmetricInteraction
-                            ? targetPreviewLabel
+                            ? targetPreviewLabel.data()
                             : choosingTarget
                             ? isSelectedControl
                                   ? "C"
-                                  : targetPreviewLabel
+                                  : targetPreviewLabel.data()
                             : "C";
 
                 if (hovered) {
@@ -1754,7 +1716,11 @@ namespace quantum_sim::gui {
                     drawGate(
                         drawList,
                         ImVec2{x, thirdY},
-                        "X",
+                        std::string{
+                            gate_notation::circuitLabel(
+                                instruction.name
+                            )
+                        },
                         highlighted,
                         hovered,
                         false,
@@ -1811,7 +1777,9 @@ namespace quantum_sim::gui {
                                 exchangeMaximumY
                             ) * 0.5F
                         },
-                        "SW",
+                        gate_notation::exchangeBadge(
+                            instruction.name
+                        ).data(),
                         backgroundColor,
                         gateColor,
                         style_
@@ -2082,14 +2050,6 @@ namespace quantum_sim::gui {
                         style_.controlledConnectionThickness
                     );
 
-                    const char *swapLabel =
-                            isISwap
-                                ? "iSW"
-                                : isSqrtSwap
-                                      ? "\xE2\x88\x9A"
-                                        "SW"
-                                      : "SW";
-
                     drawExchangeBadge(
                         drawList,
                         ImVec2{
@@ -2099,7 +2059,9 @@ namespace quantum_sim::gui {
                                 controlledMaxY
                             ) * 0.5F
                         },
-                        swapLabel,
+                        gate_notation::exchangeBadge(
+                            instruction.name
+                        ).data(),
                         backgroundColor,
                         gateColor,
                         style_
@@ -2110,9 +2072,9 @@ namespace quantum_sim::gui {
 
                 if (isInteraction) {
                     const char *axisLabel =
-                            twoQubitTargetLabel(
+                            gate_notation::circuitLabel(
                                 instruction.name
-                            );
+                            ).data();
 
                     const auto drawInteractionBox =
                             [&](const ImVec2 &center, const ImU32 color) {
@@ -2375,9 +2337,9 @@ namespace quantum_sim::gui {
                 );
 
                 const char *targetLabel =
-                        twoQubitTargetLabel(
+                        gate_notation::circuitLabel(
                             instruction.name
-                        );
+                        ).data();
 
                 const ImVec2 targetBoxMin{
                     targetCenter.x - style_.gateHalfWidth,
@@ -2433,10 +2395,16 @@ namespace quantum_sim::gui {
 
             const float y = firstWireY + effectiveWireSpacing_ * static_cast<float>(instruction.targetQubit.value());
 
+            const std::string circuitLabel{
+                gate_notation::circuitLabel(
+                    instruction.name
+                )
+            };
+
             const float gateHalfWidth =
                     gateHalfWidthForLabel(
                         style_,
-                        instruction.name
+                        circuitLabel
                     );
 
             drawList->AddRectFilled(
@@ -2511,7 +2479,15 @@ namespace quantum_sim::gui {
                     selectedInstructionIndex_.has_value() &&
                     selectedInstructionIndex_.value() == instructionIndex;
 
-            drawGate(drawList, ImVec2{x, y}, instruction.name, highlighted, hovered, selected, false);
+            drawGate(
+                drawList,
+                ImVec2{x, y},
+                circuitLabel,
+                highlighted,
+                hovered,
+                selected,
+                false
+            );
 
             if (instruction.angleRadians.has_value()) {
                 const std::string angleLabel =
