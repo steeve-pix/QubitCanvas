@@ -141,6 +141,21 @@ namespace quantum_sim::circuit {
         [[nodiscard]] std::vector<TraceStep> executeWithTrace(const quantum::QuantumRegister &initialState) const;
 
         /**
+         * Executes a suffix of the circuit and records every resulting state.
+         *
+         * @param stateBeforeFirstInstruction Register state immediately before
+         *        firstInstructionIndex executes.
+         * @param firstInstructionIndex First instruction to execute.
+         * @return Trace steps from firstInstructionIndex through the circuit end.
+         * @throws std::invalid_argument if the register size does not match.
+         * @throws std::out_of_range if firstInstructionIndex is past the circuit end.
+         */
+        [[nodiscard]] std::vector<TraceStep> executeWithTraceFrom(
+            const quantum::QuantumRegister &stateBeforeFirstInstruction,
+            std::size_t firstInstructionIndex
+        ) const;
+
+        /**
          * @return Display metadata for all instructions in order.
          */
         [[nodiscard]] std::vector<CircuitInstructionInfo> instructionInfo() const;
@@ -172,6 +187,18 @@ namespace quantum_sim::circuit {
          * @return True when an instruction was removed.
          */
         [[nodiscard]] bool removeInstruction(std::size_t index);
+
+        /**
+         * Moves one instruction to another position without changing its data.
+         *
+         * @param fromIndex Current instruction index.
+         * @param toIndex Destination index in the completed instruction list.
+         * @return True when a valid instruction changed position.
+         */
+        [[nodiscard]] bool moveInstruction(
+            std::size_t fromIndex,
+            std::size_t toIndex
+        );
 
         /**
          * Inserts a single-qubit instruction before the requested index.

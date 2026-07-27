@@ -200,6 +200,11 @@ namespace quantum_sim::gui {
             constexpr float leftPanelWidth = 354.0F;
             constexpr float rightPanelWidth = 390.0F;
 
+            const float activeRightPanelWidth =
+                    circuitFocusMode_
+                        ? 0.0F
+                        : rightPanelWidth;
+
             const float usableHeight =
                     std::max(
                         260.0F,
@@ -207,7 +212,9 @@ namespace quantum_sim::gui {
                     );
 
             const float circuitPanelHeight =
-                    usableHeight * 0.45F;
+                    circuitFocusMode_
+                        ? usableHeight
+                        : usableHeight * 0.52F;
 
             const float densityVolumePanelHeight =
                     usableHeight - circuitPanelHeight - gap;
@@ -216,7 +223,15 @@ namespace quantum_sim::gui {
             const float circuitPanelWidth =
                     std::max(
                         360.0F,
-                        workSize.x - leftPanelWidth - rightPanelWidth - gap * 4.0F
+                        workSize.x -
+                        leftPanelWidth -
+                        activeRightPanelWidth -
+                        gap *
+                        (
+                            circuitFocusMode_
+                                ? 3.0F
+                                : 4.0F
+                        )
                     );
 
             ImGui::SetNextWindowPos(
@@ -291,18 +306,90 @@ namespace quantum_sim::gui {
                 ImGui::SameLine();
 
                 if (ImGui::SmallButton("Cancel")) {
-                    pendingGate_.reset();
-                    pendingRotationAngleRadians_.reset();
-                    circuitRenderer_.cancelPlacement();
+                    cancelGatePlacement();
                 }
             }
 
-            if (ImGui::CollapsingHeader("Developer")) {
-                ImGui::Checkbox(
-                    "Show history debug info",
-                    &showHistoryDebugInfo_
+            if (
+                ImGui::Button(
+                    circuitFocusMode_
+                        ? "Show visualizers"
+                        : "Focus editor"
+                )
+            ) {
+                circuitFocusMode_ =
+                        !circuitFocusMode_;
+            }
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    circuitFocusMode_
+                        ? "Restore the Density Volume and Inspector panels."
+                        : "Give the circuit the full center workspace."
                 );
             }
+
+            ImGui::SameLine();
+            ImGui::Checkbox(
+                "Follow edits",
+                &followManualEdits_
+            );
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Preview the state immediately after each manual edit.\n"
+                    "Algorithms still open at step 0."
+                );
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("-##CircuitZoom")) {
+                circuitRenderer_.zoomOut();
+            }
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Zoom out. Ctrl+wheel also zooms the circuit."
+                );
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Fit")) {
+                circuitRenderer_.fitToView();
+            }
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Fit the complete circuit timeline."
+                );
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("+##CircuitZoom")) {
+                circuitRenderer_.zoomIn();
+            }
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip(
+                    "Zoom in. Ctrl+wheel also zooms the circuit."
+                );
+            }
+
+            ImGui::SameLine();
+            ImGui::TextDisabled(
+                circuitRenderer_.isFittingToView()
+                    ? "AUTO"
+                    : "%d%%",
+                static_cast<int>(
+                    std::lround(
+                        circuitRenderer_.viewZoom() *
+                        100.0F
+                    )
+                )
+            );
 
             const bool canUndo =
                     !undoHistory_.empty();
@@ -421,6 +508,79 @@ namespace quantum_sim::gui {
                         toolbarSelectedInstructionIndex.value();
             }
 
+            const bool canMoveSelectedLeft =
+                    toolbarSelectedInstructionIndex.has_value() &&
+                    toolbarSelectedInstructionIndex.value() > 0U &&
+                    !pendingGate_.has_value();
+
+            const bool canMoveSelectedRight =
+                    toolbarSelectedInstructionIndex.has_value() &&
+                    toolbarSelectedInstructionIndex.value() + 1U <
+                        circuit_.instructionCount() &&
+                    !pendingGate_.has_value();
+
+            ImGui::SameLine();
+
+            if (!canMoveSelectedLeft) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool moveLeftPressed =
+                    ImGui::Button("<##MoveGateLeft");
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canMoveSelectedLeft
+                        ? "Move the selected gate one step earlier."
+                        : "Select a gate that is not already first."
+                );
+            }
+
+            if (!canMoveSelectedLeft) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::SameLine();
+
+            if (!canMoveSelectedRight) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool moveRightPressed =
+                    ImGui::Button(">##MoveGateRight");
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canMoveSelectedRight
+                        ? "Move the selected gate one step later."
+                        : "Select a gate that is not already last."
+                );
+            }
+
+            if (!canMoveSelectedRight) {
+                ImGui::EndDisabled();
+            }
+
+            if (moveLeftPressed && canMoveSelectedLeft) {
+                queuedInstructionMove_ =
+                        InstructionMove{
+                            toolbarSelectedInstructionIndex.value(),
+                            toolbarSelectedInstructionIndex.value() - 1U
+                        };
+            }
+
+            if (moveRightPressed && canMoveSelectedRight) {
+                queuedInstructionMove_ =
+                        InstructionMove{
+                            toolbarSelectedInstructionIndex.value(),
+                            toolbarSelectedInstructionIndex.value() + 1U
+                        };
+            }
+
             if (showHistoryDebugInfo_) {
                 ImGui::TextDisabled(
                     "Undo: %zu   Redo: %zu",
@@ -430,6 +590,14 @@ namespace quantum_sim::gui {
             }
 
             circuitRenderer_.draw(circuit_, snapshot, pendingGate_);
+
+            const auto requestedInstructionMove =
+                    circuitRenderer_.consumeInstructionMoveRequest();
+
+            if (requestedInstructionMove.has_value()) {
+                queuedInstructionMove_ =
+                        requestedInstructionMove;
+            }
 
             const auto requestedStepJump =
                     circuitRenderer_.consumeStepJumpRequest();
@@ -456,9 +624,6 @@ namespace quantum_sim::gui {
 
                 queuedSingleQubitRotationAngleRadians_ =
                         pendingRotationAngleRadians_;
-
-                pendingGate_.reset();
-                pendingRotationAngleRadians_.reset();
             }
 
             const auto controlledPlacement =
@@ -467,9 +632,6 @@ namespace quantum_sim::gui {
             if (controlledPlacement.has_value()) {
                 queuedControlledPlacement_ =
                         controlledPlacement;
-
-                pendingGate_.reset();
-                pendingRotationAngleRadians_.reset();
             }
 
             const auto selectedInstructionIndex =
@@ -477,44 +639,48 @@ namespace quantum_sim::gui {
 
             ImGui::End();
 
-            drawDensityVolumeViewport(
-                ImVec2{
-                    workPosition.x + leftPanelWidth + gap * 2.0F,
-                    workPosition.y + topBarHeight + gap * 2.0F + circuitPanelHeight
-                },
-                ImVec2{
-                    circuitPanelWidth,
-                    densityVolumePanelHeight
-                }
-            );
+            if (!circuitFocusMode_) {
+                drawDensityVolumeViewport(
+                    ImVec2{
+                        workPosition.x + leftPanelWidth + gap * 2.0F,
+                        workPosition.y + topBarHeight + gap * 2.0F + circuitPanelHeight
+                    },
+                    ImVec2{
+                        circuitPanelWidth,
+                        densityVolumePanelHeight
+                    }
+                );
+            }
 
-            ImGui::SetNextWindowPos(
-                ImVec2{
-                    workPosition.x + leftPanelWidth + circuitPanelWidth + gap * 3.0F,
-                    workPosition.y + topBarHeight + gap
-                },
-                ImGuiCond_Always
-            );
+            if (!circuitFocusMode_) {
+                ImGui::SetNextWindowPos(
+                    ImVec2{
+                        workPosition.x + leftPanelWidth + circuitPanelWidth + gap * 3.0F,
+                        workPosition.y + topBarHeight + gap
+                    },
+                    ImGuiCond_Always
+                );
 
-            ImGui::SetNextWindowSize(
-                ImVec2{
-                    rightPanelWidth,
-                    usableHeight
-                },
-                ImGuiCond_Always
-            );
+                ImGui::SetNextWindowSize(
+                    ImVec2{
+                        rightPanelWidth,
+                        usableHeight
+                    },
+                    ImGuiCond_Always
+                );
 
-            ImGui::Begin("Inspector");
-            inspectorPanel_.draw(
-                session_,
-                snapshot,
-                selectedInstructionIndex,
-                densityVolumeStack_,
-                selectedDensityLayer_,
-                jetBrainsMonoHeadingFont_
-            );
+                ImGui::Begin("Inspector");
+                inspectorPanel_.draw(
+                    session_,
+                    snapshot,
+                    selectedInstructionIndex,
+                    densityVolumeStack_,
+                    selectedDensityLayer_,
+                    jetBrainsMonoHeadingFont_
+                );
 
-            ImGui::End();
+                ImGui::End();
+            }
 
             ImGui::SetNextWindowPos(
                 ImVec2{
@@ -545,23 +711,9 @@ namespace quantum_sim::gui {
                     gateLibraryPanel_.consumeSelectedGate();
 
             if (selectedGate.has_value()) {
-                const std::string &gateName =
-                        selectedGate.value();
-
-                pendingGate_ =
-                        gateName;
-
-                const bool rotationGate =
-                        gateName == "Rx" ||
-                        gateName == "Ry" ||
-                        gateName == "Rz";
-
-                pendingRotationAngleRadians_ =
-                        rotationGate
-                            ? std::optional<double>{
-                                gateLibraryPanel_.rotationAngleRadians()
-                            }
-                            : std::nullopt;
+                armGatePlacement(
+                    selectedGate.value()
+                );
             }
 
             ImGui::End();
@@ -671,10 +823,7 @@ namespace quantum_sim::gui {
                 circuitRenderer_.hasPendingControlQubit()
             )
         ) {
-            pendingGate_.reset();
-            pendingRotationAngleRadians_.reset();
-            gateLibraryPanel_.clearSelection();
-            circuitRenderer_.cancelPlacement();
+            cancelGatePlacement();
             return;
         }
 
@@ -684,7 +833,81 @@ namespace quantum_sim::gui {
 
             nextAutoStepAt_ =
                     ImGui::GetTime() + 0.45;
+
+            return;
         }
+
+        if (
+            io.KeyCtrl ||
+            io.KeyAlt ||
+            io.KeyShift
+        ) {
+            return;
+        }
+
+        constexpr struct {
+            ImGuiKey key;
+            const char *gateName;
+        } gateShortcuts[]{
+            {ImGuiKey_H, "H"},
+            {ImGuiKey_X, "X"},
+            {ImGuiKey_Y, "Y"},
+            {ImGuiKey_Z, "Z"},
+            {ImGuiKey_S, "S"},
+            {ImGuiKey_T, "T"}
+        };
+
+        for (const auto &shortcut : gateShortcuts) {
+            if (
+                ImGui::IsKeyPressed(
+                    shortcut.key,
+                    false
+                )
+            ) {
+                armGatePlacement(
+                    shortcut.gateName
+                );
+                return;
+            }
+        }
+    }
+
+    void GuiApplication::armGatePlacement(
+        std::string gateName
+    ) {
+        const bool changedGate =
+                !pendingGate_.has_value() ||
+                pendingGate_.value() != gateName;
+
+        if (changedGate) {
+            circuitRenderer_.cancelPlacement();
+        }
+
+        pendingGate_ =
+                gateName;
+
+        const bool rotationGate =
+                gateName == "Rx" ||
+                gateName == "Ry" ||
+                gateName == "Rz";
+
+        pendingRotationAngleRadians_ =
+                rotationGate
+                    ? std::optional<double>{
+                        gateLibraryPanel_.rotationAngleRadians()
+                    }
+                    : std::nullopt;
+
+        gateLibraryPanel_.selectGate(
+            std::move(gateName)
+        );
+    }
+
+    void GuiApplication::cancelGatePlacement() noexcept {
+        pendingGate_.reset();
+        pendingRotationAngleRadians_.reset();
+        gateLibraryPanel_.clearSelection();
+        circuitRenderer_.cancelPlacement();
     }
 
     void GuiApplication::drawBackdrop() const {
@@ -1037,9 +1260,23 @@ namespace quantum_sim::gui {
         ImGui::End();
     }
 
-    void GuiApplication::rebuildDensityVolume() {
-        densityVolumeStack_ =
-                density_volume::DensityModel::build(session_, 16U);
+    void GuiApplication::rebuildDensityVolume(
+        const std::optional<std::size_t> firstChangedInstruction
+    ) {
+        if (firstChangedInstruction.has_value()) {
+            density_volume::DensityModel::rebuildFrom(
+                densityVolumeStack_,
+                session_,
+                firstChangedInstruction.value(),
+                16U
+            );
+        } else {
+            densityVolumeStack_ =
+                    density_volume::DensityModel::build(
+                        session_,
+                        16U
+                    );
+        }
 
         if (densityVolumeStack_.layers.empty()) {
             selectedDensityLayer_ = 0U;
@@ -1506,6 +1743,8 @@ namespace quantum_sim::gui {
         queuedSingleQubitPlacement_.reset();
         queuedSingleQubitRotationAngleRadians_.reset();
         queuedInstructionDeletion_.reset();
+        queuedInstructionMove_.reset();
+        gateLibraryPanel_.clearSelection();
         circuitRenderer_.cancelPlacement();
         circuitRenderer_.clearSelection();
         playbackPaused_ = true;
@@ -1770,18 +2009,84 @@ namespace quantum_sim::gui {
             const std::size_t instructionIndex =
                     queuedInstructionDeletion_.value();
 
-            recordCircuitForUndo();
-
-            // Remove first, then rebuild only if the index was valid.
-            const bool removed =
-                    circuit_.removeInstruction(instructionIndex);
-
             queuedInstructionDeletion_.reset();
 
-            if (removed) {
-                rebuildDebuggerAfterCircuitEdit();
-                circuitRenderer_.cancelPlacement();
+            if (
+                instructionIndex >=
+                circuit_.instructionCount()
+            ) {
+                return;
             }
+
+            recordCircuitForUndo();
+
+            const bool removed =
+                    circuit_.removeInstruction(
+                        instructionIndex
+                    );
+
+            if (!removed) {
+                undoHistory_.pop_back();
+                return;
+            }
+
+            const std::size_t nearbyStep =
+                    std::min(
+                        instructionIndex,
+                        circuit_.instructionCount()
+                    );
+
+            rebuildDebuggerAfterCircuitEdit(
+                instructionIndex,
+                nearbyStep
+            );
+
+            circuitRenderer_.clearSelection();
+            circuitRenderer_.requestFocusStep(
+                nearbyStep
+            );
+
+            return;
+        }
+
+        if (queuedInstructionMove_.has_value()) {
+            const InstructionMove move =
+                    queuedInstructionMove_.value();
+
+            queuedInstructionMove_.reset();
+
+            if (
+                move.fromIndex >= circuit_.instructionCount() ||
+                move.toIndex >= circuit_.instructionCount() ||
+                move.fromIndex == move.toIndex
+            ) {
+                return;
+            }
+
+            recordCircuitForUndo();
+
+            const bool moved =
+                    circuit_.moveInstruction(
+                        move.fromIndex,
+                        move.toIndex
+                    );
+
+            if (!moved) {
+                undoHistory_.pop_back();
+                return;
+            }
+
+            rebuildDebuggerAfterCircuitEdit(
+                std::min(
+                    move.fromIndex,
+                    move.toIndex
+                ),
+                move.toIndex + 1U
+            );
+
+            circuitRenderer_.selectInstruction(
+                move.toIndex
+            );
 
             return;
         }
@@ -1800,7 +2105,10 @@ namespace quantum_sim::gui {
 
             // Placement stores the insertion slot picked by the circuit renderer.
             const std::size_t instructionIndex =
-                    queuedSingleQubitPlacement_->instructionIndex;
+                    std::min(
+                        queuedSingleQubitPlacement_->instructionIndex,
+                        circuit_.instructionCount()
+                    );
 
             circuit_.insertSingleQubitGate(
                 instructionIndex,
@@ -1813,7 +2121,15 @@ namespace quantum_sim::gui {
             queuedSingleQubitPlacement_.reset();
             queuedSingleQubitRotationAngleRadians_.reset();
 
-            rebuildDebuggerAfterCircuitEdit();
+            rebuildDebuggerAfterCircuitEdit(
+                instructionIndex,
+                instructionIndex + 1U
+            );
+
+            circuitRenderer_.clearSelection();
+            circuitRenderer_.continuePlacementAfter(
+                instructionIndex
+            );
         } else if (queuedControlledPlacement_.has_value()) {
             const std::string &gateName =
                     queuedControlledPlacement_->gateName;
@@ -1824,7 +2140,10 @@ namespace quantum_sim::gui {
                     queuedControlledPlacement_->targetQubit;
 
             const std::size_t instructionIndex =
-                    queuedControlledPlacement_->instructionIndex;
+                    std::min(
+                        queuedControlledPlacement_->instructionIndex,
+                        circuit_.instructionCount()
+                    );
 
             recordCircuitForUndo();
 
@@ -1840,7 +2159,15 @@ namespace quantum_sim::gui {
 
             queuedControlledPlacement_.reset();
 
-            rebuildDebuggerAfterCircuitEdit();
+            rebuildDebuggerAfterCircuitEdit(
+                instructionIndex,
+                instructionIndex + 1U
+            );
+
+            circuitRenderer_.clearSelection();
+            circuitRenderer_.continuePlacementAfter(
+                instructionIndex
+            );
         }
     }
 
@@ -1848,6 +2175,9 @@ namespace quantum_sim::gui {
         if (undoHistory_.empty()) {
             return;
         }
+
+        const std::size_t previousStep =
+                session_.currentStepNumber();
 
         redoHistory_.push_back(
             circuit_
@@ -1861,16 +2191,24 @@ namespace quantum_sim::gui {
 
         undoHistory_.pop_back();
 
-        rebuildDebuggerAfterCircuitEdit();
+        rebuildDebuggerAfterCircuitEdit(
+            std::nullopt,
+            std::min(
+                previousStep,
+                circuit_.instructionCount()
+            )
+        );
 
-        pendingGate_.reset();
-        circuitRenderer_.cancelPlacement();
+        cancelGatePlacement();
     }
 
     void GuiApplication::redoLastCircuitEdit() {
         if (redoHistory_.empty()) {
             return;
         }
+
+        const std::size_t previousStep =
+                session_.currentStepNumber();
 
         undoHistory_.push_back(
             circuit_
@@ -1884,10 +2222,15 @@ namespace quantum_sim::gui {
 
         redoHistory_.pop_back();
 
-        rebuildDebuggerAfterCircuitEdit();
+        rebuildDebuggerAfterCircuitEdit(
+            std::nullopt,
+            std::min(
+                previousStep,
+                circuit_.instructionCount()
+            )
+        );
 
-        pendingGate_.reset();
-        circuitRenderer_.cancelPlacement();
+        cancelGatePlacement();
     }
 
     math::ComplexMatrix GuiApplication::createTwoQubitGateMatrix(
@@ -1919,10 +2262,38 @@ namespace quantum_sim::gui {
     }
 
 
-    void GuiApplication::rebuildDebuggerAfterCircuitEdit() {
-        session_.rebuild(circuit_, initialState_);
-        rebuildDensityVolume();
-        circuitRenderer_.clearSelection();
+    void GuiApplication::rebuildDebuggerAfterCircuitEdit(
+        const std::optional<std::size_t> firstChangedInstruction,
+        const std::optional<std::size_t> preferredStep
+    ) {
+        if (firstChangedInstruction.has_value()) {
+            session_.rebuildFrom(
+                circuit_,
+                initialState_,
+                firstChangedInstruction.value()
+            );
+        } else {
+            session_.rebuild(
+                circuit_,
+                initialState_
+            );
+        }
+
+        if (
+            followManualEdits_ &&
+            preferredStep.has_value()
+        ) {
+            session_.moveToStepNumber(
+                std::min(
+                    preferredStep.value(),
+                    session_.stepCount()
+                )
+            );
+        }
+
+        rebuildDensityVolume(
+            firstChangedInstruction
+        );
     }
 
     void GuiApplication::recordCircuitForUndo() {
