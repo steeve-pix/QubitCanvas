@@ -400,6 +400,25 @@ namespace quantum_sim::gui::notation {
         return text;
     }
 
+    std::string formatAngleMeasurement(
+        const double radians,
+        const int piDecimalPlaces,
+        const int radianDecimalPlaces
+    ) {
+        return
+                formatRadians(
+                    radians,
+                    piDecimalPlaces,
+                    false
+                ) +
+                " (" +
+                trimDecimal(
+                    radians,
+                    radianDecimalPlaces
+                ) +
+                " rad)";
+    }
+
     std::string formatPolarAmplitude(
         const double magnitude,
         const double phaseRadians,

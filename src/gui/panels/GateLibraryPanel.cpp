@@ -435,12 +435,12 @@ namespace quantum_sim::gui {
 
         if (isRotationGate(gateName)) {
             const std::string angleText =
-                    notation::formatRadians(
+                    notation::formatAngleMeasurement(
                         rotationAngleRadians_
                     );
 
             ImGui::TextDisabled(
-                "\xCE\xB8 %s",
+                "\xCE\xB8 = %s",
                 angleText.c_str()
             );
         }
@@ -634,7 +634,7 @@ namespace quantum_sim::gui {
         }
 
         const std::string exactAngle =
-                notation::formatRadians(
+                notation::formatAngleMeasurement(
                     rotationAngleRadians_
                 );
 

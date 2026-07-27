@@ -278,7 +278,7 @@ namespace quantum_sim::gui {
 
                 if (pendingRotationAngleRadians_.has_value()) {
                     const std::string angleText =
-                            notation::formatRadians(
+                            notation::formatAngleMeasurement(
                                 pendingRotationAngleRadians_.value()
                             );
 

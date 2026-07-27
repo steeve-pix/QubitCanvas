@@ -927,6 +927,12 @@ int main() {
             3,
             true
         ) == "\xCF\x80/2 rad" &&
+        quantum_sim::gui::notation::formatAngleMeasurement(
+            std::numbers::pi / 2.0
+        ) == "\xCF\x80/2 (1.571 rad)" &&
+        quantum_sim::gui::notation::formatAngleMeasurement(
+            0.74 * std::numbers::pi
+        ) == "0.74\xCF\x80 (2.325 rad)" &&
         quantum_sim::gui::notation::formatPolarAmplitude(
             std::numbers::sqrt2 / 2.0,
             -std::numbers::pi / 4.0

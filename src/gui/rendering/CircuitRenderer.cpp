@@ -824,7 +824,7 @@ namespace quantum_sim::gui {
 
                 if (instruction.angleRadians.has_value()) {
                     const std::string angleText =
-                            quantum_sim::gui::notation::formatRadians(
+                            quantum_sim::gui::notation::formatAngleMeasurement(
                                 instruction.angleRadians.value()
                             );
 
@@ -1334,7 +1334,7 @@ namespace quantum_sim::gui {
 
                 if (instruction.angleRadians.has_value()) {
                     const std::string angleText =
-                            quantum_sim::gui::notation::formatRadians(
+                            quantum_sim::gui::notation::formatAngleMeasurement(
                                 instruction.angleRadians.value()
                             );
 

@@ -1262,10 +1262,10 @@ namespace quantum_sim::gui {
                 notation::formatReal(bloch.z, 6);
 
         const std::string thetaText =
-                notation::formatRadians(theta, 6);
+                notation::formatAngleMeasurement(theta, 6, 3);
 
         const std::string phiText =
-                notation::formatRadians(phi, 6);
+                notation::formatAngleMeasurement(phi, 6, 3);
 
         const std::string purityText =
                 notation::formatReal(
@@ -1281,9 +1281,17 @@ namespace quantum_sim::gui {
         );
 
         ImGui::Text(
-            "\xCE\xB8 %s   \xCF\x86 %s   purity %s",
-            thetaText.c_str(),
-            phiText.c_str(),
+            "\xCE\xB8 = %s",
+            thetaText.c_str()
+        );
+
+        ImGui::Text(
+            "\xCF\x86 = %s",
+            phiText.c_str()
+        );
+
+        ImGui::Text(
+            "purity %s",
             purityText.c_str()
         );
 
