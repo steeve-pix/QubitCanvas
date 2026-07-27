@@ -957,17 +957,16 @@ void main() {
 
     vec3 base = max(vColor * uHeat, vec3(0.0005));
 
-    // QuantumAtom's density points read as soft samples because their centers
-    // carry the color while their silhouettes recede. Recreate that behavior
-    // on a real rounded cuboid by darkening its geometric rim and corners.
+    // Preserve the bright density core without hiding the voxel's square top
+    // and side faces. Only the physically rounded corner receives a soft falloff.
     float surfaceRadius = length(vLocalPosition);
     float densityCore =
         1.0 -
-        smoothstep(0.50, 0.82, surfaceRadius);
+        smoothstep(0.68, 0.94, surfaceRadius);
     float fresnelRim = pow(1.0 - viewFacing, 1.65);
     float softBody =
-        mix(0.74, 1.07, densityCore) *
-        mix(1.0, 0.82, fresnelRim);
+        mix(0.88, 1.04, densityCore) *
+        mix(1.0, 0.92, fresnelRim);
 
     vec3 highlight =
         mix(base, vec3(1.0, 0.72, 0.38), 0.30) *
@@ -997,7 +996,7 @@ void main() {
 
     float bloomEnergy =
         (0.32 + vMaterial.x * 0.68) *
-        mix(0.62, 1.0, densityCore);
+        mix(0.82, 1.0, densityCore);
 
     brightColor = vec4(
         lit * bloomMask * bloomEnergy,
