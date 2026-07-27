@@ -1,4 +1,5 @@
 #include "quantum_sim/debug/DebuggerSession.hpp"
+#include <iterator>
 #include <stdexcept>
 
 namespace quantum_sim::debug {
@@ -147,6 +148,52 @@ namespace quantum_sim::debug {
                 circuit.executeWithTrace(initialState_);
 
         instructions_ = circuit.instructionInfo();
+
+        currentStepNumber_ = 0U;
+    }
+
+    void DebuggerSession::rebuildFrom(
+        const circuit::QuantumCircuit &circuit,
+        const quantum::QuantumRegister &initialState,
+        const std::size_t firstChangedInstruction
+    ) {
+        if (
+            initialState.qubitCount() != initialState_.qubitCount() ||
+            firstChangedInstruction > trace_.size() ||
+            firstChangedInstruction > circuit.instructionCount()
+        ) {
+            rebuild(circuit, initialState);
+            return;
+        }
+
+        initialState_ =
+                initialState;
+
+        const quantum::QuantumRegister &stateBeforeChangedInstruction =
+                firstChangedInstruction == 0U
+                    ? initialState_
+                    : trace_[firstChangedInstruction - 1U].state;
+
+        std::vector<circuit::TraceStep> rebuiltSuffix =
+                circuit.executeWithTraceFrom(
+                    stateBeforeChangedInstruction,
+                    firstChangedInstruction
+                );
+
+        trace_.erase(
+            trace_.begin() +
+            static_cast<std::ptrdiff_t>(firstChangedInstruction),
+            trace_.end()
+        );
+
+        trace_.insert(
+            trace_.end(),
+            std::make_move_iterator(rebuiltSuffix.begin()),
+            std::make_move_iterator(rebuiltSuffix.end())
+        );
+
+        instructions_ =
+                circuit.instructionInfo();
 
         currentStepNumber_ = 0U;
     }

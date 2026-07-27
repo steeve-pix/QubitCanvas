@@ -208,6 +208,36 @@ namespace quantum_sim::gui::density_volume {
 
             return layer;
         }
+
+        void finalizeStackMetadata(
+            DensityStack &stack
+        ) noexcept {
+            stack.maximumMagnitude = 0.0;
+            stack.fingerprint = fnvOffset;
+
+            for (const DensityLayer &layer : stack.layers) {
+                hashValue(stack.fingerprint, layer.index);
+                hashValue(stack.fingerprint, layer.dimension);
+
+                for (const DensityCell &cell : layer.cells) {
+                    stack.maximumMagnitude =
+                            std::max(
+                                stack.maximumMagnitude,
+                                cell.magnitude
+                            );
+
+                    hashValue(
+                        stack.fingerprint,
+                        std::bit_cast<std::uint64_t>(cell.real)
+                    );
+
+                    hashValue(
+                        stack.fingerprint,
+                        std::bit_cast<std::uint64_t>(cell.imaginary)
+                    );
+                }
+            }
+        }
     }
 
     const DensityCell &DensityLayer::cellAt(
@@ -256,29 +286,60 @@ namespace quantum_sim::gui::density_volume {
             );
         }
 
-        for (const DensityLayer &layer : stack.layers) {
-            hashValue(stack.fingerprint, layer.index);
-            hashValue(stack.fingerprint, layer.dimension);
-
-            for (const DensityCell &cell : layer.cells) {
-                stack.maximumMagnitude =
-                        std::max(
-                            stack.maximumMagnitude,
-                            cell.magnitude
-                        );
-
-                hashValue(
-                    stack.fingerprint,
-                    std::bit_cast<std::uint64_t>(cell.real)
-                );
-
-                hashValue(
-                    stack.fingerprint,
-                    std::bit_cast<std::uint64_t>(cell.imaginary)
-                );
-            }
-        }
+        finalizeStackMetadata(stack);
 
         return stack;
+    }
+
+    void DensityModel::rebuildFrom(
+        DensityStack &stack,
+        const debug::DebuggerSession &session,
+        const std::size_t firstChangedInstruction,
+        const std::size_t maximumDimension
+    ) {
+        const std::size_t preservedLayerCount =
+                firstChangedInstruction + 1U;
+
+        if (
+            maximumDimension < 2U ||
+            firstChangedInstruction > session.stepCount() ||
+            stack.layers.size() < preservedLayerCount
+        ) {
+            stack =
+                    build(
+                        session,
+                        maximumDimension
+                    );
+            return;
+        }
+
+        stack.layers.resize(
+            preservedLayerCount
+        );
+
+        stack.layers.reserve(
+            session.stepCount() + 1U
+        );
+
+        for (
+            std::size_t stepIndex =
+                    firstChangedInstruction;
+            stepIndex < session.stepCount();
+            ++stepIndex
+        ) {
+            const circuit::TraceStep &step =
+                    session.stepAt(stepIndex);
+
+            stack.layers.push_back(
+                buildLayer(
+                    step.state,
+                    stepIndex + 1U,
+                    step.description,
+                    maximumDimension
+                )
+            );
+        }
+
+        finalizeStackMetadata(stack);
     }
 }

@@ -1007,18 +1007,23 @@ namespace quantum_sim::gui {
         constexpr double liveThreshold = 1e-10;
 
         for (std::size_t stateIndex = 0; stateIndex < state.stateCount(); ++stateIndex) {
+            const math::Complex &amplitude =
+                    state.amplitude(stateIndex);
+
+            const double probability =
+                    amplitude.magnitudeSquared();
+
+            if (
+                showOnlyLiveAmplitudes_ &&
+                probability <= liveThreshold
+            ) {
+                continue;
+            }
+
             IndexedStateInfo entry{
                 stateIndex,
                 state.stateInfo(stateIndex)
             };
-
-            // The default table omits zero amplitudes so large registers stay readable.
-            if (
-                showOnlyLiveAmplitudes_ &&
-                entry.state.probability <= liveThreshold
-            ) {
-                continue;
-            }
 
             if (!stateMatchesFilter(entry, filter)) {
                 continue;

@@ -121,6 +121,7 @@ namespace quantum_sim::gui {
         std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
         std::optional<double> queuedSingleQubitRotationAngleRadians_;
         std::optional<std::size_t> queuedInstructionDeletion_;
+        std::optional<InstructionMove> queuedInstructionMove_;
         std::optional<CircuitPreset> queuedPreset_;
         std::vector<circuit::QuantumCircuit> undoHistory_;
         std::vector<circuit::QuantumCircuit> redoHistory_;
@@ -141,16 +142,27 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> lastDensityDebuggerStepNumber_;
         bool densityVolumePointerDragged_{false};
         bool densityVolumeCameraFramePending_{true};
+        bool circuitFocusMode_{false};
+        bool followManualEdits_{true};
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
+         *
+         * @param firstChangedInstruction Earliest affected instruction. Omit
+         *        when the entire circuit may have changed.
+         * @param preferredStep Step to show when followManualEdits_ is enabled.
          */
-        void rebuildDebuggerAfterCircuitEdit();
+        void rebuildDebuggerAfterCircuitEdit(
+            std::optional<std::size_t> firstChangedInstruction = std::nullopt,
+            std::optional<std::size_t> preferredStep = std::nullopt
+        );
 
         /**
          * Recomputes the shared 2D/3D density history after a trace rebuild.
          */
-        void rebuildDensityVolume();
+        void rebuildDensityVolume(
+            std::optional<std::size_t> firstChangedInstruction = std::nullopt
+        );
 
         /**
          * Follows debugger navigation while preserving an explicit initial-layer selection.
@@ -192,6 +204,18 @@ namespace quantum_sim::gui {
          * Escape cancels an armed gate placement and Space toggles playback.
          */
         void handleGlobalShortcuts();
+
+        /**
+         * Arms a gate for repeated placement and synchronizes its palette state.
+         *
+         * @param gateName Gate display name.
+         */
+        void armGatePlacement(std::string gateName);
+
+        /**
+         * Clears all active and partially completed gate-placement state.
+         */
+        void cancelGatePlacement() noexcept;
 
         /**
          * Draws the application background behind the docked panels.

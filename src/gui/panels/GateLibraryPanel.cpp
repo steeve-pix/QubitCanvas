@@ -266,13 +266,20 @@ namespace quantum_sim::gui {
     }
 
     void GateLibraryPanel::draw() {
-        // Categories keep one-click gate selection compact as the palette grows.
+        // Gate groups remain compact; angle controls appear only while useful.
         drawGateCategory("Single-qubit gates", singleQubitGates, std::size(singleQubitGates));
 
         ImGui::Spacing();
 
-        drawRotationAngleControl();
         drawGateCategory("Rotation gates", rotationGates, std::size(rotationGates));
+
+        if (
+            selectedGate_.has_value() &&
+            isRotationGate(selectedGate_.value())
+        ) {
+            ImGui::Spacing();
+            drawRotationAngleControl();
+        }
 
         ImGui::Spacing();
 
@@ -311,7 +318,11 @@ namespace quantum_sim::gui {
                     }
                 );
 
-        if (ImGui::IsItemHovered()) {
+        if (
+            ImGui::IsItemHovered(
+                ImGuiHoveredFlags_DelayNormal
+            )
+        ) {
             ImGui::SetMouseCursor(
                 ImGuiMouseCursor_Hand
             );
@@ -386,8 +397,8 @@ namespace quantum_sim::gui {
         const ImVec2 pointer =
                 ImGui::GetMousePos();
 
-        constexpr float tooltipWidth = 350.0F;
-        constexpr float estimatedTooltipHeight = 245.0F;
+        constexpr float tooltipWidth = 300.0F;
+        constexpr float estimatedTooltipHeight = 220.0F;
         constexpr float pointerOffset = 14.0F;
 
         const float viewportRight =
@@ -534,7 +545,7 @@ namespace quantum_sim::gui {
         ImGui::Separator();
         ImGui::TextDisabled("Explanation");
         ImGui::PushTextWrapPos(
-            ImGui::GetCursorPosX() + 310.0F
+            ImGui::GetCursorPosX() + 260.0F
         );
         ImGui::TextDisabled(
             "%s",
@@ -576,6 +587,7 @@ namespace quantum_sim::gui {
             if (drawGateButton(gate, isGateSelected(gate.name))) {
                 selectedGate_ =
                         gate.name;
+                selectionChanged_ = true;
             }
 
             if (index + 1 < gateCount && canPlaceNextGateButton()) {
@@ -592,22 +604,28 @@ namespace quantum_sim::gui {
         return static_cast<double>(rotationAngleRadians_);
     }
 
+    void GateLibraryPanel::selectGate(std::string gateName) {
+        selectedGate_ =
+                std::move(gateName);
+        selectionChanged_ = false;
+    }
+
     void GateLibraryPanel::clearSelection() noexcept {
         selectedGate_.reset();
+        selectionChanged_ = false;
     }
 
     std::optional<std::string> GateLibraryPanel::consumeSelectedGate() {
-        if (!selectedGate_.has_value()) {
+        if (
+            !selectionChanged_ ||
+            !selectedGate_.has_value()
+        ) {
             return std::nullopt;
         }
 
-        std::optional<std::string> result =
-                std::move(selectedGate_);
+        selectionChanged_ = false;
 
-        // Make consumeSelectedGate a one-shot event.
-        selectedGate_.reset();
-
-        return result;
+        return selectedGate_;
     }
 
     void GateLibraryPanel::drawRotationAngleControl() {

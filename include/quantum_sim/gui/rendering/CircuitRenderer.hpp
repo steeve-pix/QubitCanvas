@@ -31,6 +31,14 @@ namespace quantum_sim::gui {
     };
 
     /**
+     * Completed drag movement for one existing circuit instruction.
+     */
+    struct InstructionMove {
+        std::size_t fromIndex;
+        std::size_t toIndex;
+    };
+
+    /**
      * ImGui draw-list renderer for the interactive circuit canvas.
      */
     class CircuitRenderer {
@@ -117,6 +125,59 @@ namespace quantum_sim::gui {
          */
         [[nodiscard]] std::optional<std::size_t> pendingInsertionIndex() const noexcept;
 
+        /**
+         * Returns and clears a gate movement requested by a canvas drag.
+         *
+         * @return Source and destination instruction indices, or nullopt.
+         */
+        [[nodiscard]] std::optional<InstructionMove> consumeInstructionMoveRequest() noexcept;
+
+        /**
+         * Keeps repeated placement at the slot immediately after a new gate.
+         *
+         * @param insertedInstructionIndex Index of the newly inserted gate.
+         */
+        void continuePlacementAfter(std::size_t insertedInstructionIndex) noexcept;
+
+        /**
+         * Selects and reveals an instruction after an external edit.
+         *
+         * @param instructionIndex Instruction to select.
+         */
+        void selectInstruction(std::size_t instructionIndex) noexcept;
+
+        /**
+         * Requests horizontal focus on one displayed timeline step.
+         *
+         * @param stepNumber Zero for the initial state, otherwise instruction step.
+         */
+        void requestFocusStep(std::size_t stepNumber) noexcept;
+
+        /**
+         * Increases timeline spacing and disables automatic fitting.
+         */
+        void zoomIn() noexcept;
+
+        /**
+         * Decreases timeline spacing and disables automatic fitting.
+         */
+        void zoomOut() noexcept;
+
+        /**
+         * Fits the complete timeline to the available width when practical.
+         */
+        void fitToView() noexcept;
+
+        /**
+         * @return Current user-controlled timeline zoom multiplier.
+         */
+        [[nodiscard]] float viewZoom() const noexcept;
+
+        /**
+         * @return True while timeline spacing follows the available width.
+         */
+        [[nodiscard]] bool isFittingToView() const noexcept;
+
     private:
         /**
          * Draws one boxed gate symbol.
@@ -139,8 +200,16 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> pendingTargetQubit_;
         std::optional<SingleQubitPlacement> completedSingleQubitPlacement_;
         std::optional<std::size_t> pendingInsertionIndex_;
+        std::optional<float> insertionMouseXLock_;
         std::optional<std::string> pendingControlledGateName_;
+        std::optional<std::size_t> draggedInstructionIndex_;
+        std::optional<std::size_t> dragDestinationIndex_;
+        std::optional<InstructionMove> completedInstructionMove_;
+        std::optional<std::size_t> requestedFocusStepNumber_;
         std::optional<std::size_t> lastFocusedStepNumber_;
         std::size_t lastFocusedInstructionCount_{0};
+        float viewZoom_{1.0F};
+        bool fitToWindow_{true};
+        bool placementModeWasActive_{false};
     };
 }
