@@ -74,9 +74,10 @@ untouched initial register before any instruction executes.
 | Controlled and exchange | `CX`, `CY`, `CZ`, `SWAP`, `iSWAP` |
 
 Rotation angles are stored in radians and displayed as exact or decimal
-multiples of `π`. Hover a gate button to see its name, purpose, and unitary
-matrix; zero-valued entries are intentionally subdued so the matrix structure
-scans quickly.
+multiples of `π`. Detailed angle controls and hover readouts place the decimal
+radian value beside that notation, for example `π/2 (1.571 rad)`. Hover a gate
+button to see its name, purpose, and unitary matrix; zero-valued entries are
+intentionally subdued so the matrix structure scans quickly.
 
 `Escape` cancels an active gate placement. `Space` toggles playback whenever a
 text field is not accepting input.
