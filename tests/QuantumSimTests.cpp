@@ -911,13 +911,21 @@ int main() {
         ) == "\xE2\x88\x9A""2/2-\xE2\x88\x9A""2/2i" &&
         quantum_sim::gui::notation::formatRadians(
             -3.0 * std::numbers::pi / 4.0
-        ) == "-3\xCF\x80/4 rad" &&
+        ) == "-3\xCF\x80/4" &&
         quantum_sim::gui::notation::formatRadians(
             static_cast<double>(
                 static_cast<float>(
                     std::numbers::pi / 2.0
                 )
             )
+        ) == "\xCF\x80/2" &&
+        quantum_sim::gui::notation::formatRadians(
+            0.74 * std::numbers::pi
+        ) == "0.74\xCF\x80" &&
+        quantum_sim::gui::notation::formatRadians(
+            std::numbers::pi / 2.0,
+            3,
+            true
         ) == "\xCF\x80/2 rad" &&
         quantum_sim::gui::notation::formatPolarAmplitude(
             std::numbers::sqrt2 / 2.0,
