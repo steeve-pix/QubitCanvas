@@ -313,6 +313,18 @@ namespace quantum_sim::gui::density_volume {
                 0.0F
             };
 
+            scene.framingMinimum = Vector3{
+                -span * 0.5F,
+                -cubeSide * 0.5F,
+                -span * 0.5F
+            };
+
+            scene.framingMaximum = Vector3{
+                span * 0.5F,
+                historyHeight - cubeSide * 0.5F,
+                span * 0.5F
+            };
+
             scene.matrixSpan = span;
             scene.layerSpacing = layerGap;
             scene.voxelSide = cubeSide;
@@ -463,6 +475,18 @@ namespace quantum_sim::gui::density_volume {
                 0.0F,
                 maximumHeight * 0.32F,
                 0.0F
+            };
+
+            scene.framingMinimum = Vector3{
+                -span * 0.5F,
+                0.0F,
+                -span * 0.5F
+            };
+
+            scene.framingMaximum = Vector3{
+                span * 0.5F,
+                maximumHeight,
+                span * 0.5F
             };
 
             scene.matrixSpan = span;

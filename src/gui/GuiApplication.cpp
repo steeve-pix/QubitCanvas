@@ -1435,32 +1435,36 @@ namespace quantum_sim::gui {
                     ? density_volume::VisualizationMode::FloorField
                     : density_volume::VisualizationMode::LayerStack;
 
-        const bool sceneChanged =
-                densityVolumeRenderer_.updateScene(
-                    densityVolumeStack_,
-                    selectedDensityLayer_,
-                    visualizationMode
-                );
+        densityVolumeRenderer_.updateScene(
+            densityVolumeStack_,
+            selectedDensityLayer_,
+            visualizationMode
+        );
+
+        const float viewportAspect =
+                static_cast<float>(framebufferWidth) /
+                static_cast<float>(framebufferHeight);
 
         if (
             densityVolumeCameraFramePending_ ||
             !densityVolumeCamera_.isFramed()
         ) {
             densityVolumeCamera_.frameScene(
-                densityVolumeRenderer_.sceneCenter(),
-                densityVolumeRenderer_.sceneFocusRadius(),
-                densityVolumeRenderer_.sceneRadius(),
+                densityVolumeRenderer_.framingMinimum(),
+                densityVolumeRenderer_.framingMaximum(),
+                viewportAspect,
                 visualizationMode ==
                     density_volume::VisualizationMode::FloorField
             );
             densityVolumeCameraFramePending_ = false;
-        } else if (sceneChanged) {
-            // Untouched playback follows the selected layer at a fixed orbit
-            // distance. Manual camera input keeps full ownership of the pose.
+        } else {
+            // The complete planned history keeps untouched playback stable.
+            // Reapplying its bounds also adapts the reset composition when the
+            // viewport aspect changes. Manual input retains the live pose.
             densityVolumeCamera_.updateSceneBounds(
-                densityVolumeRenderer_.sceneCenter(),
-                densityVolumeRenderer_.sceneFocusRadius(),
-                densityVolumeRenderer_.sceneRadius(),
+                densityVolumeRenderer_.framingMinimum(),
+                densityVolumeRenderer_.framingMaximum(),
+                viewportAspect,
                 visualizationMode ==
                     density_volume::VisualizationMode::FloorField
             );
