@@ -116,6 +116,31 @@ namespace quantum_sim::gates {
     [[nodiscard]] math::ComplexMatrix czGate();
 
     /**
+     * @return Compact controlled-Hadamard matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix chGate();
+
+    /**
+     * @return Compact controlled-S matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix csGate();
+
+    /**
+     * @return Compact controlled inverse-S matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix csDaggerGate();
+
+    /**
+     * @return Compact controlled-T matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix ctGate();
+
+    /**
+     * @return Compact controlled inverse-T matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix ctDaggerGate();
+
+    /**
      * Creates a controlled phase gate.
      *
      * @param angleRadians Phase applied only to |11>.
@@ -172,6 +197,43 @@ namespace quantum_sim::gates {
      * @return Compact 4x4 RZZ matrix.
      */
     [[nodiscard]] math::ComplexMatrix rzzGate(double angleRadians);
+
+    /**
+     * @return Double-CNOT matrix, CX(0->1) followed by CX(1->0).
+     */
+    [[nodiscard]] math::ComplexMatrix dcxGate();
+
+    /**
+     * @return Echoed cross-resonance two-qubit gate matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix ecrGate();
+
+    /**
+     * @return Principal square root of the SWAP operation.
+     */
+    [[nodiscard]] math::ComplexMatrix squareRootSwapGate();
+
+    /**
+     * Creates the two-parameter fermionic simulation gate.
+     *
+     * @param thetaRadians Exchange rotation between |01> and |10>.
+     * @param phiRadians Conditional phase applied to |11>.
+     * @return Compact 4x4 fSim matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix fSimGate(
+        double thetaRadians,
+        double phiRadians
+    );
+
+    /**
+     * @return Compact 8x8 controlled-controlled-X (Toffoli) matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix ccxGate();
+
+    /**
+     * @return Compact 8x8 controlled-SWAP (Fredkin) matrix.
+     */
+    [[nodiscard]] math::ComplexMatrix cSwapGate();
 
     /**
      * @return Two-qubit SWAP matrix for adjacent two-qubit states.

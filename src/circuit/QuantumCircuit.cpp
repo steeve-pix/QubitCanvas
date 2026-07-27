@@ -81,6 +81,56 @@ namespace quantum_sim::circuit {
         );
     }
 
+    void QuantumCircuit::addThreeQubitGate(
+        std::string name,
+        math::ComplexMatrix gate,
+        const std::size_t firstQubit,
+        const std::size_t secondQubit,
+        const std::size_t thirdQubit
+    ) {
+        if (gate.rows() != 8U || gate.columns() != 8U) {
+            throw std::invalid_argument{
+                "A three-qubit gate must be an 8 by 8 matrix."
+            };
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{
+                "A quantum gate must be unitary."
+            };
+        }
+
+        if (
+            firstQubit >= qubitCount_ ||
+            secondQubit >= qubitCount_ ||
+            thirdQubit >= qubitCount_
+        ) {
+            throw std::out_of_range{
+                "Three-qubit gate index is outside the circuit."
+            };
+        }
+
+        if (
+            firstQubit == secondQubit ||
+            firstQubit == thirdQubit ||
+            secondQubit == thirdQubit
+        ) {
+            throw std::invalid_argument{
+                "A three-qubit gate requires three different qubits."
+            };
+        }
+
+        instructions_.push_back(
+            ThreeQubitInstruction{
+                std::move(name),
+                std::move(gate),
+                firstQubit,
+                secondQubit,
+                thirdQubit
+            }
+        );
+    }
+
     void QuantumCircuit::addReflection(
         std::string name,
         math::ComplexVector normalizedAxis,
@@ -143,8 +193,8 @@ namespace quantum_sim::circuit {
 
         quantum::QuantumRegister currentState = initialState;
 
-        // Instructions store either a single-qubit gate or a full-register gate;
-        // visit selects the correct execution path without exposing the variant.
+        // Visit selects the compact local, reflection, or full-register path
+        // without exposing the private instruction variant to callers.
         for (const Instruction &instruction: instructions_) {
             std::visit([&currentState]<typename T0>(const T0 &actualInstruction) {
                            using InstructionType =
@@ -160,6 +210,14 @@ namespace quantum_sim::circuit {
                                            actualInstruction.gate,
                                            actualInstruction.firstQubit,
                                            actualInstruction.secondQubit
+                                       );
+                           } else if constexpr (std::is_same_v<InstructionType, ThreeQubitInstruction>) {
+                               currentState =
+                                       currentState.applyThreeQubitGate(
+                                           actualInstruction.gate,
+                                           actualInstruction.firstQubit,
+                                           actualInstruction.secondQubit,
+                                           actualInstruction.thirdQubit
                                        );
                            } else if constexpr (std::is_same_v<InstructionType, ReflectionInstruction>) {
                                currentState =
@@ -267,6 +325,23 @@ namespace quantum_sim::circuit {
                                 std::to_string(actualInstruction.angleRadians.value()) +
                                 " radians";
                     }
+                } else if constexpr (std::is_same_v<InstructionType, ThreeQubitInstruction>) {
+                    currentState =
+                            currentState.applyThreeQubitGate(
+                                actualInstruction.gate,
+                                actualInstruction.firstQubit,
+                                actualInstruction.secondQubit,
+                                actualInstruction.thirdQubit
+                            );
+
+                    description =
+                            actualInstruction.name +
+                            " on qubits " +
+                            std::to_string(actualInstruction.firstQubit) +
+                            ", " +
+                            std::to_string(actualInstruction.secondQubit) +
+                            ", and " +
+                            std::to_string(actualInstruction.thirdQubit);
                 } else if constexpr (std::is_same_v<InstructionType, ReflectionInstruction>) {
                     currentState =
                             currentState.applyReflection(
@@ -303,6 +378,7 @@ namespace quantum_sim::circuit {
                         actualInstruction.targetQubit,
                         std::nullopt,
                         std::nullopt,
+                        std::nullopt,
                         actualInstruction.angleRadians
                     });
                 } else if constexpr (std::is_same_v<InstructionType, TwoQubitInstruction>) {
@@ -312,13 +388,25 @@ namespace quantum_sim::circuit {
                         std::nullopt,
                         actualInstruction.firstQubit,
                         actualInstruction.secondQubit,
+                        std::nullopt,
                         actualInstruction.angleRadians
+                    });
+                } else if constexpr (std::is_same_v<InstructionType, ThreeQubitInstruction>) {
+                    result.push_back(CircuitInstructionInfo{
+                        actualInstruction.name,
+                        CircuitInstructionKind::ThreeQubit,
+                        std::nullopt,
+                        actualInstruction.firstQubit,
+                        actualInstruction.secondQubit,
+                        actualInstruction.thirdQubit,
+                        std::nullopt
                     });
                 } else if constexpr (std::is_same_v<InstructionType, ReflectionInstruction>) {
                     result.push_back(CircuitInstructionInfo{
                         actualInstruction.name,
                         CircuitInstructionKind::Reflection,
                         actualInstruction.displayQubit,
+                        std::nullopt,
                         std::nullopt,
                         std::nullopt,
                         std::nullopt
@@ -330,6 +418,7 @@ namespace quantum_sim::circuit {
                         std::nullopt,
                         actualInstruction.controlQubit,
                         actualInstruction.targetQubit,
+                        std::nullopt,
                         std::nullopt
                     });
                 }
@@ -489,6 +578,65 @@ namespace quantum_sim::circuit {
                 firstQubit,
                 secondQubit,
                 angleRadians
+            }
+        );
+    }
+
+    void QuantumCircuit::insertThreeQubitGate(
+        const std::size_t instructionIndex,
+        std::string name,
+        math::ComplexMatrix gate,
+        const std::size_t firstQubit,
+        const std::size_t secondQubit,
+        const std::size_t thirdQubit
+    ) {
+        if (gate.rows() != 8U || gate.columns() != 8U) {
+            throw std::invalid_argument{
+                "A three-qubit gate must be an 8 by 8 matrix."
+            };
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{
+                "A quantum gate must be unitary."
+            };
+        }
+
+        if (
+            firstQubit >= qubitCount_ ||
+            secondQubit >= qubitCount_ ||
+            thirdQubit >= qubitCount_
+        ) {
+            throw std::out_of_range{
+                "Three-qubit gate index is outside the circuit."
+            };
+        }
+
+        if (
+            firstQubit == secondQubit ||
+            firstQubit == thirdQubit ||
+            secondQubit == thirdQubit
+        ) {
+            throw std::invalid_argument{
+                "A three-qubit gate requires three different qubits."
+            };
+        }
+
+        const std::size_t clampedIndex =
+                std::min(
+                    instructionIndex,
+                    instructions_.size()
+                );
+
+        instructions_.insert(
+            instructions_.begin() +
+            static_cast<ptrdiff_t>(clampedIndex),
+            ThreeQubitInstruction{
+                std::move(name),
+                std::move(gate),
+                firstQubit,
+                secondQubit,
+                thirdQubit
             }
         );
     }

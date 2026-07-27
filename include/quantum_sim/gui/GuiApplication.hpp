@@ -64,7 +64,15 @@ namespace quantum_sim::gui {
         WeightedState,
         BitFlipCode,
         SteaneCode,
-        ShorCode
+        ShorCode,
+        PhaseFlipCode,
+        FiveQubitCode,
+        QuantumCounting,
+        AmplitudeEstimation,
+        RippleCarryAdder,
+        DraperAdder,
+        Iqp,
+        SurfaceCode
     };
 
     /**
@@ -141,6 +149,17 @@ namespace quantum_sim::gui {
             const GateParameters &parameters = GateParameters{}
         );
 
+        /**
+         * Creates a supported compact three-qubit gate by display name.
+         *
+         * @param gateName `CCX` or `CSWAP`.
+         * @return Compact 8x8 unitary matrix.
+         * @throws std::invalid_argument if gateName is unsupported.
+         */
+        [[nodiscard]] static math::ComplexMatrix createThreeQubitGateMatrix(
+            const std::string &gateName
+        );
+
     private:
         /**
          * Complete authoring state stored by Undo and Redo.
@@ -168,6 +187,7 @@ namespace quantum_sim::gui {
         std::optional<std::string> pendingGate_;
         std::optional<GateParameters> pendingGateParameters_;
         std::optional<ControlledPlacement> queuedControlledPlacement_;
+        std::optional<ThreeQubitPlacement> queuedThreeQubitPlacement_;
         std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
         std::optional<GateParameters> queuedSingleQubitParameters_;
         std::optional<GateParameters> queuedTwoQubitParameters_;

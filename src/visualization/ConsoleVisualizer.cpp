@@ -161,8 +161,58 @@ namespace quantum_sim::visualization {
                         output << "-----";
                     }
                 } else {
-                    // Controlled gates draw C and X markers plus a note below.
-                    if (instruction.controlQubit.has_value() && instruction.secondaryTargetQubit.has_value()) {
+                    if (
+                        instruction.controlQubit.has_value() &&
+                        instruction.secondaryTargetQubit.has_value() &&
+                        instruction.tertiaryTargetQubit.has_value()
+                    ) {
+                        const bool controlledSwap =
+                                instruction.name == "CSWAP";
+
+                        if (qubit == instruction.controlQubit.value()) {
+                            output << (isCurrentInstruction ? "-[C]-" : "--C--");
+                        } else if (
+                            qubit == instruction.secondaryTargetQubit.value()
+                        ) {
+                            output <<
+                                    (
+                                        controlledSwap
+                                            ? (
+                                                isCurrentInstruction
+                                                    ? "-[S]-"
+                                                    : "--S--"
+                                            )
+                                            : (
+                                                isCurrentInstruction
+                                                    ? "-[C]-"
+                                                    : "--C--"
+                                            )
+                                    );
+                        } else if (
+                            qubit == instruction.tertiaryTargetQubit.value()
+                        ) {
+                            output <<
+                                    (
+                                        controlledSwap
+                                            ? (
+                                                isCurrentInstruction
+                                                    ? "-[S]-"
+                                                    : "--S--"
+                                            )
+                                            : (
+                                                isCurrentInstruction
+                                                    ? "-[X]-"
+                                                    : "--X--"
+                                            )
+                                    );
+                        } else {
+                            output << "-----";
+                        }
+                    } else if (
+                        instruction.controlQubit.has_value() &&
+                        instruction.secondaryTargetQubit.has_value()
+                    ) {
+                        // Two-qubit controlled gates draw one marker per operand.
                         if (qubit == instruction.controlQubit.value()) {
                             output << (isCurrentInstruction ? "-[C]-" : "--C--");
                         } else if (qubit == instruction.secondaryTargetQubit.value()
@@ -184,7 +234,23 @@ namespace quantum_sim::visualization {
         }
 
         for (const circuit::CircuitInstructionInfo &instruction: instructions) {
-            if (instruction.controlQubit.has_value() && instruction.secondaryTargetQubit.has_value()) {
+            if (
+                instruction.controlQubit.has_value() &&
+                instruction.secondaryTargetQubit.has_value() &&
+                instruction.tertiaryTargetQubit.has_value()
+            ) {
+                output
+                        << "            operands q"
+                        << instruction.controlQubit.value()
+                        << ", q"
+                        << instruction.secondaryTargetQubit.value()
+                        << ", q"
+                        << instruction.tertiaryTargetQubit.value()
+                        << '\n';
+            } else if (
+                instruction.controlQubit.has_value() &&
+                instruction.secondaryTargetQubit.has_value()
+            ) {
                 output
                         << "            control q"
                         << instruction.controlQubit.value()

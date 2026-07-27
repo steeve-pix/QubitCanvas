@@ -394,6 +394,118 @@ namespace quantum_sim::algorithms {
     );
 
     /**
+     * Demonstrates coherent correction with the three-qubit phase-flip code.
+     *
+     * q0 carries a non-trivial input state, q0 through q2 are encoded in the
+     * Hadamard basis, and a Z error is injected on q1 before coherent decoding.
+     *
+     * @param qubitCount Total register size. Must be at least 3.
+     * @return Phase-flip encoding, error injection, and correction circuit.
+     * @throws std::invalid_argument if qubitCount is less than 3.
+     */
+    [[nodiscard]] circuit::QuantumCircuit phaseFlipCodeCircuit(
+        std::size_t qubitCount = 3U
+    );
+
+    /**
+     * Prepares the logical-zero state of the five-qubit perfect code.
+     *
+     * The exact sixteen-term codeword is prepared with one compact reflection;
+     * extra register qubits remain in |0>.
+     *
+     * @param qubitCount Total register size. Must be at least 5.
+     * @return Exact [[5,1,3]] logical-zero state preparation.
+     * @throws std::invalid_argument if qubitCount is less than 5.
+     */
+    [[nodiscard]] circuit::QuantumCircuit fiveQubitCodeCircuit(
+        std::size_t qubitCount = 5U
+    );
+
+    /**
+     * Builds a compact quantum-counting demonstration.
+     *
+     * q0 through q2 form the counting register and q3/q4 form a two-qubit
+     * Grover search space with one marked state.
+     *
+     * @param qubitCount Total register size. Must be at least 5.
+     * @return Controlled Grover powers followed by a three-qubit inverse QFT.
+     * @throws std::invalid_argument if qubitCount is less than 5.
+     */
+    [[nodiscard]] circuit::QuantumCircuit quantumCountingCircuit(
+        std::size_t qubitCount = 5U
+    );
+
+    /**
+     * Builds three-bit quantum amplitude estimation for a fixed probability.
+     *
+     * q0 through q2 estimate the prepared probability on q3. The demonstration
+     * uses only compact one- and two-qubit instructions at every register size.
+     *
+     * @param qubitCount Total register size. Must be at least 4.
+     * @return Controlled amplification powers and inverse-QFT readout.
+     * @throws std::invalid_argument if qubitCount is less than 4.
+     */
+    [[nodiscard]] circuit::QuantumCircuit amplitudeEstimationCircuit(
+        std::size_t qubitCount = 4U
+    );
+
+    /**
+     * Adds the two-bit value in q0/q1 into q2/q3 with a ripple carry.
+     *
+     * The preset prepares 1 + 2 and leaves the first operand intact, producing
+     * the deterministic register state A=1, B=3.
+     *
+     * @param qubitCount Total register size. Must be at least 4.
+     * @return Compact reversible ripple-carry addition circuit.
+     * @throws std::invalid_argument if qubitCount is less than 4.
+     */
+    [[nodiscard]] circuit::QuantumCircuit rippleCarryAdderCircuit(
+        std::size_t qubitCount = 4U
+    );
+
+    /**
+     * Adds two two-bit values in the Fourier basis.
+     *
+     * The preset prepares 1 + 2, applies a QFT to q2/q3, accumulates controlled
+     * phases from q0/q1, and uncomputes the Fourier transform.
+     *
+     * @param qubitCount Total register size. Must be at least 4.
+     * @return Draper-style addition circuit producing A=1, B=3.
+     * @throws std::invalid_argument if qubitCount is less than 4.
+     */
+    [[nodiscard]] circuit::QuantumCircuit draperAdderCircuit(
+        std::size_t qubitCount = 4U
+    );
+
+    /**
+     * Builds an instantaneous-quantum-polynomial sampling circuit.
+     *
+     * Hadamard layers surround deterministic commuting Rz and RZZ phase terms,
+     * producing a reproducible uneven probability distribution.
+     *
+     * @param qubitCount Register size. Must be at least 2.
+     * @return Register-wide IQP sampling circuit.
+     * @throws std::invalid_argument if qubitCount is less than 2.
+     */
+    [[nodiscard]] circuit::QuantumCircuit iqpCircuit(
+        std::size_t qubitCount
+    );
+
+    /**
+     * Builds a compact surface-code stabilizer-measurement demonstration.
+     *
+     * q0 through q8 form a 3x3 data patch and q9 is a syndrome ancilla. The
+     * circuit prepares graph correlations and coherently extracts one X check.
+     *
+     * @param qubitCount Total register size. Must be at least 10.
+     * @return Ten-qubit stabilizer demonstration using local CZ interactions.
+     * @throws std::invalid_argument if qubitCount is less than 10.
+     */
+    [[nodiscard]] circuit::QuantumCircuit surfaceCodeStabilizerCircuit(
+        std::size_t qubitCount = 10U
+    );
+
+    /**
      * Builds a one-qubit Rx rotation demo.
      *
      * @param angleRadians Rotation angle in radians.

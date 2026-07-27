@@ -363,6 +363,36 @@ namespace quantum_sim::gates {
         };
     }
 
+    math::ComplexMatrix chGate() {
+        return controlledGate(
+            hadamardGate()
+        );
+    }
+
+    math::ComplexMatrix csGate() {
+        return controlledGate(
+            sGate()
+        );
+    }
+
+    math::ComplexMatrix csDaggerGate() {
+        return controlledGate(
+            sDaggerGate()
+        );
+    }
+
+    math::ComplexMatrix ctGate() {
+        return controlledGate(
+            tGate()
+        );
+    }
+
+    math::ComplexMatrix ctDaggerGate() {
+        return controlledGate(
+            tDaggerGate()
+        );
+    }
+
     math::ComplexMatrix controlledPhaseGate(
         const double angleRadians
     ) {
@@ -450,6 +480,138 @@ namespace quantum_sim::gates {
                 math::Complex{}, math::Complex{}, oddPhase, math::Complex{},
                 math::Complex{}, math::Complex{}, math::Complex{}, evenPhase
             }
+        };
+    }
+
+    math::ComplexMatrix dcxGate() {
+        return math::ComplexMatrix{
+            4,
+            4,
+            std::vector{
+                math::Complex{1.0, 0.0}, math::Complex{}, math::Complex{}, math::Complex{},
+                math::Complex{}, math::Complex{}, math::Complex{1.0, 0.0}, math::Complex{},
+                math::Complex{}, math::Complex{}, math::Complex{}, math::Complex{1.0, 0.0},
+                math::Complex{}, math::Complex{1.0, 0.0}, math::Complex{}, math::Complex{}
+            }
+        };
+    }
+
+    math::ComplexMatrix ecrGate() {
+        const double scale =
+                1.0 /
+                std::sqrt(2.0);
+
+        const math::Complex one{
+            scale,
+            0.0
+        };
+
+        const math::Complex positiveI{
+            0.0,
+            scale
+        };
+
+        const math::Complex negativeI{
+            0.0,
+            -scale
+        };
+
+        return math::ComplexMatrix{
+            4,
+            4,
+            std::vector{
+                math::Complex{}, math::Complex{}, one, positiveI,
+                math::Complex{}, math::Complex{}, positiveI, one,
+                one, negativeI, math::Complex{}, math::Complex{},
+                negativeI, one, math::Complex{}, math::Complex{}
+            }
+        };
+    }
+
+    math::ComplexMatrix squareRootSwapGate() {
+        const math::Complex diagonal{0.5, 0.5};
+        const math::Complex exchange{0.5, -0.5};
+
+        return math::ComplexMatrix{
+            4,
+            4,
+            std::vector{
+                math::Complex{1.0, 0.0}, math::Complex{}, math::Complex{}, math::Complex{},
+                math::Complex{}, diagonal, exchange, math::Complex{},
+                math::Complex{}, exchange, diagonal, math::Complex{},
+                math::Complex{}, math::Complex{}, math::Complex{}, math::Complex{1.0, 0.0}
+            }
+        };
+    }
+
+    math::ComplexMatrix fSimGate(
+        const double thetaRadians,
+        const double phiRadians
+    ) {
+        const double cosine =
+                std::cos(thetaRadians);
+
+        const double sine =
+                std::sin(thetaRadians);
+
+        return math::ComplexMatrix{
+            4,
+            4,
+            std::vector{
+                math::Complex{1.0, 0.0}, math::Complex{}, math::Complex{}, math::Complex{},
+                math::Complex{}, math::Complex{cosine, 0.0}, math::Complex{0.0, -sine}, math::Complex{},
+                math::Complex{}, math::Complex{0.0, -sine}, math::Complex{cosine, 0.0}, math::Complex{},
+                math::Complex{}, math::Complex{}, math::Complex{}, phase(-phiRadians)
+            }
+        };
+    }
+
+    math::ComplexMatrix ccxGate() {
+        std::vector values(
+            std::size_t{64},
+            math::Complex{}
+        );
+
+        for (std::size_t state = 0U; state < 6U; ++state) {
+            values[state * 8U + state] =
+                    math::Complex{1.0, 0.0};
+        }
+
+        values[6U * 8U + 7U] =
+                math::Complex{1.0, 0.0};
+
+        values[7U * 8U + 6U] =
+                math::Complex{1.0, 0.0};
+
+        return math::ComplexMatrix{
+            8,
+            8,
+            std::move(values)
+        };
+    }
+
+    math::ComplexMatrix cSwapGate() {
+        std::vector values(
+            std::size_t{64},
+            math::Complex{}
+        );
+
+        for (std::size_t state = 0U; state < 8U; ++state) {
+            const std::size_t outputState =
+                    state == 5U
+                        ? 6U
+                        : state == 6U
+                            ? 5U
+                            : state;
+
+            values[outputState * 8U + state] =
+                    math::Complex{1.0, 0.0};
+        }
+
+        return math::ComplexMatrix{
+            8,
+            8,
+            std::move(values)
         };
     }
 

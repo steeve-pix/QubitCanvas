@@ -160,6 +160,102 @@ namespace quantum_sim::quantum {
         };
     }
 
+    QuantumRegister QuantumRegister::applyThreeQubitGate(
+        const math::ComplexMatrix &gate,
+        const std::size_t firstQubit,
+        const std::size_t secondQubit,
+        const std::size_t thirdQubit
+    ) const {
+        if (gate.rows() != 8U || gate.columns() != 8U) {
+            throw std::invalid_argument{
+                "A three-qubit gate must be an 8 by 8 matrix."
+            };
+        }
+
+        if (!gate.isUnitary()) {
+            throw std::invalid_argument{
+                "A quantum gate must be unitary."
+            };
+        }
+
+        if (
+            firstQubit >= qubitCount_ ||
+            secondQubit >= qubitCount_ ||
+            thirdQubit >= qubitCount_
+        ) {
+            throw std::out_of_range{
+                "Three-qubit gate index is outside the register."
+            };
+        }
+
+        if (
+            firstQubit == secondQubit ||
+            firstQubit == thirdQubit ||
+            secondQubit == thirdQubit
+        ) {
+            throw std::invalid_argument{
+                "A three-qubit gate requires three different qubits."
+            };
+        }
+
+        const std::size_t firstMask =
+                std::size_t{1} << (qubitCount_ - 1U - firstQubit);
+
+        const std::size_t secondMask =
+                std::size_t{1} << (qubitCount_ - 1U - secondQubit);
+
+        const std::size_t thirdMask =
+                std::size_t{1} << (qubitCount_ - 1U - thirdQubit);
+
+        std::vector<math::Complex> transformed(
+            stateCount(),
+            math::Complex{}
+        );
+
+        for (std::size_t baseState = 0U; baseState < stateCount(); ++baseState) {
+            if (
+                (baseState & firstMask) != 0U ||
+                (baseState & secondMask) != 0U ||
+                (baseState & thirdMask) != 0U
+            ) {
+                continue;
+            }
+
+            const std::size_t stateIndices[8]{
+                baseState,
+                baseState | thirdMask,
+                baseState | secondMask,
+                baseState | secondMask | thirdMask,
+                baseState | firstMask,
+                baseState | firstMask | thirdMask,
+                baseState | firstMask | secondMask,
+                baseState | firstMask | secondMask | thirdMask
+            };
+
+            for (std::size_t output = 0U; output < 8U; ++output) {
+                math::Complex sum{};
+
+                for (std::size_t input = 0U; input < 8U; ++input) {
+                    sum +=
+                            gate.at(output, input) *
+                            amplitudes_.at(
+                                stateIndices[input]
+                            );
+                }
+
+                transformed[stateIndices[output]] =
+                        sum;
+            }
+        }
+
+        return QuantumRegister{
+            qubitCount_,
+            math::ComplexVector{
+                std::move(transformed)
+            }
+        };
+    }
+
     QuantumRegister QuantumRegister::applyGate(const math::ComplexMatrix &gate) const {
         if (gate.rows() != stateCount() ||
             gate.columns() != stateCount()) {

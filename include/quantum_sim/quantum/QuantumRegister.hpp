@@ -102,6 +102,30 @@ namespace quantum_sim::quantum {
         ) const;
 
         /**
+         * Applies a compact 8x8 gate to any three distinct qubits.
+         *
+         * Local basis ordering is |000> through |111>, where the first,
+         * second, and third local bits correspond to the operands in the same
+         * order. The matrix is evaluated over independent eight-amplitude
+         * blocks without expansion to a full-register matrix.
+         *
+         * @param gate Three-qubit unitary matrix.
+         * @param firstQubit Qubit represented by the first local basis bit.
+         * @param secondQubit Qubit represented by the second local basis bit.
+         * @param thirdQubit Qubit represented by the third local basis bit.
+         * @return New register after the transformation.
+         * @throws std::invalid_argument if gate is not an 8x8 unitary or any
+         *         operand indices are equal.
+         * @throws std::out_of_range if an operand is outside the register.
+         */
+        [[nodiscard]] QuantumRegister applyThreeQubitGate(
+            const math::ComplexMatrix &gate,
+            std::size_t firstQubit,
+            std::size_t secondQubit,
+            std::size_t thirdQubit
+        ) const;
+
+        /**
          * Applies a full-register unitary matrix.
          *
          * @param gate Matrix sized stateCount() by stateCount().

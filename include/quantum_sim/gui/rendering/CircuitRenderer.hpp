@@ -31,6 +31,17 @@ namespace quantum_sim::gui {
     };
 
     /**
+     * Completed placement data for a compact three-qubit gate.
+     */
+    struct ThreeQubitPlacement {
+        std::string gateName;
+        std::size_t firstQubit;
+        std::size_t secondQubit;
+        std::size_t thirdQubit;
+        std::size_t instructionIndex;
+    };
+
+    /**
      * Completed drag movement for one existing circuit instruction.
      */
     struct InstructionMove {
@@ -104,6 +115,14 @@ namespace quantum_sim::gui {
         [[nodiscard]] std::optional<ControlledPlacement> consumeCompletedControlledPlacement() noexcept;
 
         /**
+         * Returns and clears a completed three-qubit placement.
+         *
+         * @return Three selected operands and insertion index, or nullopt while
+         *         the placement is incomplete.
+         */
+        [[nodiscard]] std::optional<ThreeQubitPlacement> consumeCompletedThreeQubitPlacement() noexcept;
+
+        /**
          * Returns and clears a completed single-qubit placement.
          *
          * @return Placement data, or nullopt when placement is incomplete.
@@ -114,6 +133,11 @@ namespace quantum_sim::gui {
          * @return True when a two-qubit placement has picked its first qubit.
          */
         [[nodiscard]] bool hasPendingControlQubit() const noexcept;
+
+        /**
+         * @return Number of distinct operands selected for the active placement.
+         */
+        [[nodiscard]] std::size_t placementOperandCount() const noexcept;
 
         /**
          * Clears all in-progress placement state.
@@ -198,6 +222,7 @@ namespace quantum_sim::gui {
         CircuitStyle style_;
         std::optional<std::size_t> pendingControlQubit_;
         std::optional<std::size_t> pendingTargetQubit_;
+        std::optional<std::size_t> pendingThirdQubit_;
         std::optional<SingleQubitPlacement> completedSingleQubitPlacement_;
         std::optional<std::size_t> pendingInsertionIndex_;
         std::optional<float> insertionMouseXLock_;
