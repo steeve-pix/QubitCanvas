@@ -40,6 +40,9 @@ namespace quantum_sim::gui {
         float symbolGapHalfHeight{3.0F};
         float targetCrossInset{3.0F};
         float exchangePathHalfWidth{23.0F};
+        float exchangePathUnderlayThickness{7.0F};
+        float exchangePathUnderlayInset{5.0F};
+        float exchangePortOverlap{5.0F};
         float exchangeBadgePaddingX{4.0F};
         float exchangeBadgePaddingY{2.0F};
         float exchangeBadgeCornerRadius{3.0F};

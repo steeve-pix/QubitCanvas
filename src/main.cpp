@@ -2,6 +2,7 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/gates/QuantumGates.hpp"
 #include "quantum_sim/gui/GuiApplication.hpp"
 
 #include <cstddef>
@@ -179,6 +180,29 @@ namespace {
         }
         if (preset == "surface-code") {
             return algorithms::surfaceCodeStabilizerCircuit(qubitCount);
+        }
+        if (preset == "swap-routing") {
+            if (qubitCount < 6U) {
+                throw std::invalid_argument{
+                    "The swap-routing visual check requires six qubits."
+                };
+            }
+
+            circuit::QuantumCircuit circuit{qubitCount};
+            circuit.addTwoQubitGate(
+                "SWAP",
+                gates::swapGate(),
+                1U,
+                4U
+            );
+            circuit.addThreeQubitGate(
+                "CSWAP",
+                gates::cSwapGate(),
+                0U,
+                2U,
+                5U
+            );
+            return circuit;
         }
 
         throw std::invalid_argument{
