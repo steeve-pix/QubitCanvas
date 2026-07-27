@@ -1448,16 +1448,18 @@ namespace quantum_sim::gui {
         ) {
             densityVolumeCamera_.frameScene(
                 densityVolumeRenderer_.sceneCenter(),
+                densityVolumeRenderer_.sceneFocusRadius(),
                 densityVolumeRenderer_.sceneRadius(),
                 visualizationMode ==
                     density_volume::VisualizationMode::FloorField
             );
             densityVolumeCameraFramePending_ = false;
         } else if (sceneChanged) {
-            // Playback changes the visible layer range, but that data refresh
-            // must not overwrite the camera pose chosen by the user.
+            // Untouched playback follows the selected layer at a fixed orbit
+            // distance. Manual camera input keeps full ownership of the pose.
             densityVolumeCamera_.updateSceneBounds(
                 densityVolumeRenderer_.sceneCenter(),
+                densityVolumeRenderer_.sceneFocusRadius(),
                 densityVolumeRenderer_.sceneRadius(),
                 visualizationMode ==
                     density_volume::VisualizationMode::FloorField

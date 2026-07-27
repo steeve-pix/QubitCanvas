@@ -11,31 +11,35 @@ namespace quantum_sim::gui::density_volume {
         /**
          * Frames a new scene and stores that composition as the reset view.
          *
-         * @param center Stable look-at target at the scene bounds center.
-         * @param radius Bounding-sphere radius used for distance and clip planes.
+         * @param center Look-at target at the selected density layer.
+         * @param focusRadius Selected matrix radius used for orbit distance.
+         * @param extentRadius Complete visible history radius used for clipping.
          * @param floorField True when framing the height-field presentation.
          */
         void frameScene(
             const Vector3 &center,
-            float radius,
+            float focusRadius,
+            float extentRadius,
             bool floorField = false
         );
 
         /**
-         * Refreshes scene-aware reset and clipping bounds without moving the camera.
+         * Refreshes scene-aware focus, reset, and clipping bounds.
          *
          * Playback calls this when the visible layer range changes. An
-         * untouched camera follows the new framing targets smoothly. Once the
-         * user orbits, pans, or zooms, the live pose remains untouched and
-         * only a later reset uses the newest composition.
+         * untouched Layer Stack camera follows the new target without changing
+         * orbit distance. Once the user orbits, pans, or zooms, the live pose
+         * remains untouched and only a later reset uses the newest composition.
          *
-         * @param center Stable look-at target at the latest scene bounds center.
-         * @param radius Bounding-sphere radius used for reset distance and clip planes.
+         * @param center Look-at target at the selected density layer.
+         * @param focusRadius Selected matrix radius used for orbit distance.
+         * @param extentRadius Complete visible history radius used for clipping.
          * @param floorField True when framing the height-field presentation.
          */
         void updateSceneBounds(
             const Vector3 &center,
-            float radius,
+            float focusRadius,
+            float extentRadius,
             bool floorField = false
         ) noexcept;
 
@@ -92,6 +96,11 @@ namespace quantum_sim::gui::density_volume {
          */
         [[nodiscard]] bool isFramed() const noexcept;
 
+        /**
+         * Returns the current eye-to-target orbit distance.
+         */
+        [[nodiscard]] float orbitDistance() const noexcept;
+
     private:
         float yawDegrees_{-40.0F};
         float pitchDegrees_{20.0F};
@@ -107,6 +116,7 @@ namespace quantum_sim::gui::density_volume {
         float launchPitchDegrees_{20.0F};
         float launchDistance_{20.0F};
         Vector3 launchTarget_{};
+        float focusRadius_{4.0F};
         float sceneRadius_{4.0F};
         float smoothness_{2.5F};
         bool userControlled_{false};

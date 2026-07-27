@@ -322,6 +322,7 @@ namespace quantum_sim::gui::density_volume {
             sceneSelectedLayer_.reset();
             sceneMode_ = mode;
             sceneCenter_ = Vector3{};
+            sceneFocusRadius_ = 1.0F;
             sceneRadius_ = 1.0F;
             return true;
         }
@@ -403,32 +404,47 @@ namespace quantum_sim::gui::density_volume {
                     );
 
             if (visibleBounds.valid) {
-                const float minimumContextRadius =
-                        std::clamp(
-                            scene_.matrixSpan * 0.28F,
-                            1.4F,
-                            4.6F
-                        );
+                const float matrixHalfSpan =
+                        scene_.matrixSpan * 0.5F;
 
                 sceneCenter_ =
-                        visibleBounds.center;
+                        safeSelectedLayer <
+                            scene_.layerCenters.size()
+                            ? scene_.layerCenters[
+                                safeSelectedLayer
+                            ]
+                            : visibleBounds.center;
+
+                sceneFocusRadius_ =
+                        std::max(
+                            std::sqrt(
+                                matrixHalfSpan *
+                                    matrixHalfSpan *
+                                    2.0F +
+                                scene_.voxelSide *
+                                    scene_.voxelSide *
+                                    0.25F
+                            ) *
+                            1.12F,
+                            1.4F
+                        );
 
                 sceneRadius_ =
                         std::max(
                             visibleBounds.radius * 1.18F,
-                            minimumContextRadius
+                            sceneFocusRadius_
                         );
 
                 scene_.groundCenter = Vector3{
-                    sceneCenter_.x,
+                    0.0F,
                     visibleBounds.minimum.y -
                         scene_.voxelSide * 1.15F,
-                    sceneCenter_.z
+                    0.0F
                 };
 
                 scene_.groundHalfExtentX =
                         std::max(
-                            sceneRadius_ * 1.28F,
+                            scene_.matrixSpan * 0.78F,
                             2.5F
                         );
 
@@ -436,11 +452,21 @@ namespace quantum_sim::gui::density_volume {
                         scene_.groundHalfExtentX;
             } else {
                 sceneCenter_ =
-                        scene_.center;
+                        safeSelectedLayer <
+                            scene_.layerCenters.size()
+                            ? scene_.layerCenters[
+                                safeSelectedLayer
+                            ]
+                            : scene_.center;
+                sceneFocusRadius_ =
+                        std::max(
+                            scene_.matrixSpan * 0.8F,
+                            1.4F
+                        );
                 sceneRadius_ =
                         std::max(
                             scene_.radius,
-                            1.0F
+                            sceneFocusRadius_
                         );
             }
         } else {
@@ -449,6 +475,7 @@ namespace quantum_sim::gui::density_volume {
             visibleGhostCount_ =
                     static_cast<int>(scene_.ghostVoxels.size());
             sceneCenter_ = scene_.center;
+            sceneFocusRadius_ = scene_.radius;
             sceneRadius_ = scene_.radius;
         }
 
@@ -838,6 +865,10 @@ namespace quantum_sim::gui::density_volume {
 
     Vector3 Renderer::sceneCenter() const noexcept {
         return sceneCenter_;
+    }
+
+    float Renderer::sceneFocusRadius() const noexcept {
+        return sceneFocusRadius_;
     }
 
     float Renderer::sceneRadius() const noexcept {

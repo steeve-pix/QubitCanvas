@@ -41,15 +41,17 @@ bloom pass and linear-to-sRGB output preserve the warm gold, orange, magenta,
 and violet range without heavy tone-map compression. Restrained face lighting,
 perspective framing, depth testing, and a procedural ground grid keep cube
 tops, sides, matrix depth, and history separation readable.
-Camera bounds follow the visible solid volume with a minimum amount of grid
-context, so sparse initial states remain grounded and legible instead of being
-reduced to a distant point inside the complete logical matrix extent.
+Layer Stack frames the selected matrix at a stable orbit distance. During
+untouched playback, the look-at target climbs to each new layer while the full
+history extent is used only for safe clipping; the camera does not zoom
+backward as the history grows. Manual orbit, pan, or zoom keeps ownership of
+the camera until reset.
 
 Two synchronized layouts are available:
 
-- **Layer Stack** places complete Y-Z density matrices along the X axis and
-  reveals pre-uploaded solid and ghost instance ranges through the selected
-  debugger step.
+- **Layer Stack** places complete X-Z density matrices upward along the Y axis
+  and reveals pre-uploaded solid and ghost instance ranges through the
+  selected debugger step.
 - **Floor Field** shows the selected density matrix as one square X-Z grid and
   maps `|ρ|` linearly to voxel height.
 
