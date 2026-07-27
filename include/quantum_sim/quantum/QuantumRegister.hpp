@@ -111,6 +111,20 @@ namespace quantum_sim::quantum {
         [[nodiscard]] QuantumRegister applyGate(const math::ComplexMatrix &gate) const;
 
         /**
+         * Reflects the state across a normalized state-vector axis.
+         *
+         * The transformation is I - 2|axis><axis| and is applied directly to
+         * the state vector, avoiding a stateCount() by stateCount() matrix.
+         *
+         * @param normalizedAxis Unit vector with stateCount() elements.
+         * @return New register after the Householder reflection.
+         * @throws std::invalid_argument if the axis size or normalization is invalid.
+         */
+        [[nodiscard]] QuantumRegister applyReflection(
+            const math::ComplexVector &normalizedAxis
+        ) const;
+
+        /**
          * @param stateIndex Basis-state index.
          * @return Measurement probability for the indexed basis state.
          * @throws std::out_of_range if stateIndex is outside the register.

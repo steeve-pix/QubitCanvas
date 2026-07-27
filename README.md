@@ -76,15 +76,20 @@ there in a paused state before playback begins.
 
 | Category | Gates |
 | --- | --- |
-| Single-qubit | `H`, `X`, `Y`, `Z`, `S`, `Sdg`, `T`, `Tdg` |
-| Rotations | `Rx`, `Ry`, `Rz` |
-| Controlled and exchange | `CX`, `CY`, `CZ`, `SWAP`, `iSWAP` |
+| Core single-qubit | `H`, `X`, `Y`, `Z`, `S`, `Sdg`, `T`, `Tdg`, `SX`, `SXdg` |
+| Parameterized single-qubit | `P`, `U`, `Rx`, `Ry`, `Rz` |
+| Core two-qubit | `CX`, `CY`, `CZ`, `SWAP`, `iSWAP` |
+| Parameterized controlled | `CP`, `CRx`, `CRy`, `CRz` |
+| Interaction rotations | `RXX`, `RYY`, `RZZ` |
 
-Rotation angles are stored in radians and displayed as exact or decimal
-multiples of `π`. Detailed angle controls and hover readouts place the decimal
-radian value beside that notation, for example `π/2 (1.571 rad)`. Hover a gate
-button to see its name, purpose, and unitary matrix; zero-valued entries are
-intentionally subdued so the matrix structure scans quickly.
+The gate catalog uses compact previous/page/next controls. Core operations stay
+on page one, while parameterized and interaction gates stay on page two.
+Angles are stored in radians and displayed as exact or decimal multiples of
+`π`. The universal `U` gate exposes independent `θ`, `φ`, and `λ` controls.
+Detailed controls and hover readouts place the decimal radian value beside the
+π notation, for example `π/2 (1.571 rad)`. Hover a gate button to see its name,
+purpose, and unitary matrix; zero-valued entries are intentionally subdued so
+the matrix structure scans quickly.
 
 `Escape` cancels an active gate placement. `Space` toggles playback whenever a
 text field is not accepting input.
@@ -141,6 +146,14 @@ contains custom edits.
 - Coined quantum walk
 - BB84 basis demonstration
 - Superdense coding
+- W state
+- Dicke state with two excitations
+- Linear graph/cluster state
+- Reproducible random circuit with uneven output probabilities
+- Weighted state preparation
+- Three-qubit bit-flip error correction
+- Seven-qubit Steane logical-zero encoding
+- Nine-qubit Shor-code encoding
 
 The register slider controls the size of the next blank circuit or preset from
 1 to 10 qubits; it does not silently resize the circuit currently being edited.
@@ -149,6 +162,8 @@ The fixed-height catalog uses previous and next page controls, so the expanded
 algorithm collection does not make the Gate Library taller. Fixed
 demonstrations use their leading qubits and leave any additional register
 qubits in the initial state.
+Grover is register-wide: it marks the all-one basis state and uses the
+near-optimal number of oracle/diffusion iterations for the selected register.
 
 ## Build
 
@@ -185,6 +200,18 @@ available:
 .\build\qubit_canvas.exe
 ```
 
+The executable also supports hidden framebuffer captures for unattended visual
+regression checks:
+
+```powershell
+.\build\qubit_canvas.exe --preset random --qubits 6 --algorithm-page 3 `
+  --final-step --capture C:\captures\random-final.ppm
+```
+
+Supported capture presets are `qft`, `grover`, `w`, `dicke`, `graph`, `random`,
+`weighted`, `bit-flip`, `steane`, and `shor-code`. `--gate-page 2 --gate U`
+captures the parameterized gate catalog with `U` armed.
+
 For a Visual Studio multi-configuration generator, the executable may instead
 be located at `build\Debug\qubit_canvas.exe`.
 
@@ -195,6 +222,8 @@ execution cost scale exponentially with qubit count. Single-qubit and
 two-qubit instructions remain compact as 2x2 and 4x4 matrices and are applied
 directly to amplitude pairs or quartets. They therefore use O(2^n) execution
 memory instead of expanding every gate into an O(4^n) full-register matrix.
+State preparation and register-wide Grover use compact Householder reflections
+evaluated directly against the state vector, also in O(2^n) memory.
 The explicit full-register gate API remains available for custom unitaries
 that genuinely require it.
 

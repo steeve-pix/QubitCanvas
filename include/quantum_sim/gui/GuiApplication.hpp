@@ -19,6 +19,19 @@
 
 namespace quantum_sim::gui {
     /**
+     * Optional startup behavior used by unattended visual regression captures.
+     */
+    struct GuiLaunchOptions {
+        bool hiddenWindow{false};
+        std::optional<std::string> capturePath;
+        std::size_t captureAfterFrames{8U};
+        std::optional<std::size_t> algorithmPage;
+        std::optional<std::size_t> gatePage;
+        std::optional<std::string> armedGate;
+        bool startAtFinalStep{false};
+    };
+
+    /**
      * Built-in circuit scripts available from the left-side algorithm panel.
      */
     enum class CircuitPreset {
@@ -43,7 +56,15 @@ namespace quantum_sim::gui {
         SwapTest,
         QuantumWalk,
         Bb84,
-        Superdense
+        Superdense,
+        WState,
+        DickeState,
+        GraphState,
+        RandomCircuit,
+        WeightedState,
+        BitFlipCode,
+        SteaneCode,
+        ShorCode
     };
 
     /**
@@ -64,8 +85,13 @@ namespace quantum_sim::gui {
          *
          * @param circuit Circuit edited and executed by the UI.
          * @param initialState Starting state used by the debugger trace.
+         * @param launchOptions Optional hidden capture and initial-view settings.
          */
-        GuiApplication(circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState);
+        GuiApplication(
+            circuit::QuantumCircuit &circuit,
+            const quantum::QuantumRegister &initialState,
+            GuiLaunchOptions launchOptions = {}
+        );
 
         /**
          * Opens the window and runs the GUI event/render loop until closed.
@@ -77,14 +103,14 @@ namespace quantum_sim::gui {
         /**
          * Creates a supported single-qubit gate by display name.
          *
-         * @param gateName Gate name such as H, X, Y, Z, S, Sdg, T, Tdg, Rx, Ry, or Rz.
-         * @param angleRadians Required rotation angle for Rx, Ry, and Rz.
+         * @param gateName Supported one-qubit gate display name.
+         * @param parameters Angles used by parameterized gates.
          * @return 2x2 unitary gate matrix.
-         * @throws std::invalid_argument if the gate is unsupported or a rotation has no angle.
+         * @throws std::invalid_argument if the gate is unsupported.
          */
         [[nodiscard]] math::ComplexMatrix createSingleQubitGateMatrix(
             const std::string &gateName,
-            std::optional<double> angleRadians = std::nullopt
+            const GateParameters &parameters = GateParameters{}
         ) const;
 
         /**
@@ -105,12 +131,14 @@ namespace quantum_sim::gui {
         /**
          * Creates a supported compact two-qubit gate by display name.
          *
-         * @param gateName Gate name such as CX, CY, CZ, SWAP, or iSWAP.
+         * @param gateName Supported two-qubit gate display name.
+         * @param parameters Angles used by parameterized gates.
          * @return Compact 4x4 unitary matrix for the selected two-qubit gate.
          * @throws std::invalid_argument if gateName is not supported.
          */
         [[nodiscard]] static math::ComplexMatrix createTwoQubitGateMatrix(
-            const std::string &gateName
+            const std::string &gateName,
+            const GateParameters &parameters = GateParameters{}
         );
 
     private:
@@ -138,10 +166,11 @@ namespace quantum_sim::gui {
         density_volume::DensityStack densityVolumeStack_;
         GateLibraryPanel gateLibraryPanel_;
         std::optional<std::string> pendingGate_;
-        std::optional<double> pendingRotationAngleRadians_;
+        std::optional<GateParameters> pendingGateParameters_;
         std::optional<ControlledPlacement> queuedControlledPlacement_;
         std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
-        std::optional<double> queuedSingleQubitRotationAngleRadians_;
+        std::optional<GateParameters> queuedSingleQubitParameters_;
+        std::optional<GateParameters> queuedTwoQubitParameters_;
         std::optional<std::size_t> queuedInstructionDeletion_;
         std::optional<InstructionMove> queuedInstructionMove_;
         std::optional<CircuitPreset> queuedPreset_;
@@ -172,6 +201,8 @@ namespace quantum_sim::gui {
         bool followManualEdits_{true};
         bool circuitHasUnsavedEdits_{false};
         std::optional<std::size_t> lastInspectorSelection_;
+        GuiLaunchOptions launchOptions_;
+        std::size_t renderedFrameCount_{0U};
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
