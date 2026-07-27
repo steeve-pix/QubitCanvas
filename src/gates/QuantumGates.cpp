@@ -7,7 +7,7 @@
 
 namespace quantum_sim::gates {
     math::ComplexMatrix xGate() {
-        // X swaps the |0> and |1> amplitudes.
+        // X swaps the |0⟩ and |1⟩ amplitudes.
         return math::ComplexMatrix{
             2, 2,
             std::vector{
@@ -115,7 +115,7 @@ namespace quantum_sim::gates {
     };
 
     math::ComplexMatrix sDaggerGate() {
-        // S-dagger reverses S by applying the conjugate phase -i to |1>.
+        // S-dagger reverses S by applying the conjugate phase -i to |1⟩.
         return math::ComplexMatrix{
             2, 2,
             std::vector{
@@ -128,7 +128,7 @@ namespace quantum_sim::gates {
     }
 
     math::ComplexMatrix tGate() {
-        // T is the fourth root of Z: phase angle pi/4 on |1>.
+        // T is the fourth root of Z: phase angle pi/4 on |1⟩.
         const double phase =
                 std::numbers::pi / 4.0;
 
@@ -503,7 +503,7 @@ namespace quantum_sim::gates {
                 std::size_t{1}
                 << (qubitCount - 1 - targetQubit);
 
-        // Controlled-Z is diagonal: only |control=1,target=1> gets a -1 phase.
+        // Controlled-Z is diagonal: only |control=1,target=1⟩ gets a -1 phase.
         for (
             std::size_t state = 0;
             state < stateCount;

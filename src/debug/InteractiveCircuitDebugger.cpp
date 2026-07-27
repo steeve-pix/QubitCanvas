@@ -50,48 +50,54 @@ namespace quantum_sim::debug {
         // selection and step inspection speak with the same vocabulary.
         if (gateName == "H") {
             return
-                    "Create a superposition by mixing the |0> "
-                    "and |1> amplitudes.";
+                    "Create a superposition by mixing the |0\xE2\x9F\xA9 "
+                    "and |1\xE2\x9F\xA9 amplitudes.";
         }
 
         if (gateName == "CX") {
             return
-                    "Flips the target qubit when the control qubit is |1>. "
+                    "Flips the target qubit when the control qubit is |1\xE2\x9F\xA9. "
                     "It can create entanglement.";
         }
         if (gateName == "X") {
             return
-                    "Flips |0> to |1> and |1> to |0>. "
+                    "Flips |0\xE2\x9F\xA9 to |1\xE2\x9F\xA9 and "
+                    "|1\xE2\x9F\xA9 to |0\xE2\x9F\xA9. "
                     "It is the quantum equivalent of a classical NOT gate.";
         }
         if (gateName == "Y") {
             return
                     "Flips the qubit like X, while also changing its phase. "
-                    "It maps |0> to i|1> and |1> to -i|0>.";
+                    "It maps |0\xE2\x9F\xA9 to i|1\xE2\x9F\xA9 and "
+                    "|1\xE2\x9F\xA9 to -i|0\xE2\x9F\xA9.";
         }
         if (gateName == "Z") {
             return
-                    "Leaves |0> unchanged and multiplies the |1> amplitude by -1. "
+                    "Leaves |0\xE2\x9F\xA9 unchanged and multiplies the "
+                    "|1\xE2\x9F\xA9 amplitude by -1. "
                     "This changes phase without changing measurement probabilities.";
         }
         if (gateName == "S") {
             return
-                    "Leaves |0> unchanged and multiplies the |1> amplitude by i. "
+                    "Leaves |0\xE2\x9F\xA9 unchanged and multiplies the "
+                    "|1\xE2\x9F\xA9 amplitude by i. "
                     "This adds a phase of pi/2 radians.";
         }
         if (gateName == "Sdg") {
             return
-                    "Applies the inverse S phase: |0> stays unchanged and |1> "
+                    "Applies the inverse S phase: |0\xE2\x9F\xA9 stays unchanged and "
+                    "|1\xE2\x9F\xA9 "
                     "receives a phase of -pi/2 radians.";
         }
         if (gateName == "T") {
             return
-                    "Leaves |0> unchanged and adds a phase of pi/4 radians "
-                    "to the |1> amplitude.";
+                    "Leaves |0\xE2\x9F\xA9 unchanged and adds a phase of pi/4 radians "
+                    "to the |1\xE2\x9F\xA9 amplitude.";
         }
         if (gateName == "Tdg") {
             return
-                    "Applies the inverse T phase: |0> stays unchanged and |1> "
+                    "Applies the inverse T phase: |0\xE2\x9F\xA9 stays unchanged and "
+                    "|1\xE2\x9F\xA9 "
                     "receives a phase of -pi/4 radians.";
         }
         if (gateName == "SWAP") {

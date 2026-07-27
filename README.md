@@ -24,8 +24,8 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 
 ## Density Volume
 
-The Density Volume panel converts each debugger state into
-`ρ = |ψ><ψ|`. Numerically visible cells become opaque instances of one indexed,
+The Density Volume panel converts each debugger state into the projector
+`ρ = |ψ⟩⟨ψ|`. Numerically visible cells become opaque instances of one indexed,
 smoothly rounded cube with a soft density-core material. The roundover keeps a
 constant world-space radius when Floor Field instances grow vertically, so
 tall values remain cuboids instead of stretching into capsules. Near-zero cells
@@ -73,9 +73,10 @@ untouched initial register before any instruction executes.
 | Rotations | `Rx`, `Ry`, `Rz` |
 | Controlled and exchange | `CX`, `CY`, `CZ`, `SWAP`, `iSWAP` |
 
-Rotation angles are entered and displayed in radians. Hover a gate button to
-see its name, purpose, and unitary matrix; zero-valued entries are intentionally
-subdued so the matrix structure scans quickly.
+Rotation angles are stored in radians and displayed as exact or decimal
+multiples of `π`. Hover a gate button to see its name, purpose, and unitary
+matrix; zero-valued entries are intentionally subdued so the matrix structure
+scans quickly.
 
 `Escape` cancels an active gate placement. `Space` toggles playback whenever a
 text field is not accepting input.

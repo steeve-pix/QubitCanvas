@@ -276,7 +276,7 @@ namespace quantum_sim::algorithms {
 
         circuit::QuantumCircuit circuit{qubitCount};
 
-        // Uniform preparation followed by a CZ oracle that marks |11>.
+        // Uniform preparation followed by a CZ oracle that marks |11⟩.
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);
         circuit.addTwoQubitGate(
@@ -319,7 +319,7 @@ namespace quantum_sim::algorithms {
         const std::size_t ancilla =
                 qubitCount - 1U;
 
-        // Prepare the ancilla in |1>, then move the full register into the oracle basis.
+        // Prepare the ancilla in |1⟩, then move the full register into the oracle basis.
         circuit.addSingleQubitGate("X", gates::xGate(), ancilla);
 
         for (std::size_t qubit = 0; qubit < qubitCount; ++qubit) {
@@ -429,7 +429,7 @@ namespace quantum_sim::algorithms {
 
         circuit::QuantumCircuit circuit{qubitCount};
 
-        // Start both controls in |1> so the decomposition visibly flips q2.
+        // Start both controls in |1⟩ so the decomposition visibly flips q2.
         circuit.addSingleQubitGate("X", gates::xGate(), 0);
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 2);
@@ -474,7 +474,7 @@ namespace quantum_sim::algorithms {
 
         circuit::QuantumCircuit circuit{qubitCount};
 
-        // The target |-> is a -1 eigenstate of X, so CX kicks phase to q0.
+        // The target |-⟩ is a -1 eigenstate of X, so CX kicks phase to q0.
         circuit.addSingleQubitGate("X", gates::xGate(), 1);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 0);
         circuit.addSingleQubitGate("H", gates::hadamardGate(), 1);

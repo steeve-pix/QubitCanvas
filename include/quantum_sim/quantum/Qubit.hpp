@@ -13,26 +13,26 @@ namespace quantum_sim::quantum {
     };
 
     /**
-     * Single normalized qubit represented as alpha|0> + beta|1>.
+     * Single normalized qubit represented as alpha|0⟩ + beta|1⟩.
      */
     class Qubit final {
     public:
         /**
          * Creates a qubit from two amplitudes.
          *
-         * @param alpha Amplitude for |0>.
-         * @param beta Amplitude for |1>.
+         * @param alpha Amplitude for |0⟩.
+         * @param beta Amplitude for |1⟩.
          * @throws std::invalid_argument if alpha and beta are not normalized.
          */
         Qubit(math::Complex alpha, math::Complex beta);
 
         /**
-         * @return Amplitude for basis state |0>.
+         * @return Amplitude for basis state |0⟩.
          */
         [[nodiscard]] const math::Complex &zeroAmplitude() const noexcept;
 
         /**
-         * @return Amplitude for basis state |1>.
+         * @return Amplitude for basis state |1⟩.
          */
         [[nodiscard]] const math::Complex &oneAmplitude() const noexcept;
 
@@ -46,12 +46,12 @@ namespace quantum_sim::quantum {
         [[nodiscard]] Qubit apply(const math::ComplexMatrix &gate) const;
 
         /**
-         * @return Probability of measuring |0>.
+         * @return Probability of measuring |0⟩.
          */
         [[nodiscard]] double probabilityOfZero() const noexcept;
 
         /**
-         * @return Probability of measuring |1>.
+         * @return Probability of measuring |1⟩.
          */
         [[nodiscard]] double probabilityOfOne() const noexcept;
 

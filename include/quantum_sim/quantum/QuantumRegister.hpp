@@ -81,7 +81,7 @@ namespace quantum_sim::quantum {
         /**
          * Applies a compact 4x4 gate to any two qubits without expanding it.
          *
-         * Local matrix basis ordering is |00>, |01>, |10>, |11>, where the
+         * Local matrix basis ordering is |00⟩, |01⟩, |10⟩, |11⟩, where the
          * first bit belongs to firstQubit and the second bit belongs to
          * secondQubit. The operation visits each amplitude exactly once, so
          * memory and execution scale with the state vector rather than with a
@@ -126,19 +126,19 @@ namespace quantum_sim::quantum {
         [[nodiscard]] std::size_t measure(std::mt19937 &randomEngine);
 
         /**
-         * Computes the marginal probability that one qubit measures as |1>.
+         * Computes the marginal probability that one qubit measures as |1⟩.
          *
          * @param qubitIndex Qubit index using q0 as the most-significant bit.
-         * @return Probability of outcome |1> for that qubit.
+         * @return Probability of outcome |1⟩ for that qubit.
          * @throws std::out_of_range if qubitIndex is outside the register.
          */
         [[nodiscard]] double probabilityOfQubitOne(std::size_t qubitIndex) const;
 
         /**
-         * Computes the marginal probability that one qubit measures as |0>.
+         * Computes the marginal probability that one qubit measures as |0⟩.
          *
          * @param qubitIndex Qubit index using q0 as the most-significant bit.
-         * @return Probability of outcome |0> for that qubit.
+         * @return Probability of outcome |0⟩ for that qubit.
          * @throws std::out_of_range if qubitIndex is outside the register.
          */
         [[nodiscard]] double probabilityOfQubitZero(std::size_t qubitIndex) const;
@@ -165,7 +165,7 @@ namespace quantum_sim::quantum {
         [[nodiscard]] static QuantumRegister basisState(std::size_t qubitCount, std::size_t stateIndex);
 
         /**
-         * Formats a basis-state label such as |0101>.
+         * Formats a basis-state ket such as |0101⟩.
          *
          * @param stateIndex Basis-state index.
          * @return Label for the indexed state.

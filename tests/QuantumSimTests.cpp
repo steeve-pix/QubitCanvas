@@ -399,10 +399,10 @@ int main() {
             twoQubitHadamardStack.layers.at(1U);
 
     check(
-        twoQubitHadamardLayer.bins.at(0U).label == "|00>" &&
-        twoQubitHadamardLayer.bins.at(1U).label == "|10>" &&
-        twoQubitHadamardLayer.bins.at(2U).label == "|01>" &&
-        twoQubitHadamardLayer.bins.at(3U).label == "|11>",
+        twoQubitHadamardLayer.bins.at(0U).label == "|00\xE2\x9F\xA9" &&
+        twoQubitHadamardLayer.bins.at(1U).label == "|10\xE2\x9F\xA9" &&
+        twoQubitHadamardLayer.bins.at(2U).label == "|01\xE2\x9F\xA9" &&
+        twoQubitHadamardLayer.bins.at(3U).label == "|11\xE2\x9F\xA9",
         "Density Volume display axes use bit-reversed two-qubit basis order"
     );
 
@@ -684,7 +684,7 @@ int main() {
 
     check(
         approximatelyEqual(groverResult.probability(3), 1.0),
-        "Grover search amplifies the marked state |11>"
+        "Grover search amplifies the marked state |11⟩"
     );
 
     const QuantumRegister expandedGroverResult =
@@ -694,7 +694,7 @@ int main() {
 
     check(
         approximatelyEqual(expandedGroverResult.probability(12), 1.0),
-        "Expanded Grover preserves idle qubits while marking q0/q1 as |11>"
+        "Expanded Grover preserves idle qubits while marking q0/q1 as |11⟩"
     );
 
     const QuantumRegister deutschJozsaResult =
@@ -776,7 +776,7 @@ int main() {
 
     check(
         approximatelyEqual(kickbackResult.probability(3), 1.0),
-        "Phase kickback is exposed as the final basis state |11>"
+        "Phase kickback is exposed as the final basis state |11⟩"
     );
 
     const QuantumRegister teleportationResult =
@@ -971,12 +971,12 @@ int main() {
 
     check(
         approximatelyEqual(rxResult.probability(1), 1.0),
-        "Rx(pi) rotates |0> to |1> up to phase"
+        "Rx(pi) rotates |0⟩ to |1⟩ up to phase"
     );
 
     check(
         approximatelyEqual(ryResult.probability(1), 1.0),
-        "Ry(pi) rotates |0> to |1>"
+        "Ry(pi) rotates |0⟩ to |1⟩"
     );
 
     const double metadataAngle =
