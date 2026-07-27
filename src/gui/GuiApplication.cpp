@@ -380,26 +380,20 @@ namespace quantum_sim::gui {
                         workSize.y - topBarHeight - bottomBarHeight - gap * 3.0F
                     );
 
-            const float circuitHeightRatio =
-                    std::clamp(
-                        0.52F +
-                        static_cast<float>(
-                            circuit_.qubitCount() > 4U
-                                ? circuit_.qubitCount() - 4U
-                                : 0U
-                        ) *
-                        0.027F,
-                        0.52F,
-                        0.68F
-                    );
+            const float splitPanelHeight =
+                    (
+                        usableHeight -
+                        gap
+                    ) *
+                    0.5F;
 
             const float circuitPanelHeight =
                     circuitFocusMode_
                         ? usableHeight
-                        : usableHeight * circuitHeightRatio;
+                        : splitPanelHeight;
 
             const float densityVolumePanelHeight =
-                    usableHeight - circuitPanelHeight - gap;
+                    splitPanelHeight;
 
             // Center circuit canvas gets all remaining width after fixed side panels.
             const float circuitPanelWidth =
