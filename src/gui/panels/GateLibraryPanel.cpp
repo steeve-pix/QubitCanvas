@@ -185,7 +185,7 @@ namespace quantum_sim::gui {
         },
         {
             "X",
-            "Pauli-X gate: flips |0> and |1>."
+            "Pauli-X gate: flips |0\xE2\x9F\xA9 and |1\xE2\x9F\xA9."
         },
         {
             "Y",
@@ -193,7 +193,7 @@ namespace quantum_sim::gui {
         },
         {
             "Z",
-            "Pauli-Z gate: changes the phase of |1>."
+            "Pauli-Z gate: changes the phase of |1\xE2\x9F\xA9."
         },
         {
             "S",
@@ -201,7 +201,7 @@ namespace quantum_sim::gui {
         },
         {
             "Sdg",
-            "Inverse S gate: rotates the |1> phase by -\xCF\x80/2 radians. "
+            "Inverse S gate: rotates the |1\xE2\x9F\xA9 phase by -\xCF\x80/2 radians. "
             "It cancels the S gate."
         },
         {
@@ -210,7 +210,7 @@ namespace quantum_sim::gui {
         },
         {
             "Tdg",
-            "Inverse T gate: rotates the |1> phase by -\xCF\x80/4 radians. "
+            "Inverse T gate: rotates the |1\xE2\x9F\xA9 phase by -\xCF\x80/4 radians. "
             "It cancels T and is used in decompositions such as Toffoli."
         }
     };
@@ -233,15 +233,15 @@ namespace quantum_sim::gui {
     constexpr GateDescriptor controlledGates[] = {
         {
             "CX",
-            "Controlled-X gate: flips the target when the control is |1>."
+            "Controlled-X gate: flips the target when the control is |1\xE2\x9F\xA9."
         },
         {
             "CY",
-            "Controlled-Y gate: applies the Pauli-Y gate to the target when the control is |1>."
+            "Controlled-Y gate: applies the Pauli-Y gate to the target when the control is |1\xE2\x9F\xA9."
         },
         {
             "CZ",
-            "Controlled-Z gate: applies a phase flip to the target when the control is |1>."
+            "Controlled-Z gate: applies a phase flip to the target when the control is |1\xE2\x9F\xA9."
         },
         {
             "SWAP",

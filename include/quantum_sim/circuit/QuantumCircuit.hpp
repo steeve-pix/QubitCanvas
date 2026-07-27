@@ -78,7 +78,7 @@ namespace quantum_sim::circuit {
         /**
          * Appends a compact two-qubit instruction.
          *
-         * The 4x4 matrix uses local |00>, |01>, |10>, |11> ordering, with
+         * The 4x4 matrix uses local |00⟩, |01⟩, |10⟩, |11⟩ ordering, with
          * firstQubit represented by the first bit. Keeping the local matrix
          * compact prevents controlled gates from consuming O(4^n) memory.
          *
