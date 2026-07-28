@@ -11,7 +11,6 @@ namespace quantum_sim::gui::density_volume {
         constexpr float cellPitch = 1.0F;
         constexpr float cubeSide = 0.88F;
         constexpr float maximumFloorHeight = 4.4F;
-        constexpr float maximumFloorColorMagnitude = 0.52F;
         constexpr float solidVisibilityThreshold = 1.0e-4F;
         constexpr float roundedCubeRadius = 0.12F;
         constexpr std::size_t roundedCubeSegments = 4U;
@@ -234,6 +233,9 @@ namespace quantum_sim::gui::density_volume {
                     cellPitch *
                     0.5F;
 
+            const double displayReferenceMagnitude =
+                    stack.maximumMagnitude;
+
             for (const DensityLayer &layer : stack.layers) {
                 const float layerX =
                         static_cast<float>(layer.index) *
@@ -254,9 +256,17 @@ namespace quantum_sim::gui::density_volume {
                         layer.dimension <= 16U;
 
                 for (const DensityCell &cell : layer.cells) {
-                    const float magnitude =
+                    const float rawMagnitude =
                             clamp01(
                                 static_cast<float>(cell.magnitude)
+                            );
+
+                    const float displayMagnitude =
+                            static_cast<float>(
+                                normalizeMagnitude(
+                                    cell.magnitude,
+                                    displayReferenceMagnitude
+                                )
                             );
 
                     const Vector3 center{
@@ -275,14 +285,14 @@ namespace quantum_sim::gui::density_volume {
                         cubeSide
                     };
 
-                    if (magnitude >= solidVisibilityThreshold) {
+                    if (rawMagnitude >= solidVisibilityThreshold) {
                         appendSolidVoxel(
                             scene,
                             cell,
                             layer.index,
                             center,
                             size,
-                            magnitude
+                            displayMagnitude
                         );
                     } else if (showGhosts) {
                         appendGhostVoxel(
@@ -356,7 +366,8 @@ namespace quantum_sim::gui::density_volume {
         }
 
         [[nodiscard]] InstanceScene buildIsolatedLayer(
-            const DensityLayer &layer
+            const DensityLayer &layer,
+            const double displayReferenceMagnitude
         ) {
             InstanceScene scene;
             scene.voxels.reserve(layer.cells.size());
@@ -390,10 +401,18 @@ namespace quantum_sim::gui::density_volume {
                     layer.dimension <= 16U;
 
             for (const DensityCell &cell : layer.cells) {
-                const float magnitude =
+                const float rawMagnitude =
                         clamp01(
                             static_cast<float>(
                                 cell.magnitude
+                            )
+                        );
+
+                const float displayMagnitude =
+                        static_cast<float>(
+                            normalizeMagnitude(
+                                cell.magnitude,
+                                displayReferenceMagnitude
                             )
                         );
 
@@ -413,14 +432,14 @@ namespace quantum_sim::gui::density_volume {
                     cubeSide
                 };
 
-                if (magnitude >= solidVisibilityThreshold) {
+                if (rawMagnitude >= solidVisibilityThreshold) {
                     appendSolidVoxel(
                         scene,
                         cell,
                         layer.index,
                         center,
                         size,
-                        magnitude
+                        displayMagnitude
                     );
                 } else if (showGhosts) {
                     appendGhostVoxel(
@@ -476,7 +495,8 @@ namespace quantum_sim::gui::density_volume {
         }
 
         [[nodiscard]] InstanceScene buildFloorField(
-            const DensityLayer &layer
+            const DensityLayer &layer,
+            const double displayReferenceMagnitude
         ) {
             InstanceScene scene;
             scene.voxels.reserve(layer.cells.size());
@@ -506,16 +526,8 @@ namespace quantum_sim::gui::density_volume {
                     !layer.bucketed &&
                     layer.dimension <= 16U;
 
-            double layerMaximumMagnitude =
-                    1.0e-12;
-
-            for (const DensityCell &cell : layer.cells) {
-                layerMaximumMagnitude =
-                        std::max(
-                            layerMaximumMagnitude,
-                            cell.magnitude
-                        );
-            }
+            const double layerMaximumMagnitude =
+                    layer.maximumCellMagnitude();
 
             for (const DensityCell &cell : layer.cells) {
                 const float rawMagnitude =
@@ -524,10 +536,18 @@ namespace quantum_sim::gui::density_volume {
                         );
 
                 const float normalizedMagnitude =
-                        clamp01(
-                            static_cast<float>(
-                                cell.magnitude /
+                        static_cast<float>(
+                            normalizeMagnitude(
+                                cell.magnitude,
                                 layerMaximumMagnitude
+                            )
+                        );
+
+                const float colorMagnitude =
+                        static_cast<float>(
+                            normalizeMagnitude(
+                                cell.magnitude,
+                                displayReferenceMagnitude
                             )
                         );
 
@@ -537,13 +557,6 @@ namespace quantum_sim::gui::density_volume {
                             normalizedMagnitude *
                             maximumFloorHeight
                         );
-
-                // The complete normalized range belongs to geometry. Limiting
-                // the color input keeps bright columns in Inferno's gold band
-                // instead of clipping every selected-layer maximum to ivory.
-                const float colorMagnitude =
-                        normalizedMagnitude *
-                        maximumFloorColorMagnitude;
 
                 maximumHeight =
                         std::max(maximumHeight, height);
@@ -889,8 +902,14 @@ namespace quantum_sim::gui::density_volume {
                     );
 
             return mode == VisualizationMode::LayerStack
-                       ? buildIsolatedLayer(differenceLayer)
-                       : buildFloorField(differenceLayer);
+                       ? buildIsolatedLayer(
+                           differenceLayer,
+                           stack.maximumMagnitude
+                       )
+                       : buildFloorField(
+                           differenceLayer,
+                           stack.maximumMagnitude
+                       );
         }
 
         if (
@@ -898,12 +917,16 @@ namespace quantum_sim::gui::density_volume {
             options.isolateSelectedLayer
         ) {
             return buildIsolatedLayer(
-                stack.layers[safeLayer]
+                stack.layers[safeLayer],
+                stack.maximumMagnitude
             );
         }
 
         return mode == VisualizationMode::LayerStack
                    ? buildLayerStack(stack)
-                   : buildFloorField(stack.layers[safeLayer]);
+                   : buildFloorField(
+                       stack.layers[safeLayer],
+                       stack.maximumMagnitude
+                   );
     }
 }

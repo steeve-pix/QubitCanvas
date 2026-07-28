@@ -60,6 +60,13 @@ namespace quantum_sim::gui::density_volume {
             std::size_t row,
             std::size_t column
         ) const;
+
+        /**
+         * Finds the strongest cell used for relative layer geometry.
+         *
+         * @return Largest finite non-negative magnitude in this layer.
+         */
+        [[nodiscard]] double maximumCellMagnitude() const noexcept;
     };
 
     /**
