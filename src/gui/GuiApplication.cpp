@@ -638,8 +638,11 @@ namespace quantum_sim::gui {
             const auto toolbarSelectedInstructionIndex =
                     circuitRenderer_.selectedInstructionIndex();
 
+            const std::vector<std::size_t> &toolbarSelectedInstructionIndices =
+                    circuitRenderer_.selectedInstructionIndices();
+
             const bool canDeleteSelectedInstruction =
-                    toolbarSelectedInstructionIndex.has_value() &&
+                    !toolbarSelectedInstructionIndices.empty() &&
                     !pendingGate_.has_value();
 
             const bool redoShortcutPressed =
@@ -709,10 +712,17 @@ namespace quantum_sim::gui {
                 ImGui::BeginDisabled();
             }
 
+            const std::string deleteLabel =
+                    toolbarSelectedInstructionIndices.size() > 1U
+                        ? "Delete selected (" +
+                          std::to_string(
+                              toolbarSelectedInstructionIndices.size()
+                          ) +
+                          ")  [Delete]"
+                        : "Delete selected gate  [Delete]";
+
             const bool deleteButtonPressed =
-                    ImGui::Button(
-                        "Delete selected gate  [Delete]"
-                    );
+                    ImGui::Button(deleteLabel.c_str());
 
             if (
                 ImGui::IsItemHovered(
@@ -721,8 +731,8 @@ namespace quantum_sim::gui {
             ) {
                 ImGui::SetTooltip(
                     canDeleteSelectedInstruction
-                        ? "Remove the selected circuit instruction. Shortcut: Delete"
-                        : "Select a circuit gate before deleting it."
+                        ? "Remove every selected circuit instruction in one undoable edit."
+                        : "Select one or more circuit gates before deleting them."
                 );
             }
 
@@ -742,8 +752,8 @@ namespace quantum_sim::gui {
                     deleteShortcutPressed
                 )
             ) {
-                queuedInstructionDeletion_ =
-                        toolbarSelectedInstructionIndex.value();
+                queuedInstructionDeletions_ =
+                        toolbarSelectedInstructionIndices;
             }
 
             ImGui::SameLine();
@@ -777,11 +787,13 @@ namespace quantum_sim::gui {
             }
 
             const bool canMoveSelectedLeft =
+                    toolbarSelectedInstructionIndices.size() == 1U &&
                     toolbarSelectedInstructionIndex.has_value() &&
                     toolbarSelectedInstructionIndex.value() > 0U &&
                     !pendingGate_.has_value();
 
             const bool canMoveSelectedRight =
+                    toolbarSelectedInstructionIndices.size() == 1U &&
                     toolbarSelectedInstructionIndex.has_value() &&
                     toolbarSelectedInstructionIndex.value() + 1U <
                         circuit_.instructionCount() &&
@@ -847,6 +859,161 @@ namespace quantum_sim::gui {
                             toolbarSelectedInstructionIndex.value(),
                             toolbarSelectedInstructionIndex.value() + 1U
                         };
+            }
+
+            const bool clipboardShortcutAllowed =
+                    !io.WantTextInput &&
+                    io.KeyCtrl &&
+                    !pendingGate_.has_value();
+
+            const bool copyShortcutPressed =
+                    clipboardShortcutAllowed &&
+                    ImGui::IsKeyPressed(ImGuiKey_C);
+
+            const bool pasteShortcutPressed =
+                    clipboardShortcutAllowed &&
+                    ImGui::IsKeyPressed(ImGuiKey_V);
+
+            const bool duplicateShortcutPressed =
+                    clipboardShortcutAllowed &&
+                    ImGui::IsKeyPressed(ImGuiKey_D);
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled(
+                "Selection %zu",
+                toolbarSelectedInstructionIndices.size()
+            );
+
+            ImGui::SameLine();
+
+            const bool canCopy =
+                    !toolbarSelectedInstructionIndices.empty() &&
+                    !pendingGate_.has_value();
+
+            if (!canCopy) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool copyButtonPressed =
+                    ImGui::SmallButton("Copy");
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canCopy
+                        ? "Copy selected gates [Ctrl+C]"
+                        : "Select one or more gates to copy."
+                );
+            }
+
+            if (!canCopy) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::SameLine();
+
+            const bool canPaste =
+                    !instructionClipboard_.empty() &&
+                    !pendingGate_.has_value();
+
+            if (!canPaste) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool pasteButtonPressed =
+                    ImGui::SmallButton("Paste");
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canPaste
+                        ? "Paste after the current selection [Ctrl+V]"
+                        : "Copy gates before pasting."
+                );
+            }
+
+            if (!canPaste) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::SameLine();
+
+            if (!canCopy) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool duplicateButtonPressed =
+                    ImGui::SmallButton("Duplicate");
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canCopy
+                        ? "Duplicate selected gates [Ctrl+D]"
+                        : "Select one or more gates to duplicate."
+                );
+            }
+
+            if (!canCopy) {
+                ImGui::EndDisabled();
+            }
+
+            const auto copySelectionToClipboard =
+                    [&]() {
+                const std::vector<circuit::CircuitInstructionSnapshot> allInstructions =
+                        circuit_.instructionSnapshots();
+
+                instructionClipboard_.clear();
+                instructionClipboard_.reserve(
+                    toolbarSelectedInstructionIndices.size()
+                );
+
+                for (
+                    const std::size_t instructionIndex :
+                        toolbarSelectedInstructionIndices
+                ) {
+                    if (instructionIndex < allInstructions.size()) {
+                        instructionClipboard_.push_back(
+                            allInstructions[instructionIndex]
+                        );
+                    }
+                }
+            };
+
+            if (
+                canCopy &&
+                (
+                    copyButtonPressed ||
+                    copyShortcutPressed
+                )
+            ) {
+                copySelectionToClipboard();
+            }
+
+            if (
+                canCopy &&
+                (
+                    duplicateButtonPressed ||
+                    duplicateShortcutPressed
+                )
+            ) {
+                copySelectionToClipboard();
+                queuedClipboardInsertionIndex_ =
+                        toolbarSelectedInstructionIndices.back() + 1U;
+            } else if (
+                canPaste &&
+                (
+                    pasteButtonPressed ||
+                    pasteShortcutPressed
+                )
+            ) {
+                queuedClipboardInsertionIndex_ =
+                        toolbarSelectedInstructionIndices.empty()
+                            ? circuit_.instructionCount()
+                            : toolbarSelectedInstructionIndices.back() + 1U;
             }
 
             if (showHistoryDebugInfo_) {
@@ -3127,41 +3294,69 @@ namespace quantum_sim::gui {
             return;
         }
 
-        if (queuedInstructionDeletion_.has_value()) {
-            const std::size_t instructionIndex =
-                    queuedInstructionDeletion_.value();
+        if (!queuedInstructionDeletions_.empty()) {
+            std::vector<std::size_t> instructionIndices =
+                    std::move(queuedInstructionDeletions_);
 
-            queuedInstructionDeletion_.reset();
+            queuedInstructionDeletions_.clear();
 
-            if (
-                instructionIndex >=
-                circuit_.instructionCount()
-            ) {
+            std::sort(
+                instructionIndices.begin(),
+                instructionIndices.end()
+            );
+
+            instructionIndices.erase(
+                std::unique(
+                    instructionIndices.begin(),
+                    instructionIndices.end()
+                ),
+                instructionIndices.end()
+            );
+
+            instructionIndices.erase(
+                std::remove_if(
+                    instructionIndices.begin(),
+                    instructionIndices.end(),
+                    [this](const std::size_t index) {
+                        return index >=
+                               circuit_.instructionCount();
+                    }
+                ),
+                instructionIndices.end()
+            );
+
+            if (instructionIndices.empty()) {
                 return;
             }
 
+            const std::size_t firstChangedInstruction =
+                    instructionIndices.front();
+
             recordEditorForUndo();
 
-            const bool removed =
+            for (
+                auto instructionIterator =
+                        instructionIndices.rbegin();
+                instructionIterator != instructionIndices.rend();
+                ++instructionIterator
+            ) {
+                static_cast<void>(
                     circuit_.removeInstruction(
-                        instructionIndex
-                    );
-
-            if (!removed) {
-                undoHistory_.pop_back();
-                return;
+                        *instructionIterator
+                    )
+                );
             }
 
             circuitHasUnsavedEdits_ = true;
 
             const std::size_t nearbyStep =
                     std::min(
-                        instructionIndex,
+                        firstChangedInstruction,
                         circuit_.instructionCount()
                     );
 
             rebuildDebuggerAfterCircuitEdit(
-                instructionIndex,
+                firstChangedInstruction,
                 nearbyStep
             );
 
@@ -3172,6 +3367,58 @@ namespace quantum_sim::gui {
 
             return;
         }
+
+        if (
+            queuedClipboardInsertionIndex_.has_value() &&
+            !instructionClipboard_.empty()
+        ) {
+            const std::size_t insertionIndex =
+                    std::min(
+                        queuedClipboardInsertionIndex_.value(),
+                        circuit_.instructionCount()
+                    );
+
+            queuedClipboardInsertionIndex_.reset();
+            recordEditorForUndo();
+
+            std::vector<std::size_t> insertedIndices;
+            insertedIndices.reserve(
+                instructionClipboard_.size()
+            );
+
+            for (
+                std::size_t clipboardIndex = 0U;
+                clipboardIndex < instructionClipboard_.size();
+                ++clipboardIndex
+            ) {
+                const std::size_t targetIndex =
+                        insertionIndex +
+                        clipboardIndex;
+
+                circuit_.insertInstructionSnapshot(
+                    targetIndex,
+                    instructionClipboard_[clipboardIndex]
+                );
+
+                insertedIndices.push_back(targetIndex);
+            }
+
+            circuitHasUnsavedEdits_ = true;
+
+            rebuildDebuggerAfterCircuitEdit(
+                insertionIndex,
+                insertionIndex +
+                    insertedIndices.size()
+            );
+
+            circuitRenderer_.selectInstructions(
+                std::move(insertedIndices)
+            );
+
+            return;
+        }
+
+        queuedClipboardInsertionIndex_.reset();
 
         if (queuedInstructionMove_.has_value()) {
             const InstructionMove move =
@@ -3418,6 +3665,7 @@ namespace quantum_sim::gui {
         );
 
         cancelGatePlacement();
+        circuitRenderer_.clearSelection();
     }
 
     void GuiApplication::redoLastCircuitEdit() {
@@ -3471,6 +3719,7 @@ namespace quantum_sim::gui {
         );
 
         cancelGatePlacement();
+        circuitRenderer_.clearSelection();
     }
 
     math::ComplexMatrix GuiApplication::createTwoQubitGateMatrix(
@@ -3773,8 +4022,9 @@ namespace quantum_sim::gui {
         queuedSingleQubitPlacement_.reset();
         queuedSingleQubitParameters_.reset();
         queuedTwoQubitParameters_.reset();
-        queuedInstructionDeletion_.reset();
+        queuedInstructionDeletions_.clear();
         queuedInstructionMove_.reset();
+        queuedClipboardInsertionIndex_.reset();
         presetAwaitingConfirmation_.reset();
         gateLibraryPanel_.clearSelection();
         circuitRenderer_.cancelPlacement();
