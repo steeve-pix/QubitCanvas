@@ -50,12 +50,14 @@ namespace quantum_sim::gui::density_volume {
          * @param stack Shared density history.
          * @param selectedLayer Debugger layer visible to the user.
          * @param mode Spatial presentation to render.
+         * @param options Optional isolation or difference presentation.
          * @return true when scene bounds or visible contents changed.
          */
         bool updateScene(
             const DensityStack &stack,
             std::size_t selectedLayer,
-            VisualizationMode mode
+            VisualizationMode mode,
+            const SceneViewOptions &options = {}
         );
 
         /**
@@ -166,6 +168,7 @@ namespace quantum_sim::gui::density_volume {
         std::uint64_t sceneFingerprint_{};
         std::optional<std::size_t> sceneSelectedLayer_;
         std::optional<VisualizationMode> sceneMode_;
+        SceneViewOptions sceneViewOptions_;
         InstanceScene scene_;
         VoxelGeometry voxelGeometry_;
         VoxelGeometry floorColumnGeometry_;

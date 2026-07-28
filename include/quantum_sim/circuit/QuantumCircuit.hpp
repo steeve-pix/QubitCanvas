@@ -4,13 +4,26 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 
 #include <cstddef>
+#include <exception>
 #include <optional>
 #include <random>
+#include <stop_token>
 #include <string>
 #include <variant>
 #include <vector>
 
 namespace quantum_sim::circuit {
+    /**
+     * Signals that a trace build was deliberately cancelled by its owner.
+     */
+    class TraceBuildCancelled final : public std::exception {
+    public:
+        /**
+         * @return Stable diagnostic text for cancelled background work.
+         */
+        [[nodiscard]] const char *what() const noexcept override;
+    };
+
     /**
      * One executed instruction and the register state immediately after it.
      */
@@ -41,6 +54,21 @@ namespace quantum_sim::circuit {
         std::optional<std::size_t> secondaryTargetQubit;
         std::optional<std::size_t> tertiaryTargetQubit;
         std::optional<double> angleRadians;
+    };
+
+    /**
+     * Lossless public copy of one executable circuit instruction.
+     *
+     * Project persistence and editor clipboard operations use this structure
+     * without exposing the circuit's private execution variant.
+     */
+    struct CircuitInstructionSnapshot {
+        CircuitInstructionKind kind;
+        std::string name;
+        std::vector<std::size_t> operands;
+        std::optional<double> angleRadians;
+        std::optional<math::ComplexMatrix> matrix;
+        std::optional<math::ComplexVector> reflectionAxis;
     };
 
     /**
@@ -194,13 +222,51 @@ namespace quantum_sim::circuit {
          */
         [[nodiscard]] std::vector<TraceStep> executeWithTraceFrom(
             const quantum::QuantumRegister &stateBeforeFirstInstruction,
-            std::size_t firstInstructionIndex
+            std::size_t firstInstructionIndex,
+            std::stop_token stopToken = {}
+        ) const;
+
+        /**
+         * Executes the circuit while allowing background callers to cancel
+         * between instructions.
+         *
+         * @param initialState Register whose qubit count must match this circuit.
+         * @param stopToken Cooperative cancellation token.
+         * @return Trace steps in instruction order.
+         * @throws TraceBuildCancelled when cancellation is requested.
+         */
+        [[nodiscard]] std::vector<TraceStep> executeWithTrace(
+            const quantum::QuantumRegister &initialState,
+            std::stop_token stopToken
         ) const;
 
         /**
          * @return Display metadata for all instructions in order.
          */
         [[nodiscard]] std::vector<CircuitInstructionInfo> instructionInfo() const;
+
+        /**
+         * Copies every executable instruction without losing matrix data.
+         *
+         * @return Instructions in circuit order.
+         */
+        [[nodiscard]] std::vector<CircuitInstructionSnapshot>
+        instructionSnapshots() const;
+
+        /**
+         * Inserts a previously exported instruction.
+         *
+         * Matrix dimensions, unitarity, reflection normalization, and operand
+         * bounds are validated through the same paths as ordinary gate edits.
+         *
+         * @param instructionIndex Insert position; values past the end append.
+         * @param snapshot Lossless instruction data to insert.
+         * @throws std::invalid_argument when required data is missing or invalid.
+         */
+        void insertInstructionSnapshot(
+            std::size_t instructionIndex,
+            const CircuitInstructionSnapshot &snapshot
+        );
 
         /**
          * Appends a two-qubit gate stored as a full-register instruction.

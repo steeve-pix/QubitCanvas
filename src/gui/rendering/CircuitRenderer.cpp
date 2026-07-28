@@ -3,6 +3,7 @@
 #include "quantum_sim/gui/QuantumNotation.hpp"
 
 #include "imgui.h"
+#include "imgui_internal.h"
 
 #include <algorithm>
 #include <cmath>
@@ -500,6 +501,27 @@ namespace quantum_sim::gui {
             canvasMin.y + ImGui::GetWindowHeight()
         };
 
+        bool gateDropDelivered = false;
+
+        if (
+            ImGui::BeginDragDropTargetCustom(
+                ImRect{canvasMin, canvasMax},
+                ImGui::GetID("##CircuitGateDropTarget")
+            )
+        ) {
+            const ImGuiPayload *payload =
+                    ImGui::AcceptDragDropPayload(
+                        "QUBITCANVAS_GATE",
+                        ImGuiDragDropFlags_AcceptNoDrawDefaultRect
+                    );
+
+            gateDropDelivered =
+                    payload != nullptr &&
+                    payload->IsDelivery();
+
+            ImGui::EndDragDropTarget();
+        }
+
         const ImVec2 cursorPosition =
                 ImGui::GetCursorScreenPos();
 
@@ -950,8 +972,11 @@ namespace quantum_sim::gui {
 
                 const bool clicked =
                         hovered &&
-                        ImGui::IsMouseClicked(
-                            ImGuiMouseButton_Left
+                        (
+                            ImGui::IsMouseClicked(
+                                ImGuiMouseButton_Left
+                            ) ||
+                            gateDropDelivered
                         );
 
                 if (hovered) {
@@ -1120,8 +1145,11 @@ namespace quantum_sim::gui {
 
                 const bool clicked =
                         hovered &&
-                        ImGui::IsMouseClicked(
-                            ImGuiMouseButton_Left
+                        (
+                            ImGui::IsMouseClicked(
+                                ImGuiMouseButton_Left
+                            ) ||
+                            gateDropDelivered
                         );
 
                 const bool isSelectedControl =
@@ -1417,11 +1445,11 @@ namespace quantum_sim::gui {
 
         if (initialStepDoubleClicked) {
             gateClickedThisFrame = true;
-            selectedInstructionIndex_.reset();
+            clearSelection();
             requestedStepJumpNumber_ = 0U;
         } else if (initialStepClicked) {
             gateClickedThisFrame = true;
-            selectedInstructionIndex_.reset();
+            clearSelection();
         }
 
         if (initialStepHovered) {
@@ -1545,13 +1573,17 @@ namespace quantum_sim::gui {
 
             if (stepBadgeDoubleClicked) {
                 gateClickedThisFrame = true;
-                selectedInstructionIndex_ = instructionIndex;
+                setSingleInstructionSelection(
+                    instructionIndex
+                );
                 requestedStepJumpNumber_ =
                         instructionIndex + 1U;
             } else if (stepBadgeClicked) {
                 // Step badges select gates without requiring a precise gate click.
                 gateClickedThisFrame = true;
-                selectedInstructionIndex_ = instructionIndex;
+                updateInstructionSelection(
+                    instructionIndex
+                );
             }
 
             if (stepBadgeHovered) {
@@ -1707,29 +1739,22 @@ namespace quantum_sim::gui {
 
                 if (doubleClicked) {
                     gateClickedThisFrame = true;
-                    selectedInstructionIndex_ =
-                            instructionIndex;
+                    setSingleInstructionSelection(
+                        instructionIndex
+                    );
                     requestedStepJumpNumber_ =
                             instructionIndex + 1U;
                 } else if (clicked) {
                     gateClickedThisFrame = true;
-
-                    if (
-                        selectedInstructionIndex_.has_value() &&
-                        selectedInstructionIndex_.value() ==
-                            instructionIndex
-                    ) {
-                        selectedInstructionIndex_.reset();
-                    } else {
-                        selectedInstructionIndex_ =
-                                instructionIndex;
-                    }
+                    updateInstructionSelection(
+                        instructionIndex
+                    );
                 }
 
                 const bool selected =
-                        selectedInstructionIndex_.has_value() &&
-                        selectedInstructionIndex_.value() ==
-                            instructionIndex;
+                        isInstructionSelected(
+                            instructionIndex
+                        );
 
                 if (!highlighted && hovered) {
                     gateColor =
@@ -2058,25 +2083,23 @@ namespace quantum_sim::gui {
 
                 if (doubleClicked) {
                     gateClickedThisFrame = true;
-                    selectedInstructionIndex_ =
-                            instructionIndex;
+                    setSingleInstructionSelection(
+                        instructionIndex
+                    );
 
                     requestedStepJumpNumber_ =
                             instructionIndex + 1U;
                 } else if (clicked) {
                     gateClickedThisFrame = true;
-
-                    if (selectedInstructionIndex_.has_value() &&
-                        selectedInstructionIndex_.value() == instructionIndex) {
-                        selectedInstructionIndex_.reset();
-                    } else {
-                        selectedInstructionIndex_ = instructionIndex;
-                    }
+                    updateInstructionSelection(
+                        instructionIndex
+                    );
                 }
 
                 const bool selected =
-                        selectedInstructionIndex_.has_value() &&
-                        selectedInstructionIndex_.value() == instructionIndex;
+                        isInstructionSelected(
+                            instructionIndex
+                        );
 
                 const bool isSwap =
                         instruction.name == "SWAP";
@@ -2695,27 +2718,23 @@ namespace quantum_sim::gui {
 
             if (doubleClicked) {
                 gateClickedThisFrame = true;
-                selectedInstructionIndex_ =
-                        instructionIndex;
+                setSingleInstructionSelection(
+                    instructionIndex
+                );
 
                 requestedStepJumpNumber_ =
                         instructionIndex + 1U;
             } else if (clicked) {
                 gateClickedThisFrame = true;
-                if (
-                    selectedInstructionIndex_.has_value() &&
-                    selectedInstructionIndex_.value() == instructionIndex
-                ) {
-                    selectedInstructionIndex_.reset();
-                } else {
-                    selectedInstructionIndex_ =
-                            instructionIndex;
-                }
+                updateInstructionSelection(
+                    instructionIndex
+                );
             }
 
             const bool selected =
-                    selectedInstructionIndex_.has_value() &&
-                    selectedInstructionIndex_.value() == instructionIndex;
+                    isInstructionSelected(
+                        instructionIndex
+                    );
 
             drawGate(
                 drawList,
@@ -2818,8 +2837,9 @@ namespace quantum_sim::gui {
                                 dragDestinationIndex_.value()
                             };
 
-                    selectedInstructionIndex_ =
-                            dragDestinationIndex_;
+                    setSingleInstructionSelection(
+                        dragDestinationIndex_.value()
+                    );
 
                     requestedFocusStepNumber_ =
                             dragDestinationIndex_.value() + 1U;
@@ -2892,7 +2912,7 @@ namespace quantum_sim::gui {
             ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
             !gateClickedThisFrame
         ) {
-            selectedInstructionIndex_.reset();
+            clearSelection();
         }
 
         ImGui::EndChild();
@@ -2914,6 +2934,11 @@ namespace quantum_sim::gui {
         return selectedInstructionIndex_;
     }
 
+    const std::vector<std::size_t> &
+    CircuitRenderer::selectedInstructionIndices() const noexcept {
+        return selectedInstructionIndices_;
+    }
+
     std::optional<std::size_t> CircuitRenderer::consumeStepJumpRequest() noexcept {
         const std::optional<std::size_t> request =
                 requestedStepJumpNumber_;
@@ -2924,6 +2949,8 @@ namespace quantum_sim::gui {
 
     void CircuitRenderer::clearSelection() noexcept {
         selectedInstructionIndex_.reset();
+        selectedInstructionIndices_.clear();
+        selectionAnchorIndex_.reset();
     }
 
     std::optional<ControlledPlacement> CircuitRenderer::completedControlledPlacement() const noexcept {
@@ -3056,11 +3083,167 @@ namespace quantum_sim::gui {
 
     void CircuitRenderer::selectInstruction(
         const std::size_t instructionIndex
-    ) noexcept {
-        selectedInstructionIndex_ =
-                instructionIndex;
+    ) {
+        setSingleInstructionSelection(
+            instructionIndex
+        );
         requestedFocusStepNumber_ =
                 instructionIndex + 1U;
+    }
+
+    void CircuitRenderer::selectInstructions(
+        std::vector<std::size_t> instructionIndices
+    ) {
+        std::sort(
+            instructionIndices.begin(),
+            instructionIndices.end()
+        );
+
+        instructionIndices.erase(
+            std::unique(
+                instructionIndices.begin(),
+                instructionIndices.end()
+            ),
+            instructionIndices.end()
+        );
+
+        selectedInstructionIndices_ =
+                std::move(instructionIndices);
+
+        if (selectedInstructionIndices_.empty()) {
+            selectedInstructionIndex_.reset();
+            selectionAnchorIndex_.reset();
+            return;
+        }
+
+        selectedInstructionIndex_ =
+                selectedInstructionIndices_.back();
+
+        selectionAnchorIndex_ =
+                selectedInstructionIndex_;
+
+        requestedFocusStepNumber_ =
+                selectedInstructionIndex_.value() + 1U;
+    }
+
+    bool CircuitRenderer::isInstructionSelected(
+        const std::size_t instructionIndex
+    ) const noexcept {
+        return std::binary_search(
+            selectedInstructionIndices_.begin(),
+            selectedInstructionIndices_.end(),
+            instructionIndex
+        );
+    }
+
+    void CircuitRenderer::updateInstructionSelection(
+        const std::size_t instructionIndex
+    ) {
+        const ImGuiIO &io =
+                ImGui::GetIO();
+
+        if (io.KeyShift) {
+            const std::size_t anchor =
+                    selectionAnchorIndex_.value_or(
+                        selectedInstructionIndex_.value_or(
+                            instructionIndex
+                        )
+                    );
+
+            if (!io.KeyCtrl) {
+                selectedInstructionIndices_.clear();
+            }
+
+            const std::size_t first =
+                    std::min(anchor, instructionIndex);
+
+            const std::size_t last =
+                    std::max(anchor, instructionIndex);
+
+            for (
+                std::size_t index = first;
+                index <= last;
+                ++index
+            ) {
+                selectedInstructionIndices_.push_back(index);
+            }
+
+            std::sort(
+                selectedInstructionIndices_.begin(),
+                selectedInstructionIndices_.end()
+            );
+
+            selectedInstructionIndices_.erase(
+                std::unique(
+                    selectedInstructionIndices_.begin(),
+                    selectedInstructionIndices_.end()
+                ),
+                selectedInstructionIndices_.end()
+            );
+
+            selectedInstructionIndex_ =
+                    instructionIndex;
+            return;
+        }
+
+        if (io.KeyCtrl) {
+            const auto existing =
+                    std::lower_bound(
+                        selectedInstructionIndices_.begin(),
+                        selectedInstructionIndices_.end(),
+                        instructionIndex
+                    );
+
+            if (
+                existing != selectedInstructionIndices_.end() &&
+                *existing == instructionIndex
+            ) {
+                selectedInstructionIndices_.erase(existing);
+            } else {
+                selectedInstructionIndices_.insert(
+                    existing,
+                    instructionIndex
+                );
+            }
+
+            selectedInstructionIndex_ =
+                    selectedInstructionIndices_.empty()
+                        ? std::nullopt
+                        : std::optional<std::size_t>{
+                            selectedInstructionIndices_.back()
+                        };
+
+            selectionAnchorIndex_ =
+                    instructionIndex;
+            return;
+        }
+
+        if (
+            selectedInstructionIndices_.size() == 1U &&
+            selectedInstructionIndices_.front() ==
+                instructionIndex
+        ) {
+            clearSelection();
+            return;
+        }
+
+        setSingleInstructionSelection(
+            instructionIndex
+        );
+    }
+
+    void CircuitRenderer::setSingleInstructionSelection(
+        const std::size_t instructionIndex
+    ) {
+        selectedInstructionIndex_ =
+                instructionIndex;
+
+        selectedInstructionIndices_ = {
+            instructionIndex
+        };
+
+        selectionAnchorIndex_ =
+                instructionIndex;
     }
 
     void CircuitRenderer::requestFocusStep(

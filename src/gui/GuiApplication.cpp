@@ -1,7 +1,9 @@
 #include "quantum_sim/gui/GuiApplication.hpp"
+#include "quantum_sim/gui/NativeFileDialog.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/project/ProjectFile.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <glad/gl.h>
@@ -180,6 +182,15 @@ namespace quantum_sim::gui {
             canvasMode_ = CanvasMode::FloorField;
         }
 
+        isolateDensityLayer_ =
+                launchOptions_.isolateDensityLayer;
+
+        if (launchOptions_.comparisonDensityLayer.has_value()) {
+            compareDensityLayers_ = true;
+            comparisonDensityLayer_ =
+                    launchOptions_.comparisonDensityLayer.value();
+        }
+
         synchronizeDensityLayer(session_.snapshot());
     }
 
@@ -342,8 +353,10 @@ namespace quantum_sim::gui {
             pushApplicationFont();
 
             handleGlobalShortcuts();
+            applyQueuedProjectOpen();
             applyQueuedPreset();
             applyQueuedCircuitEdits();
+            adoptCompletedSimulationHistory();
 
             debug::DebuggerSnapshot snapshot =
                     session_.snapshot();
@@ -634,8 +647,11 @@ namespace quantum_sim::gui {
             const auto toolbarSelectedInstructionIndex =
                     circuitRenderer_.selectedInstructionIndex();
 
+            const std::vector<std::size_t> &toolbarSelectedInstructionIndices =
+                    circuitRenderer_.selectedInstructionIndices();
+
             const bool canDeleteSelectedInstruction =
-                    toolbarSelectedInstructionIndex.has_value() &&
+                    !toolbarSelectedInstructionIndices.empty() &&
                     !pendingGate_.has_value();
 
             const bool redoShortcutPressed =
@@ -705,10 +721,17 @@ namespace quantum_sim::gui {
                 ImGui::BeginDisabled();
             }
 
+            const std::string deleteLabel =
+                    toolbarSelectedInstructionIndices.size() > 1U
+                        ? "Delete selected (" +
+                          std::to_string(
+                              toolbarSelectedInstructionIndices.size()
+                          ) +
+                          ")  [Delete]"
+                        : "Delete selected gate  [Delete]";
+
             const bool deleteButtonPressed =
-                    ImGui::Button(
-                        "Delete selected gate  [Delete]"
-                    );
+                    ImGui::Button(deleteLabel.c_str());
 
             if (
                 ImGui::IsItemHovered(
@@ -717,8 +740,8 @@ namespace quantum_sim::gui {
             ) {
                 ImGui::SetTooltip(
                     canDeleteSelectedInstruction
-                        ? "Remove the selected circuit instruction. Shortcut: Delete"
-                        : "Select a circuit gate before deleting it."
+                        ? "Remove every selected circuit instruction in one undoable edit."
+                        : "Select one or more circuit gates before deleting them."
                 );
             }
 
@@ -738,8 +761,8 @@ namespace quantum_sim::gui {
                     deleteShortcutPressed
                 )
             ) {
-                queuedInstructionDeletion_ =
-                        toolbarSelectedInstructionIndex.value();
+                queuedInstructionDeletions_ =
+                        toolbarSelectedInstructionIndices;
             }
 
             ImGui::SameLine();
@@ -773,11 +796,13 @@ namespace quantum_sim::gui {
             }
 
             const bool canMoveSelectedLeft =
+                    toolbarSelectedInstructionIndices.size() == 1U &&
                     toolbarSelectedInstructionIndex.has_value() &&
                     toolbarSelectedInstructionIndex.value() > 0U &&
                     !pendingGate_.has_value();
 
             const bool canMoveSelectedRight =
+                    toolbarSelectedInstructionIndices.size() == 1U &&
                     toolbarSelectedInstructionIndex.has_value() &&
                     toolbarSelectedInstructionIndex.value() + 1U <
                         circuit_.instructionCount() &&
@@ -843,6 +868,161 @@ namespace quantum_sim::gui {
                             toolbarSelectedInstructionIndex.value(),
                             toolbarSelectedInstructionIndex.value() + 1U
                         };
+            }
+
+            const bool clipboardShortcutAllowed =
+                    !io.WantTextInput &&
+                    io.KeyCtrl &&
+                    !pendingGate_.has_value();
+
+            const bool copyShortcutPressed =
+                    clipboardShortcutAllowed &&
+                    ImGui::IsKeyPressed(ImGuiKey_C);
+
+            const bool pasteShortcutPressed =
+                    clipboardShortcutAllowed &&
+                    ImGui::IsKeyPressed(ImGuiKey_V);
+
+            const bool duplicateShortcutPressed =
+                    clipboardShortcutAllowed &&
+                    ImGui::IsKeyPressed(ImGuiKey_D);
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled(
+                "Selection %zu",
+                toolbarSelectedInstructionIndices.size()
+            );
+
+            ImGui::SameLine();
+
+            const bool canCopy =
+                    !toolbarSelectedInstructionIndices.empty() &&
+                    !pendingGate_.has_value();
+
+            if (!canCopy) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool copyButtonPressed =
+                    ImGui::SmallButton("Copy");
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canCopy
+                        ? "Copy selected gates [Ctrl+C]"
+                        : "Select one or more gates to copy."
+                );
+            }
+
+            if (!canCopy) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::SameLine();
+
+            const bool canPaste =
+                    !instructionClipboard_.empty() &&
+                    !pendingGate_.has_value();
+
+            if (!canPaste) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool pasteButtonPressed =
+                    ImGui::SmallButton("Paste");
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canPaste
+                        ? "Paste after the current selection [Ctrl+V]"
+                        : "Copy gates before pasting."
+                );
+            }
+
+            if (!canPaste) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::SameLine();
+
+            if (!canCopy) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool duplicateButtonPressed =
+                    ImGui::SmallButton("Duplicate");
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canCopy
+                        ? "Duplicate selected gates [Ctrl+D]"
+                        : "Select one or more gates to duplicate."
+                );
+            }
+
+            if (!canCopy) {
+                ImGui::EndDisabled();
+            }
+
+            const auto copySelectionToClipboard =
+                    [&]() {
+                const std::vector<circuit::CircuitInstructionSnapshot> allInstructions =
+                        circuit_.instructionSnapshots();
+
+                instructionClipboard_.clear();
+                instructionClipboard_.reserve(
+                    toolbarSelectedInstructionIndices.size()
+                );
+
+                for (
+                    const std::size_t instructionIndex :
+                        toolbarSelectedInstructionIndices
+                ) {
+                    if (instructionIndex < allInstructions.size()) {
+                        instructionClipboard_.push_back(
+                            allInstructions[instructionIndex]
+                        );
+                    }
+                }
+            };
+
+            if (
+                canCopy &&
+                (
+                    copyButtonPressed ||
+                    copyShortcutPressed
+                )
+            ) {
+                copySelectionToClipboard();
+            }
+
+            if (
+                canCopy &&
+                (
+                    duplicateButtonPressed ||
+                    duplicateShortcutPressed
+                )
+            ) {
+                copySelectionToClipboard();
+                queuedClipboardInsertionIndex_ =
+                        toolbarSelectedInstructionIndices.back() + 1U;
+            } else if (
+                canPaste &&
+                (
+                    pasteButtonPressed ||
+                    pasteShortcutPressed
+                )
+            ) {
+                queuedClipboardInsertionIndex_ =
+                        toolbarSelectedInstructionIndices.empty()
+                            ? circuit_.instructionCount()
+                            : toolbarSelectedInstructionIndices.back() + 1U;
             }
 
             if (showHistoryDebugInfo_) {
@@ -1264,6 +1444,23 @@ namespace quantum_sim::gui {
         }
 
         if (
+            io.KeyCtrl &&
+            ImGui::IsKeyPressed(ImGuiKey_O, false)
+        ) {
+            queuedProjectOpenPath_ =
+                    NativeFileDialog::openProject();
+            return;
+        }
+
+        if (
+            io.KeyCtrl &&
+            ImGui::IsKeyPressed(ImGuiKey_S, false)
+        ) {
+            saveProject();
+            return;
+        }
+
+        if (
             ImGui::IsKeyPressed(ImGuiKey_Escape, false) &&
             (
                 pendingGate_.has_value() ||
@@ -1274,7 +1471,10 @@ namespace quantum_sim::gui {
             return;
         }
 
-        if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+        if (
+            ImGui::IsKeyPressed(ImGuiKey_Space, false) &&
+            !simulationHistoryWorker_.busy()
+        ) {
             playbackPaused_ =
                     !playbackPaused_;
 
@@ -1400,6 +1600,133 @@ namespace quantum_sim::gui {
             ImGuiWindowFlags_NoScrollWithMouse
         );
 
+        const std::size_t layerCount =
+                densityVolumeStack_.layers.size();
+
+        if (layerCount > 0U) {
+            selectedDensityLayer_ =
+                    std::min(
+                        selectedDensityLayer_,
+                        layerCount - 1U
+                    );
+
+            comparisonDensityLayer_ =
+                    std::min(
+                        comparisonDensityLayer_,
+                        layerCount - 1U
+                    );
+        }
+
+        bool viewOptionsChanged = false;
+
+        if (canvasMode_ != CanvasMode::LayerStack) {
+            ImGui::BeginDisabled();
+        }
+
+        viewOptionsChanged =
+                ImGui::Checkbox(
+                    "Isolate layer",
+                    &isolateDensityLayer_
+                ) ||
+                viewOptionsChanged;
+
+        if (canvasMode_ != CanvasMode::LayerStack) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+
+        const bool canCompare =
+                layerCount > 1U;
+
+        if (!canCompare) {
+            ImGui::BeginDisabled();
+        }
+
+        const bool comparisonToggled =
+                ImGui::Checkbox(
+                    "Compare",
+                    &compareDensityLayers_
+                );
+
+        if (!canCompare) {
+            ImGui::EndDisabled();
+            compareDensityLayers_ = false;
+        }
+
+        if (
+            comparisonToggled &&
+            compareDensityLayers_
+        ) {
+            comparisonDensityLayer_ =
+                    selectedDensityLayer_ > 0U
+                        ? selectedDensityLayer_ - 1U
+                        : std::min<std::size_t>(
+                            1U,
+                            layerCount - 1U
+                        );
+        }
+
+        viewOptionsChanged =
+                comparisonToggled ||
+                viewOptionsChanged;
+
+        if (
+            compareDensityLayers_ &&
+            canCompare
+        ) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("reference");
+            ImGui::SameLine();
+
+            if (
+                ImGui::SmallButton("<##PreviousComparisonLayer") &&
+                comparisonDensityLayer_ > 0U
+            ) {
+                --comparisonDensityLayer_;
+                viewOptionsChanged = true;
+            }
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(150.0F);
+
+            int comparisonLayerValue =
+                    static_cast<int>(
+                        comparisonDensityLayer_
+                    );
+
+            if (
+                ImGui::SliderInt(
+                    "##ComparisonLayer",
+                    &comparisonLayerValue,
+                    0,
+                    static_cast<int>(layerCount - 1U),
+                    "layer %d"
+                )
+            ) {
+                comparisonDensityLayer_ =
+                        static_cast<std::size_t>(
+                            comparisonLayerValue
+                        );
+
+                viewOptionsChanged = true;
+            }
+
+            ImGui::SameLine();
+
+            if (
+                ImGui::SmallButton(">##NextComparisonLayer") &&
+                comparisonDensityLayer_ + 1U < layerCount
+            ) {
+                ++comparisonDensityLayer_;
+                viewOptionsChanged = true;
+            }
+        }
+
+        if (viewOptionsChanged) {
+            densityVolumeCameraFramePending_ = true;
+        }
+
         const ImVec2 available =
                 ImGui::GetContentRegionAvail();
 
@@ -1439,10 +1766,23 @@ namespace quantum_sim::gui {
                     ? density_volume::VisualizationMode::FloorField
                     : density_volume::VisualizationMode::LayerStack;
 
+        const density_volume::SceneViewOptions sceneViewOptions{
+            .isolateSelectedLayer =
+                isolateDensityLayer_ &&
+                canvasMode_ == CanvasMode::LayerStack,
+            .comparisonLayer =
+                compareDensityLayers_ && canCompare
+                    ? std::optional<std::size_t>{
+                        comparisonDensityLayer_
+                    }
+                    : std::nullopt
+        };
+
         densityVolumeRenderer_.updateScene(
             densityVolumeStack_,
             selectedDensityLayer_,
-            visualizationMode
+            visualizationMode,
+            sceneViewOptions
         );
 
         const float viewportAspect =
@@ -1615,6 +1955,28 @@ namespace quantum_sim::gui {
                         hoveredCell->column
                     );
 
+            std::optional<density_volume::DensityCell> differenceCell;
+
+            if (
+                compareDensityLayers_ &&
+                comparisonDensityLayer_ <
+                    densityVolumeStack_.layers.size()
+            ) {
+                const density_volume::DensityLayer differenceLayer =
+                        density_volume::DensityModel::difference(
+                            layer,
+                            densityVolumeStack_.layers[
+                                comparisonDensityLayer_
+                            ]
+                        );
+
+                differenceCell =
+                        differenceLayer.cellAt(
+                            hoveredCell->row,
+                            hoveredCell->column
+                        );
+            }
+
             ImGui::BeginTooltip();
             ImGui::Text(
                 "LAYER %zu / %zu",
@@ -1671,6 +2033,35 @@ namespace quantum_sim::gui {
                 "Im(\xCF\x81)     %s",
                 imaginaryText.c_str()
             );
+
+            if (differenceCell.has_value()) {
+                ImGui::Separator();
+                ImGui::Text(
+                    "\xCE\x94 from layer %zu",
+                    comparisonDensityLayer_
+                );
+
+                ImGui::Text(
+                    "|\xCE\x94\xCF\x81|      %s",
+                    notation::formatReal(
+                        differenceCell->magnitude
+                    ).c_str()
+                );
+
+                ImGui::Text(
+                    "Re(\xCE\x94\xCF\x81)    %s",
+                    notation::formatReal(
+                        differenceCell->real
+                    ).c_str()
+                );
+
+                ImGui::Text(
+                    "Im(\xCE\x94\xCF\x81)    %s",
+                    notation::formatReal(
+                        differenceCell->imaginary
+                    ).c_str()
+                );
+            }
             ImGui::EndTooltip();
 
             if (
@@ -1682,9 +2073,6 @@ namespace quantum_sim::gui {
             }
         }
 
-        const std::size_t layerCount =
-                densityVolumeStack_.layers.size();
-
         const std::size_t dimension =
                 layerCount == 0U
                     ? 0U
@@ -1692,9 +2080,14 @@ namespace quantum_sim::gui {
 
         ImGui::TextDisabled(
             "%s | LAYER %zu/%zu | \xCF\x81 %zux%zu | fixed rounded voxels",
-            canvasMode_ == CanvasMode::FloorField
-                ? "FLOOR FIELD"
-                : "LAYER STACK",
+            compareDensityLayers_ && canCompare
+                ? "\xCE\x94 DENSITY"
+                : isolateDensityLayer_ &&
+                  canvasMode_ == CanvasMode::LayerStack
+                    ? "ISOLATED LAYER"
+                    : canvasMode_ == CanvasMode::FloorField
+                        ? "FLOOR FIELD"
+                        : "LAYER STACK",
             selectedDensityLayer_,
             layerCount == 0U ? 0U : layerCount - 1U,
             dimension,
@@ -1831,12 +2224,65 @@ namespace quantum_sim::gui {
 
         ImGui::SameLine();
         ImGui::TextColored(
-            ImVec4{1.0F, 0.76F, 0.18F, 1.0F},
+            simulationHistoryWorker_.busy()
+                ? ImVec4{0.34F, 0.74F, 1.0F, 1.0F}
+                : simulationBuildError_.empty()
+                    ? ImVec4{1.0F, 0.76F, 0.18F, 1.0F}
+                    : ImVec4{1.0F, 0.34F, 0.34F, 1.0F},
             "%s",
-            playbackPaused_ ? "settle" : "running"
+            simulationHistoryWorker_.busy()
+                ? "building"
+                : simulationBuildError_.empty()
+                    ? playbackPaused_ ? "settle" : "running"
+                    : "build failed"
         );
 
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 690.0F);
+        if (
+            !simulationBuildError_.empty() &&
+            ImGui::IsItemHovered()
+        ) {
+            ImGui::SetTooltip(
+                "%s",
+                simulationBuildError_.c_str()
+            );
+        }
+
+        if (currentProjectPath_.has_value()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled(
+                "%s%s",
+                currentProjectPath_->stem().string().c_str(),
+                circuitHasUnsavedEdits_ ? "*" : ""
+            );
+        }
+
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 860.0F);
+
+        if (ImGui::Button("Open", ImVec2{72.0F, 0.0F})) {
+            queuedProjectOpenPath_ =
+                    NativeFileDialog::openProject();
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Open project [Ctrl+O]");
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Save", ImVec2{72.0F, 0.0F})) {
+            saveProject();
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "%s",
+                projectStatusMessage_.empty()
+                    ? "Save project [Ctrl+S]"
+                    : projectStatusMessage_.c_str()
+            );
+        }
+
+        ImGui::SameLine();
 
         const auto modeButton =
                 [&](const char *label, const CanvasMode mode) {
@@ -1879,6 +2325,10 @@ namespace quantum_sim::gui {
 
         ImGui::SameLine();
 
+        if (simulationHistoryWorker_.busy()) {
+            ImGui::BeginDisabled();
+        }
+
         if (ImGui::Button(
             playbackPaused_ ? "Play" : "Pause",
             ImVec2{98.0F, 0.0F}
@@ -1912,6 +2362,10 @@ namespace quantum_sim::gui {
 
         if (ImGui::Button("Sample", ImVec2{110.0F, 0.0F})) {
             sampleCurrentState(snapshot.afterState.get());
+        }
+
+        if (simulationHistoryWorker_.busy()) {
+            ImGui::EndDisabled();
         }
 
         ImGui::End();
@@ -2498,6 +2952,10 @@ namespace quantum_sim::gui {
         debug::DebuggerSession &session,
         const debug::DebuggerSnapshot &snapshot
     ) {
+        if (simulationHistoryWorker_.busy()) {
+            return;
+        }
+
         if (
             playbackPaused_ ||
             snapshot.stepCount == 0
@@ -2534,9 +2992,11 @@ namespace quantum_sim::gui {
                 quantum::QuantumRegister::basisState(
                     circuit_.qubitCount(),
                     0
-                );
+        );
 
         resetEditorTransientState();
+        currentProjectPath_.reset();
+        projectStatusMessage_.clear();
         circuitHasUnsavedEdits_ = false;
         playbackPaused_ = true;
 
@@ -2584,6 +3044,8 @@ namespace quantum_sim::gui {
                 );
 
         resetEditorTransientState();
+        currentProjectPath_.reset();
+        projectStatusMessage_.clear();
         circuitHasUnsavedEdits_ = false;
         playbackPaused_ = true;
         rebuildDebuggerAfterCircuitEdit();
@@ -3034,41 +3496,69 @@ namespace quantum_sim::gui {
             return;
         }
 
-        if (queuedInstructionDeletion_.has_value()) {
-            const std::size_t instructionIndex =
-                    queuedInstructionDeletion_.value();
+        if (!queuedInstructionDeletions_.empty()) {
+            std::vector<std::size_t> instructionIndices =
+                    std::move(queuedInstructionDeletions_);
 
-            queuedInstructionDeletion_.reset();
+            queuedInstructionDeletions_.clear();
 
-            if (
-                instructionIndex >=
-                circuit_.instructionCount()
-            ) {
+            std::sort(
+                instructionIndices.begin(),
+                instructionIndices.end()
+            );
+
+            instructionIndices.erase(
+                std::unique(
+                    instructionIndices.begin(),
+                    instructionIndices.end()
+                ),
+                instructionIndices.end()
+            );
+
+            instructionIndices.erase(
+                std::remove_if(
+                    instructionIndices.begin(),
+                    instructionIndices.end(),
+                    [this](const std::size_t index) {
+                        return index >=
+                               circuit_.instructionCount();
+                    }
+                ),
+                instructionIndices.end()
+            );
+
+            if (instructionIndices.empty()) {
                 return;
             }
 
+            const std::size_t firstChangedInstruction =
+                    instructionIndices.front();
+
             recordEditorForUndo();
 
-            const bool removed =
+            for (
+                auto instructionIterator =
+                        instructionIndices.rbegin();
+                instructionIterator != instructionIndices.rend();
+                ++instructionIterator
+            ) {
+                static_cast<void>(
                     circuit_.removeInstruction(
-                        instructionIndex
-                    );
-
-            if (!removed) {
-                undoHistory_.pop_back();
-                return;
+                        *instructionIterator
+                    )
+                );
             }
 
             circuitHasUnsavedEdits_ = true;
 
             const std::size_t nearbyStep =
                     std::min(
-                        instructionIndex,
+                        firstChangedInstruction,
                         circuit_.instructionCount()
                     );
 
             rebuildDebuggerAfterCircuitEdit(
-                instructionIndex,
+                firstChangedInstruction,
                 nearbyStep
             );
 
@@ -3079,6 +3569,58 @@ namespace quantum_sim::gui {
 
             return;
         }
+
+        if (
+            queuedClipboardInsertionIndex_.has_value() &&
+            !instructionClipboard_.empty()
+        ) {
+            const std::size_t insertionIndex =
+                    std::min(
+                        queuedClipboardInsertionIndex_.value(),
+                        circuit_.instructionCount()
+                    );
+
+            queuedClipboardInsertionIndex_.reset();
+            recordEditorForUndo();
+
+            std::vector<std::size_t> insertedIndices;
+            insertedIndices.reserve(
+                instructionClipboard_.size()
+            );
+
+            for (
+                std::size_t clipboardIndex = 0U;
+                clipboardIndex < instructionClipboard_.size();
+                ++clipboardIndex
+            ) {
+                const std::size_t targetIndex =
+                        insertionIndex +
+                        clipboardIndex;
+
+                circuit_.insertInstructionSnapshot(
+                    targetIndex,
+                    instructionClipboard_[clipboardIndex]
+                );
+
+                insertedIndices.push_back(targetIndex);
+            }
+
+            circuitHasUnsavedEdits_ = true;
+
+            rebuildDebuggerAfterCircuitEdit(
+                insertionIndex,
+                insertionIndex +
+                    insertedIndices.size()
+            );
+
+            circuitRenderer_.selectInstructions(
+                std::move(insertedIndices)
+            );
+
+            return;
+        }
+
+        queuedClipboardInsertionIndex_.reset();
 
         if (queuedInstructionMove_.has_value()) {
             const InstructionMove move =
@@ -3286,7 +3828,8 @@ namespace quantum_sim::gui {
             EditorSnapshot{
                 circuit_,
                 initialState_,
-                circuitHasUnsavedEdits_
+                circuitHasUnsavedEdits_,
+                currentProjectPath_
             }
         );
 
@@ -3305,6 +3848,9 @@ namespace quantum_sim::gui {
         circuitHasUnsavedEdits_ =
                 restored.hasUnsavedEdits;
 
+        currentProjectPath_ =
+                std::move(restored.projectPath);
+
         presetQubitCount_ =
                 static_cast<int>(
                     circuit_.qubitCount()
@@ -3321,6 +3867,7 @@ namespace quantum_sim::gui {
         );
 
         cancelGatePlacement();
+        circuitRenderer_.clearSelection();
     }
 
     void GuiApplication::redoLastCircuitEdit() {
@@ -3335,7 +3882,8 @@ namespace quantum_sim::gui {
             EditorSnapshot{
                 circuit_,
                 initialState_,
-                circuitHasUnsavedEdits_
+                circuitHasUnsavedEdits_,
+                currentProjectPath_
             }
         );
 
@@ -3354,6 +3902,9 @@ namespace quantum_sim::gui {
         circuitHasUnsavedEdits_ =
                 restored.hasUnsavedEdits;
 
+        currentProjectPath_ =
+                std::move(restored.projectPath);
+
         presetQubitCount_ =
                 static_cast<int>(
                     circuit_.qubitCount()
@@ -3370,6 +3921,7 @@ namespace quantum_sim::gui {
         );
 
         cancelGatePlacement();
+        circuitRenderer_.clearSelection();
     }
 
     math::ComplexMatrix GuiApplication::createTwoQubitGateMatrix(
@@ -3492,34 +4044,164 @@ namespace quantum_sim::gui {
         const std::optional<std::size_t> firstChangedInstruction,
         const std::optional<std::size_t> preferredStep
     ) {
-        if (firstChangedInstruction.has_value()) {
-            session_.rebuildFrom(
-                circuit_,
-                initialState_,
-                firstChangedInstruction.value()
-            );
-        } else {
-            session_.rebuild(
-                circuit_,
-                initialState_
-            );
-        }
+        const std::optional<std::size_t> safeFirstChangedInstruction =
+                simulationHistoryWorker_.busy()
+                    ? std::nullopt
+                    : firstChangedInstruction;
+
+        playbackPaused_ = true;
+        simulationBuildError_.clear();
+
+        pendingSimulationRequestId_ =
+                simulationHistoryWorker_.request(
+                    circuit_,
+                    initialState_,
+                    session_,
+                    densityVolumeStack_,
+                    safeFirstChangedInstruction,
+                    preferredStep,
+                    followManualEdits_
+                );
+    }
+
+    void GuiApplication::adoptCompletedSimulationHistory() {
+        std::optional<SimulationHistoryResult> result =
+                simulationHistoryWorker_.takeCompleted();
 
         if (
-            followManualEdits_ &&
-            preferredStep.has_value()
+            !result.has_value() ||
+            result->requestId != pendingSimulationRequestId_
+        ) {
+            return;
+        }
+
+        if (!result->error.empty()) {
+            simulationBuildError_ =
+                    std::move(result->error);
+            return;
+        }
+
+        if (!result->session.has_value()) {
+            simulationBuildError_ =
+                    "Simulation history completed without a debugger trace.";
+            return;
+        }
+
+        session_ =
+                std::move(result->session.value());
+
+        densityVolumeStack_ =
+                std::move(result->densityStack);
+
+        if (
+            result->followPreferredStep &&
+            result->preferredStep.has_value()
         ) {
             session_.moveToStepNumber(
                 std::min(
-                    preferredStep.value(),
+                    result->preferredStep.value(),
                     session_.stepCount()
                 )
             );
         }
 
-        rebuildDensityVolume(
-            firstChangedInstruction
+        if (densityVolumeStack_.layers.empty()) {
+            selectedDensityLayer_ = 0U;
+        } else {
+            selectedDensityLayer_ =
+                    std::min(
+                        session_.currentStepNumber(),
+                        densityVolumeStack_.layers.size() - 1U
+                    );
+        }
+
+        lastDensityDebuggerStepNumber_.reset();
+        densityVolumeCameraFramePending_ = true;
+        simulationBuildError_.clear();
+        synchronizeDensityLayer(
+            session_.snapshot()
         );
+    }
+
+    void GuiApplication::saveProject() {
+        std::optional<std::filesystem::path> path =
+                currentProjectPath_;
+
+        if (!path.has_value()) {
+            path =
+                    NativeFileDialog::saveProject();
+        }
+
+        if (!path.has_value()) {
+            return;
+        }
+
+        try {
+            project::ProjectFile::save(
+                path.value(),
+                circuit_,
+                initialState_
+            );
+
+            currentProjectPath_ =
+                    path;
+
+            circuitHasUnsavedEdits_ = false;
+            projectStatusMessage_ =
+                    "Saved " +
+                    path->filename().string();
+        } catch (const std::exception &error) {
+            projectStatusMessage_ =
+                    std::string{"Save failed: "} +
+                    error.what();
+        }
+    }
+
+    void GuiApplication::applyQueuedProjectOpen() {
+        if (!queuedProjectOpenPath_.has_value()) {
+            return;
+        }
+
+        const std::filesystem::path path =
+                std::move(
+                    queuedProjectOpenPath_.value()
+                );
+
+        queuedProjectOpenPath_.reset();
+
+        try {
+            project::ProjectDocument document =
+                    project::ProjectFile::load(path);
+
+            recordEditorForUndo();
+            simulationHistoryWorker_.cancel();
+
+            circuit_ =
+                    std::move(document.circuit);
+
+            initialState_ =
+                    std::move(document.initialState);
+
+            presetQubitCount_ =
+                    static_cast<int>(
+                        circuit_.qubitCount()
+                    );
+
+            resetEditorTransientState();
+            currentProjectPath_ = path;
+            circuitHasUnsavedEdits_ = false;
+            playbackPaused_ = true;
+            projectStatusMessage_ =
+                    "Opened " +
+                    path.filename().string();
+
+            circuitRenderer_.fitToView();
+            rebuildDebuggerAfterCircuitEdit();
+        } catch (const std::exception &error) {
+            projectStatusMessage_ =
+                    std::string{"Open failed: "} +
+                    error.what();
+        }
     }
 
     void GuiApplication::recordEditorForUndo() {
@@ -3527,7 +4209,8 @@ namespace quantum_sim::gui {
             EditorSnapshot{
                 circuit_,
                 initialState_,
-                circuitHasUnsavedEdits_
+                circuitHasUnsavedEdits_,
+                currentProjectPath_
             }
         );
         redoHistory_.clear();
@@ -3541,8 +4224,9 @@ namespace quantum_sim::gui {
         queuedSingleQubitPlacement_.reset();
         queuedSingleQubitParameters_.reset();
         queuedTwoQubitParameters_.reset();
-        queuedInstructionDeletion_.reset();
+        queuedInstructionDeletions_.clear();
         queuedInstructionMove_.reset();
+        queuedClipboardInsertionIndex_.reset();
         presetAwaitingConfirmation_.reset();
         gateLibraryPanel_.clearSelection();
         circuitRenderer_.cancelPlacement();

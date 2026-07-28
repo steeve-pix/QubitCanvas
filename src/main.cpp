@@ -97,6 +97,13 @@ namespace {
                 options.launch.startAtFinalStep = true;
             } else if (argument == "--floor-field") {
                 options.launch.startInFloorField = true;
+            } else if (argument == "--isolate-layer") {
+                options.launch.isolateDensityLayer = true;
+            } else if (argument == "--compare-layer") {
+                options.launch.comparisonDensityLayer =
+                        static_cast<std::size_t>(
+                            std::stoul(nextValue())
+                        );
             } else {
                 throw std::invalid_argument{
                     "Unknown command-line option: " +

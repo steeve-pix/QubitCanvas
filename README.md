@@ -11,11 +11,13 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 ## Highlights
 
 - Editable multi-qubit circuit with blank-register creation, repeated
-  placement, insertion, drag reordering, selection, whole-circuit Clear,
-  undo, redo, and deletion.
+  placement, palette drag-and-drop, insertion, drag reordering,
+  multi-selection, clipboard duplication, whole-circuit Clear, undo, redo,
+  and batch deletion.
 - Step-by-step debugger with play, pause, restart, scrub, and sampling controls.
 - Synchronized circuit, density-matrix, probability, and Bloch-sphere views.
 - Hover documentation with matrices for every gate in the gate library.
+- Native `.qcanvas` project save/open with `Ctrl+S` and `Ctrl+O`.
 - Exact quantum notation for familiar fractions, radicals, complex values, and
   rational multiples of `π`, with compact decimal fallback.
 - JetBrains Mono typography throughout the interface.
@@ -61,6 +63,11 @@ Two synchronized layouts are available:
 The inspector heatmap always follows the selected 3D layer and outlines the
 cell under the pointer. Hovering either view reports row, column, magnitude,
 intensity, phase in radians, real component, and imaginary component.
+`Isolate layer` removes neighboring history from the 3D scene without changing
+the selected state. `Compare` renders the complex cell-wise difference
+`Δρ = ρ(selected) - ρ(reference)` and adds delta magnitude, real, and imaginary
+values to voxel hover details. The Inspector continues to show the unchanged
+selected density matrix.
 
 | Input | Action |
 | --- | --- |
@@ -109,14 +116,27 @@ can be applied repeatedly without returning to the library. The `H`, `X`, `Y`,
 `Z`, `S`, and `T` keys arm their matching gates directly. Single-qubit targets
 and both endpoints of controlled gates receive an on-canvas preview before the
 operation is committed.
+Gate buttons can also be dragged directly from the library to a circuit wire.
+Dropping a single-qubit gate commits it immediately; dropping a multi-qubit
+gate chooses its first operand and leaves the remaining operand previews active.
 
 The circuit toolbar provides fit and zoom controls, an authoring-focused layout
 that temporarily hides the visualizers, and an optional Follow edits mode that
 shows the state after each manual edit. Existing gates can be dragged to a new
 timeline position or moved one step with the adjacent arrow controls. Manual
 edits rebuild only the affected debugger and density-history suffix.
+Trace and density reconstruction run on a persistent background worker.
+Choosing another preset or editing again cancels superseded work between
+instructions and density layers; only the newest completed generation can
+replace the visible debugger state. Playback pauses while a build is active,
+and the last complete visualization remains stable until the replacement is
+ready.
 Circuit gate boxes widen within their timeline slot for long operation names,
 and hovering a placed gate always reveals its complete name.
+Plain click selects one gate, `Ctrl`+click toggles independent gates, and
+`Shift`+click selects a contiguous timeline range. The selection row provides
+Copy, Paste, and Duplicate commands with `Ctrl+C`, `Ctrl+V`, and `Ctrl+D`;
+Delete removes the entire selection as one undoable edit.
 In the normal workspace, the circuit and Density Volume always divide the
 center column equally. Larger registers scroll inside the circuit panel instead
 of reducing the 3D viewport; Focus editor remains available for a full-height
@@ -134,6 +154,12 @@ scrolls its probability table to the qubit most recently selected or edited.
 Both actions, algorithm replacement, and register-size changes store complete
 Undo snapshots. Loading a preset asks for confirmation when the current circuit
 contains custom edits.
+
+The top bar opens and saves versioned `.qcanvas` project documents through the
+native file picker. Projects retain the complete normalized initial register,
+compact gate matrices, operands, exact stored angles, full-register operations,
+and reflection axes. The current project name carries an asterisk while edits
+have not been saved.
 
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
 Compact `SW`, `iSW`, and `√SW` badges distinguish exchange variants without
@@ -240,7 +266,8 @@ regression checks:
 
 ```powershell
 .\build\qubit_canvas.exe --preset random --qubits 6 --algorithm-page 3 `
-  --final-step --floor-field --capture C:\captures\random-final.ppm
+  --final-step --floor-field --compare-layer 0 `
+  --capture C:\captures\random-final.ppm
 ```
 
 Supported capture presets are `qft`, `grover`, `w`, `dicke`, `graph`, `random`,
