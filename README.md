@@ -18,6 +18,10 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 - Synchronized circuit, density-matrix, probability, and Bloch-sphere views.
 - Hover documentation with matrices for every gate in the gate library.
 - Native `.qcanvas` project save/open with `Ctrl+S` and `Ctrl+O`.
+- Timed recovery copies, interrupted-session recovery, and recent projects.
+- Inline single-angle gate editing and persistent reusable circuit blocks.
+- Fidelity, reduced purity, and qubit-versus-rest entanglement entropy.
+- OpenQASM 3 import/export, standalone circuit SVG, and state/density CSV export.
 - Exact quantum notation for familiar fractions, radicals, complex values, and
   rational multiples of `π`, with compact decimal fallback.
 - JetBrains Mono typography throughout the interface.
@@ -161,6 +165,27 @@ compact gate matrices, operands, exact stored angles, full-register operations,
 and reflection axes. The current project name carries an asterisk while edits
 have not been saved.
 
+Unsaved edits are periodically written to a separate recovery document in the
+local QubitCanvas workspace. After an interrupted or deliberately unsaved
+session, the next launch offers to recover that document as an unnamed dirty
+project; named files are never overwritten by recovery. The compact `I/O` menu
+contains recent projects, OpenQASM 3 import/export, a standalone dark-theme SVG
+circuit export, and exact state-vector or selected-density-layer CSV exports.
+OpenQASM export fails clearly when a custom full-register operation cannot be
+represented without changing its meaning.
+
+A selected parameterized gate with one retained angle exposes an inline theta
+editor in the circuit toolbar. Applying the angle is one undoable operation and
+rebuilds only the affected history suffix. Any selected gate range can be named
+with `Save block`; persistent blocks appear in the compact Reusable blocks
+chooser and can be inserted into compatible registers.
+
+The Inspector State analysis section computes directly from the exact complex
+state vector. It reports fidelity to the preceding step, mean single-qubit
+purity, and base-2 von Neumann entropy for every qubit. For the simulator's pure
+global states, `S(q:rest)` is the entanglement entropy between that qubit and
+the remainder of the register.
+
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
 Compact `SW`, `iSW`, and `√SW` badges distinguish exchange variants without
 obscuring their crossed paths. Long exchange routes open clean overpass gaps
@@ -225,6 +250,14 @@ demonstrations use their leading qubits and leave any additional register
 qubits in the initial state.
 Grover is register-wide: it marks the all-one basis state and uses the
 near-optimal number of oracle/diffusion iterations for the selected register.
+
+## Code Ownership
+
+Start with [`0xthyz.cpp`](0xthyz.cpp) before modifying an unfamiliar subsystem.
+It maps every production file, its classes and function families, the runtime
+data flow, numerical conventions, rendering stages, and practical "change this
+when..." routes. Header comments remain the precise API contract; the guide
+explains how those contracts fit together.
 
 ## Build
 
