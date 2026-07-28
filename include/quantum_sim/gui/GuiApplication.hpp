@@ -197,8 +197,10 @@ namespace quantum_sim::gui {
         std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
         std::optional<GateParameters> queuedSingleQubitParameters_;
         std::optional<GateParameters> queuedTwoQubitParameters_;
-        std::optional<std::size_t> queuedInstructionDeletion_;
+        std::vector<std::size_t> queuedInstructionDeletions_;
         std::optional<InstructionMove> queuedInstructionMove_;
+        std::vector<circuit::CircuitInstructionSnapshot> instructionClipboard_;
+        std::optional<std::size_t> queuedClipboardInsertionIndex_;
         std::optional<CircuitPreset> queuedPreset_;
         std::optional<CircuitPreset> presetAwaitingConfirmation_;
         std::optional<std::size_t> queuedBlankCircuitQubitCount_;

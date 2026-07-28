@@ -11,8 +11,9 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 ## Highlights
 
 - Editable multi-qubit circuit with blank-register creation, repeated
-  placement, insertion, drag reordering, selection, whole-circuit Clear,
-  undo, redo, and deletion.
+  placement, palette drag-and-drop, insertion, drag reordering,
+  multi-selection, clipboard duplication, whole-circuit Clear, undo, redo,
+  and batch deletion.
 - Step-by-step debugger with play, pause, restart, scrub, and sampling controls.
 - Synchronized circuit, density-matrix, probability, and Bloch-sphere views.
 - Hover documentation with matrices for every gate in the gate library.
@@ -110,6 +111,9 @@ can be applied repeatedly without returning to the library. The `H`, `X`, `Y`,
 `Z`, `S`, and `T` keys arm their matching gates directly. Single-qubit targets
 and both endpoints of controlled gates receive an on-canvas preview before the
 operation is committed.
+Gate buttons can also be dragged directly from the library to a circuit wire.
+Dropping a single-qubit gate commits it immediately; dropping a multi-qubit
+gate chooses its first operand and leaves the remaining operand previews active.
 
 The circuit toolbar provides fit and zoom controls, an authoring-focused layout
 that temporarily hides the visualizers, and an optional Follow edits mode that
@@ -124,6 +128,10 @@ and the last complete visualization remains stable until the replacement is
 ready.
 Circuit gate boxes widen within their timeline slot for long operation names,
 and hovering a placed gate always reveals its complete name.
+Plain click selects one gate, `Ctrl`+click toggles independent gates, and
+`Shift`+click selects a contiguous timeline range. The selection row provides
+Copy, Paste, and Duplicate commands with `Ctrl+C`, `Ctrl+V`, and `Ctrl+D`;
+Delete removes the entire selection as one undoable edit.
 In the normal workspace, the circuit and Density Volume always divide the
 center column equally. Larger registers scroll inside the circuit panel instead
 of reducing the 3D viewport; Focus editor remains available for a full-height

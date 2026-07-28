@@ -633,6 +633,33 @@ namespace quantum_sim::gui {
                     }
                 );
 
+        bool dragStarted = false;
+
+        if (
+            ImGui::BeginDragDropSource(
+                ImGuiDragDropFlags_SourceAllowNullID
+            )
+        ) {
+            ImGui::SetDragDropPayload(
+                "QUBITCANVAS_GATE",
+                gate.name,
+                std::char_traits<char>::length(gate.name) + 1U,
+                ImGuiCond_Once
+            );
+
+            dragStarted =
+                    !selected;
+
+            ImGui::Text(
+                "Place %s",
+                gate_notation::displayName(
+                    gate.name
+                ).data()
+            );
+
+            ImGui::EndDragDropSource();
+        }
+
         if (
             ImGui::IsItemHovered(
                 ImGuiHoveredFlags_DelayNormal
@@ -649,7 +676,7 @@ namespace quantum_sim::gui {
             ImGui::PopStyleColor(3);
         }
 
-        return clicked;
+        return clicked || dragStarted;
     }
 
     void GateLibraryPanel::drawGateMatrixTooltip(
