@@ -13,8 +13,10 @@ namespace quantum_sim::gui::density_volume {
         constexpr float maximumFloorHeight = 4.4F;
         constexpr float maximumFloorColorMagnitude = 0.52F;
         constexpr float solidVisibilityThreshold = 1.0e-4F;
-        constexpr float roundedRadius = 0.12F;
-        constexpr std::size_t roundedSegments = 4U;
+        constexpr float roundedCubeRadius = 0.12F;
+        constexpr std::size_t roundedCubeSegments = 4U;
+        constexpr float roundedTopRadius = 0.22F;
+        constexpr std::size_t roundedTopSegments = 8U;
 
         [[nodiscard]] float clamp01(const float value) noexcept {
             return std::clamp(value, 0.0F, 1.0F);
@@ -518,177 +520,223 @@ namespace quantum_sim::gui::density_volume {
         }
 
         [[nodiscard]] Vector3 roundedPoint(
-            const Vector3 raw
+            const Vector3 raw,
+            const float radius,
+            const bool topOnly
         ) noexcept {
             constexpr float half = 0.5F;
-            constexpr float inner = half - roundedRadius;
+            const float inner = half - radius;
+
+            if (topOnly && raw.y <= inner) {
+                return raw;
+            }
 
             const Vector3 nearest{
                 std::clamp(raw.x, -inner, inner),
-                std::clamp(raw.y, -inner, inner),
+                topOnly
+                    ? std::min(raw.y, inner)
+                    : std::clamp(raw.y, -inner, inner),
                 std::clamp(raw.z, -inner, inner)
             };
 
             const Vector3 delta =
                     raw - nearest;
 
-            return nearest + normalize(delta) * roundedRadius;
+            return nearest + normalize(delta) * radius;
         }
 
         [[nodiscard]] Vector3 roundedNormal(
-            const Vector3 raw
+            const Vector3 raw,
+            const Vector3 fallbackNormal,
+            const float radius,
+            const bool topOnly
         ) noexcept {
             constexpr float half = 0.5F;
-            constexpr float inner = half - roundedRadius;
+            const float inner = half - radius;
+
+            if (topOnly && raw.y <= inner) {
+                return fallbackNormal;
+            }
 
             return normalize(
                 raw -
                 Vector3{
                     std::clamp(raw.x, -inner, inner),
-                    std::clamp(raw.y, -inner, inner),
+                    topOnly
+                        ? std::min(raw.y, inner)
+                        : std::clamp(raw.y, -inner, inner),
                     std::clamp(raw.z, -inner, inner)
                 }
             );
         }
-    }
 
-    VoxelGeometry VoxelGeometryBuilder::buildRoundedCube() {
-        struct Face {
+        [[nodiscard]] VoxelGeometry buildRoundedGeometry(
+            const float radius,
+            const std::size_t segmentCount,
+            const bool topOnly
+        ) {
+            struct Face {
             Vector3 normal;
             Vector3 tangent;
             Vector3 bitangent;
-        };
+            };
 
-        constexpr std::array<Face, 6U> faces{
-            Face{
-                Vector3{1.0F, 0.0F, 0.0F},
-                Vector3{0.0F, 0.0F, -1.0F},
-                Vector3{0.0F, 1.0F, 0.0F}
-            },
-            Face{
-                Vector3{-1.0F, 0.0F, 0.0F},
-                Vector3{0.0F, 0.0F, 1.0F},
-                Vector3{0.0F, 1.0F, 0.0F}
-            },
-            Face{
-                Vector3{0.0F, 1.0F, 0.0F},
-                Vector3{1.0F, 0.0F, 0.0F},
-                Vector3{0.0F, 0.0F, -1.0F}
-            },
-            Face{
-                Vector3{0.0F, -1.0F, 0.0F},
-                Vector3{1.0F, 0.0F, 0.0F},
-                Vector3{0.0F, 0.0F, 1.0F}
-            },
-            Face{
-                Vector3{0.0F, 0.0F, 1.0F},
-                Vector3{1.0F, 0.0F, 0.0F},
-                Vector3{0.0F, 1.0F, 0.0F}
-            },
-            Face{
-                Vector3{0.0F, 0.0F, -1.0F},
-                Vector3{-1.0F, 0.0F, 0.0F},
-                Vector3{0.0F, 1.0F, 0.0F}
-            }
-        };
+            constexpr std::array<Face, 6U> faces{
+                Face{
+                    Vector3{1.0F, 0.0F, 0.0F},
+                    Vector3{0.0F, 0.0F, -1.0F},
+                    Vector3{0.0F, 1.0F, 0.0F}
+                },
+                Face{
+                    Vector3{-1.0F, 0.0F, 0.0F},
+                    Vector3{0.0F, 0.0F, 1.0F},
+                    Vector3{0.0F, 1.0F, 0.0F}
+                },
+                Face{
+                    Vector3{0.0F, 1.0F, 0.0F},
+                    Vector3{1.0F, 0.0F, 0.0F},
+                    Vector3{0.0F, 0.0F, -1.0F}
+                },
+                Face{
+                    Vector3{0.0F, -1.0F, 0.0F},
+                    Vector3{1.0F, 0.0F, 0.0F},
+                    Vector3{0.0F, 0.0F, 1.0F}
+                },
+                Face{
+                    Vector3{0.0F, 0.0F, 1.0F},
+                    Vector3{1.0F, 0.0F, 0.0F},
+                    Vector3{0.0F, 1.0F, 0.0F}
+                },
+                Face{
+                    Vector3{0.0F, 0.0F, -1.0F},
+                    Vector3{-1.0F, 0.0F, 0.0F},
+                    Vector3{0.0F, 1.0F, 0.0F}
+                }
+            };
 
-        VoxelGeometry geometry;
+            VoxelGeometry geometry;
 
-        constexpr std::size_t verticesPerSide =
-                roundedSegments + 1U;
+            const std::size_t verticesPerSide =
+                    segmentCount + 1U;
 
-        geometry.vertices.reserve(
-            faces.size() *
-            verticesPerSide *
-            verticesPerSide
-        );
+            geometry.vertices.reserve(
+                faces.size() *
+                verticesPerSide *
+                verticesPerSide
+            );
 
-        geometry.indices.reserve(
-            faces.size() *
-            roundedSegments *
-            roundedSegments *
-            6U
-        );
+            geometry.indices.reserve(
+                faces.size() *
+                segmentCount *
+                segmentCount *
+                6U
+            );
 
-        for (const Face &face : faces) {
-            const std::uint32_t faceStart =
-                    static_cast<std::uint32_t>(
-                        geometry.vertices.size()
-                    );
+            for (const Face &face : faces) {
+                const std::uint32_t faceStart =
+                        static_cast<std::uint32_t>(
+                            geometry.vertices.size()
+                        );
 
-            for (std::size_t row = 0U; row <= roundedSegments; ++row) {
-                const float vertical =
-                        -1.0F +
-                        2.0F *
-                        static_cast<float>(row) /
-                        static_cast<float>(roundedSegments);
-
-                for (std::size_t column = 0U; column <= roundedSegments; ++column) {
-                    const float horizontal =
+                for (std::size_t row = 0U; row <= segmentCount; ++row) {
+                    const float vertical =
                             -1.0F +
                             2.0F *
-                            static_cast<float>(column) /
-                            static_cast<float>(roundedSegments);
+                            static_cast<float>(row) /
+                            static_cast<float>(segmentCount);
 
-                    const Vector3 raw =
-                            face.normal * 0.5F +
-                            face.tangent * (horizontal * 0.5F) +
-                            face.bitangent * (vertical * 0.5F);
+                    for (std::size_t column = 0U; column <= segmentCount; ++column) {
+                        const float horizontal =
+                                -1.0F +
+                                2.0F *
+                                static_cast<float>(column) /
+                                static_cast<float>(segmentCount);
 
-                    const Vector3 position =
-                            roundedPoint(raw);
+                        const Vector3 raw =
+                                face.normal * 0.5F +
+                                face.tangent * (horizontal * 0.5F) +
+                                face.bitangent * (vertical * 0.5F);
 
-                    const Vector3 normal =
-                            roundedNormal(raw);
+                        const Vector3 position =
+                                roundedPoint(
+                                    raw,
+                                    radius,
+                                    topOnly
+                                );
 
-                    geometry.vertices.push_back(
-                        VoxelVertex{
-                            .position = {
-                                position.x,
-                                position.y,
-                                position.z
-                            },
-                            .normal = {
-                                normal.x,
-                                normal.y,
-                                normal.z
+                        const Vector3 normal =
+                                roundedNormal(
+                                    raw,
+                                    face.normal,
+                                    radius,
+                                    topOnly
+                                );
+
+                        geometry.vertices.push_back(
+                            VoxelVertex{
+                                .position = {
+                                    position.x,
+                                    position.y,
+                                    position.z
+                                },
+                                .normal = {
+                                    normal.x,
+                                    normal.y,
+                                    normal.z
+                                }
                             }
-                        }
-                    );
+                        );
+                    }
+                }
+
+                for (std::size_t row = 0U; row < segmentCount; ++row) {
+                    for (std::size_t column = 0U; column < segmentCount; ++column) {
+                        const std::uint32_t lowerLeft =
+                                faceStart +
+                                static_cast<std::uint32_t>(
+                                    row * verticesPerSide + column
+                                );
+
+                        const std::uint32_t lowerRight =
+                                lowerLeft + 1U;
+
+                        const std::uint32_t upperLeft =
+                                lowerLeft +
+                                static_cast<std::uint32_t>(
+                                    verticesPerSide
+                                );
+
+                        const std::uint32_t upperRight =
+                                upperLeft + 1U;
+
+                        geometry.indices.push_back(lowerLeft);
+                        geometry.indices.push_back(lowerRight);
+                        geometry.indices.push_back(upperRight);
+                        geometry.indices.push_back(lowerLeft);
+                        geometry.indices.push_back(upperRight);
+                        geometry.indices.push_back(upperLeft);
+                    }
                 }
             }
 
-            for (std::size_t row = 0U; row < roundedSegments; ++row) {
-                for (std::size_t column = 0U; column < roundedSegments; ++column) {
-                    const std::uint32_t lowerLeft =
-                            faceStart +
-                            static_cast<std::uint32_t>(
-                                row * verticesPerSide + column
-                            );
-
-                    const std::uint32_t lowerRight =
-                            lowerLeft + 1U;
-
-                    const std::uint32_t upperLeft =
-                            lowerLeft +
-                            static_cast<std::uint32_t>(
-                                verticesPerSide
-                            );
-
-                    const std::uint32_t upperRight =
-                            upperLeft + 1U;
-
-                    geometry.indices.push_back(lowerLeft);
-                    geometry.indices.push_back(lowerRight);
-                    geometry.indices.push_back(upperRight);
-                    geometry.indices.push_back(lowerLeft);
-                    geometry.indices.push_back(upperRight);
-                    geometry.indices.push_back(upperLeft);
-                }
-            }
+            return geometry;
         }
+    }
 
-        return geometry;
+    VoxelGeometry VoxelGeometryBuilder::buildRoundedCube() {
+        return buildRoundedGeometry(
+            roundedCubeRadius,
+            roundedCubeSegments,
+            false
+        );
+    }
+
+    VoxelGeometry VoxelGeometryBuilder::buildRoundedTopColumn() {
+        return buildRoundedGeometry(
+            roundedTopRadius,
+            roundedTopSegments,
+            true
+        );
     }
 
     InstanceScene SceneBuilder::build(

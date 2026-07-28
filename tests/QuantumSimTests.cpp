@@ -918,6 +918,75 @@ int main() {
         "Density Volume reuses one indexed rounded cube with normalized lighting normals"
     );
 
+    const quantum_sim::gui::density_volume::VoxelGeometry roundedTopColumn =
+            quantum_sim::gui::density_volume::VoxelGeometryBuilder::
+                buildRoundedTopColumn();
+
+    const bool hasSquareColumnBase =
+            std::any_of(
+                roundedTopColumn.vertices.begin(),
+                roundedTopColumn.vertices.end(),
+                [](const auto &vertex) {
+                    return
+                            approximatelyEqual(
+                                std::abs(vertex.position[0]),
+                                0.5,
+                                0.0001
+                            ) &&
+                            approximatelyEqual(
+                                vertex.position[1],
+                                -0.5,
+                                0.0001
+                            ) &&
+                            approximatelyEqual(
+                                std::abs(vertex.position[2]),
+                                0.5,
+                                0.0001
+                            );
+                }
+            );
+
+    const bool hasRoundedColumnTop =
+            std::any_of(
+                roundedTopColumn.vertices.begin(),
+                roundedTopColumn.vertices.end(),
+                [](const auto &vertex) {
+                    return
+                            vertex.position[0] > 0.39F &&
+                            vertex.position[0] < 0.49F &&
+                            vertex.position[1] > 0.39F &&
+                            vertex.position[1] < 0.49F &&
+                            vertex.position[2] > 0.39F &&
+                            vertex.position[2] < 0.49F;
+                }
+            );
+
+    check(
+        roundedTopColumn.vertices.size() == 486U &&
+        roundedTopColumn.indices.size() == 2304U &&
+        hasSquareColumnBase &&
+        hasRoundedColumnTop &&
+        std::all_of(
+            roundedTopColumn.vertices.begin(),
+            roundedTopColumn.vertices.end(),
+            [](const auto &vertex) {
+                const float normalLength =
+                        std::sqrt(
+                            vertex.normal[0] * vertex.normal[0] +
+                            vertex.normal[1] * vertex.normal[1] +
+                            vertex.normal[2] * vertex.normal[2]
+                        );
+
+                return approximatelyEqual(
+                    normalLength,
+                    1.0,
+                    0.0001
+                );
+            }
+        ),
+        "Floor Field uses a smooth rounded cap above a square column base"
+    );
+
     const quantum_sim::gui::density_volume::InstanceScene largeHistoryScene =
             quantum_sim::gui::density_volume::SceneBuilder::build(
                 largeDensityStack,

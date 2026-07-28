@@ -41,6 +41,8 @@ bloom pass and linear-to-sRGB output preserve the warm gold, orange, magenta,
 and violet range without heavy tone-map compression. Restrained face lighting,
 perspective framing, depth testing, and a procedural ground grid keep cube
 tops, sides, matrix depth, and history separation readable.
+Floor Field uses a dedicated higher-detail column mesh with a square base,
+straight walls, and a smooth fixed-radius rounded top.
 Layer Stack reserves a tight frame for the algorithm's complete density
 history as soon as the preset loads. Its projected bounds, camera angle,
 perspective field of view, and viewport aspect determine the orbit distance,
@@ -238,7 +240,7 @@ regression checks:
 
 ```powershell
 .\build\qubit_canvas.exe --preset random --qubits 6 --algorithm-page 3 `
-  --final-step --capture C:\captures\random-final.ppm
+  --final-step --floor-field --capture C:\captures\random-final.ppm
 ```
 
 Supported capture presets are `qft`, `grover`, `w`, `dicke`, `graph`, `random`,

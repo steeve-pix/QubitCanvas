@@ -79,7 +79,7 @@ namespace quantum_sim::gui::density_volume {
     };
 
     /**
-     * Builds one reusable softly rounded unit cube.
+     * Builds the reusable unit meshes used by both density presentations.
      */
     class VoxelGeometryBuilder {
     public:
@@ -94,6 +94,17 @@ namespace quantum_sim::gui::density_volume {
          * @return Counter-clockwise indexed geometry centered on the origin.
          */
         [[nodiscard]] static VoxelGeometry buildRoundedCube();
+
+        /**
+         * Generates the higher-detail unit column used by Floor Field.
+         *
+         * The base remains square against the ground plane, the walls stay
+         * vertical, and only the upper edges and corners form a smooth cap.
+         * The renderer preserves this cap radius when stretching the instance.
+         *
+         * @return Counter-clockwise indexed top-rounded column geometry.
+         */
+        [[nodiscard]] static VoxelGeometry buildRoundedTopColumn();
     };
 
     /**

@@ -245,6 +245,9 @@ namespace quantum_sim::gui::density_volume {
             voxelGeometry_ =
                     VoxelGeometryBuilder::buildRoundedCube();
 
+            floorColumnGeometry_ =
+                    VoxelGeometryBuilder::buildRoundedTopColumn();
+
             createScenePrograms();
             createPostProcessPrograms();
             createVoxelBuffers();
@@ -596,10 +599,29 @@ namespace quantum_sim::gui::density_volume {
                 )
             );
 
-            glBindVertexArray(voxelVertexArray_);
+            const bool useTopRoundedColumns =
+                    sceneMode_.has_value() &&
+                    sceneMode_.value() ==
+                        VisualizationMode::FloorField;
+
+            glUniform1f(
+                voxelTopRoundedColumnsUniform_,
+                useTopRoundedColumns
+                    ? 1.0F
+                    : 0.0F
+            );
+
+            glBindVertexArray(
+                useTopRoundedColumns
+                    ? floorColumnVertexArray_
+                    : voxelVertexArray_
+            );
+
             glDrawElementsInstanced(
                 GL_TRIANGLES,
-                cubeIndexCount_,
+                useTopRoundedColumns
+                    ? floorColumnIndexCount_
+                    : cubeIndexCount_,
                 GL_UNSIGNED_INT,
                 nullptr,
                 visibleInstanceCount_
@@ -743,6 +765,9 @@ namespace quantum_sim::gui::density_volume {
         glDeleteVertexArrays(1, &voxelVertexArray_);
         glDeleteBuffers(1, &voxelVertexBuffer_);
         glDeleteBuffers(1, &voxelIndexBuffer_);
+        glDeleteVertexArrays(1, &floorColumnVertexArray_);
+        glDeleteBuffers(1, &floorColumnVertexBuffer_);
+        glDeleteBuffers(1, &floorColumnIndexBuffer_);
         glDeleteBuffers(1, &instanceBuffer_);
         glDeleteVertexArrays(1, &ghostVertexArray_);
         glDeleteBuffers(1, &ghostVertexBuffer_);
@@ -757,6 +782,9 @@ namespace quantum_sim::gui::density_volume {
         voxelVertexArray_ = 0U;
         voxelVertexBuffer_ = 0U;
         voxelIndexBuffer_ = 0U;
+        floorColumnVertexArray_ = 0U;
+        floorColumnVertexBuffer_ = 0U;
+        floorColumnIndexBuffer_ = 0U;
         instanceBuffer_ = 0U;
         ghostVertexArray_ = 0U;
         ghostVertexBuffer_ = 0U;
@@ -785,6 +813,7 @@ namespace quantum_sim::gui::density_volume {
         framebufferWidth_ = 0;
         framebufferHeight_ = 0;
         cubeIndexCount_ = 0;
+        floorColumnIndexCount_ = 0;
         visibleInstanceCount_ = 0;
         visibleGhostCount_ = 0;
         instanceCapacity_ = 0U;
@@ -794,6 +823,7 @@ namespace quantum_sim::gui::density_volume {
         sceneMode_.reset();
         scene_ = InstanceScene{};
         voxelGeometry_ = VoxelGeometry{};
+        floorColumnGeometry_ = VoxelGeometry{};
         initialized_ = false;
     }
 
@@ -825,6 +855,7 @@ layout(location = 5) in vec4 aInstanceMaterial;
 
 uniform mat4 uView;
 uniform mat4 uProjection;
+uniform float uTopRoundedColumns;
 
 out vec3 vWorldPosition;
 out vec3 vViewPosition;
@@ -836,30 +867,93 @@ flat out vec4 vMaterial;
 void main() {
     vec3 safeSize = max(aInstanceSize, vec3(0.001));
     vec3 roundedNormal = normalize(aNormal);
+    vec3 worldPosition;
 
-    // Reconstruct the rounded box in world units so a tall Floor Field column
-    // keeps the same corner radius as a regular voxel. Directly scaling the
-    // shared mesh would stretch its top and bottom curves into a capsule.
-    const float unitRadius = 0.22;
-    const float unitInnerExtent = 0.50 - unitRadius;
-    float worldRadius =
-        min(min(safeSize.x, safeSize.y), safeSize.z) *
-        unitRadius;
-    vec3 unitNearest =
-        aPosition -
-        roundedNormal * unitRadius;
-    vec3 normalizedNearest =
-        unitNearest /
-        unitInnerExtent;
-    vec3 worldInnerExtent =
-        max(
-            safeSize * 0.5 - vec3(worldRadius),
-            vec3(0.0005)
-        );
-    vec3 worldPosition =
-        aInstanceCenter +
-        normalizedNearest * worldInnerExtent +
-        roundedNormal * worldRadius;
+    if (uTopRoundedColumns > 0.5) {
+        // Floor Field columns keep a square base and vertical walls. Only the
+        // upper transition is reconstructed at a fixed world-space radius.
+        const float unitRadius = 0.22;
+        const float unitInnerExtent = 0.50 - unitRadius;
+        float worldRadius =
+            min(
+                min(safeSize.x, safeSize.z) * unitRadius,
+                safeSize.y * 0.5
+            );
+        bool roundedCap =
+            aPosition.y > unitInnerExtent + 0.0001 ||
+            roundedNormal.y > 0.0001;
+
+        if (roundedCap) {
+            vec3 unitNearest =
+                aPosition -
+                roundedNormal * unitRadius;
+            vec2 worldInnerExtent =
+                max(
+                    safeSize.xz * 0.5 - vec2(worldRadius),
+                    vec2(0.0005)
+                );
+            float normalizedY =
+                clamp(
+                    (unitNearest.y + 0.5) /
+                    (unitInnerExtent + 0.5),
+                    0.0,
+                    1.0
+                );
+            vec3 worldNearest = vec3(
+                unitNearest.x / unitInnerExtent *
+                    worldInnerExtent.x,
+                -safeSize.y * 0.5 +
+                    normalizedY *
+                    (safeSize.y - worldRadius),
+                unitNearest.z / unitInnerExtent *
+                    worldInnerExtent.y
+            );
+
+            worldPosition =
+                aInstanceCenter +
+                worldNearest +
+                roundedNormal * worldRadius;
+        } else {
+            float normalizedY =
+                clamp(
+                    (aPosition.y + 0.5) /
+                    (unitInnerExtent + 0.5),
+                    0.0,
+                    1.0
+                );
+            worldPosition = aInstanceCenter + vec3(
+                aPosition.x * safeSize.x,
+                -safeSize.y * 0.5 +
+                    normalizedY *
+                    (safeSize.y - worldRadius),
+                aPosition.z * safeSize.z
+            );
+        }
+    } else {
+        // Layer Stack keeps the lower-detail softly rounded cube.
+        const float unitRadius = 0.12;
+        const float unitInnerExtent = 0.50 - unitRadius;
+        float worldRadius =
+            min(min(safeSize.x, safeSize.y), safeSize.z) *
+            unitRadius;
+        vec3 unitNearest =
+            aPosition -
+            roundedNormal * unitRadius;
+        vec3 normalizedNearest =
+            unitNearest /
+            unitInnerExtent;
+        vec3 worldInnerExtent =
+            max(
+                safeSize * 0.5 - vec3(worldRadius),
+                vec3(0.0005)
+            );
+
+        worldPosition =
+            aInstanceCenter +
+            normalizedNearest * worldInnerExtent +
+            roundedNormal * worldRadius;
+    }
+
     vec4 viewPosition = uView * vec4(worldPosition, 1.0);
 
     vWorldPosition = worldPosition;
@@ -1135,6 +1229,12 @@ void main() {
                     "uHeat"
                 );
 
+        voxelTopRoundedColumnsUniform_ =
+                glGetUniformLocation(
+                    voxelShaderProgram_,
+                    "uTopRoundedColumns"
+                );
+
         ghostViewUniform_ =
                 glGetUniformLocation(
                     ghostShaderProgram_,
@@ -1184,6 +1284,10 @@ void main() {
             "uSelectedLayer"
         );
         requireUniform(voxelHeatUniform_, "uHeat");
+        requireUniform(
+            voxelTopRoundedColumnsUniform_,
+            "uTopRoundedColumns"
+        );
         requireUniform(ghostViewUniform_, "ghost uView");
         requireUniform(
             ghostProjectionUniform_,
@@ -1348,132 +1452,171 @@ void main() {
             std::is_standard_layout_v<VoxelInstance>
         );
 
-        if (
-            voxelGeometry_.indices.size() >
-            static_cast<std::size_t>(
-                std::numeric_limits<int>::max()
-            )
-        ) {
-            throw std::runtime_error{
-                "Density Volume rounded cube exceeds OpenGL index limits."
-            };
-        }
+        const auto checkedIndexCount =
+                [](const VoxelGeometry &geometry, const char *label) {
+            if (
+                geometry.indices.size() >
+                static_cast<std::size_t>(
+                    std::numeric_limits<int>::max()
+                )
+            ) {
+                throw std::runtime_error{
+                    std::string{"Density Volume "} +
+                    label +
+                    " exceeds OpenGL index limits."
+                };
+            }
+
+            return static_cast<int>(
+                geometry.indices.size()
+            );
+        };
 
         cubeIndexCount_ =
-                static_cast<int>(
-                    voxelGeometry_.indices.size()
+                checkedIndexCount(
+                    voxelGeometry_,
+                    "rounded cube"
                 );
 
-        glGenVertexArrays(1, &voxelVertexArray_);
-        glGenBuffers(1, &voxelVertexBuffer_);
-        glGenBuffers(1, &voxelIndexBuffer_);
+        floorColumnIndexCount_ =
+                checkedIndexCount(
+                    floorColumnGeometry_,
+                    "rounded-top column"
+                );
+
         glGenBuffers(1, &instanceBuffer_);
-        glBindVertexArray(voxelVertexArray_);
 
-        glBindBuffer(
-            GL_ARRAY_BUFFER,
-            voxelVertexBuffer_
-        );
+        const auto createGeometryBuffers =
+                [this](
+                    const VoxelGeometry &geometry,
+                    unsigned int &vertexArray,
+                    unsigned int &vertexBuffer,
+                    unsigned int &indexBuffer
+                ) {
+            glGenVertexArrays(1, &vertexArray);
+            glGenBuffers(1, &vertexBuffer);
+            glGenBuffers(1, &indexBuffer);
+            glBindVertexArray(vertexArray);
 
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(
-                voxelGeometry_.vertices.size() *
-                sizeof(VoxelVertex)
-            ),
-            voxelGeometry_.vertices.data(),
-            GL_STATIC_DRAW
-        );
+            glBindBuffer(
+                GL_ARRAY_BUFFER,
+                vertexBuffer
+            );
 
-        glVertexAttribPointer(
-            0,
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            static_cast<int>(sizeof(VoxelVertex)),
-            reinterpret_cast<const void *>(
-                offsetof(VoxelVertex, position)
-            )
-        );
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                static_cast<GLsizeiptr>(
+                    geometry.vertices.size() *
+                    sizeof(VoxelVertex)
+                ),
+                geometry.vertices.data(),
+                GL_STATIC_DRAW
+            );
 
-        glEnableVertexAttribArray(0);
+            glVertexAttribPointer(
+                0,
+                3,
+                GL_FLOAT,
+                GL_FALSE,
+                static_cast<int>(sizeof(VoxelVertex)),
+                reinterpret_cast<const void *>(
+                    offsetof(VoxelVertex, position)
+                )
+            );
 
-        glVertexAttribPointer(
-            1,
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            static_cast<int>(sizeof(VoxelVertex)),
-            reinterpret_cast<const void *>(
-                offsetof(VoxelVertex, normal)
-            )
-        );
+            glEnableVertexAttribArray(0);
 
-        glEnableVertexAttribArray(1);
+            glVertexAttribPointer(
+                1,
+                3,
+                GL_FLOAT,
+                GL_FALSE,
+                static_cast<int>(sizeof(VoxelVertex)),
+                reinterpret_cast<const void *>(
+                    offsetof(VoxelVertex, normal)
+                )
+            );
 
-        glBindBuffer(
-            GL_ELEMENT_ARRAY_BUFFER,
+            glEnableVertexAttribArray(1);
+
+            glBindBuffer(
+                GL_ELEMENT_ARRAY_BUFFER,
+                indexBuffer
+            );
+
+            glBufferData(
+                GL_ELEMENT_ARRAY_BUFFER,
+                static_cast<GLsizeiptr>(
+                    geometry.indices.size() *
+                    sizeof(std::uint32_t)
+                ),
+                geometry.indices.data(),
+                GL_STATIC_DRAW
+            );
+
+            glBindBuffer(
+                GL_ARRAY_BUFFER,
+                instanceBuffer_
+            );
+
+            const auto defineInstanceAttribute =
+                    [](
+                        const unsigned int location,
+                        const int components,
+                        const std::size_t offset
+                    ) {
+                        glVertexAttribPointer(
+                            location,
+                            components,
+                            GL_FLOAT,
+                            GL_FALSE,
+                            static_cast<int>(
+                                sizeof(VoxelInstance)
+                            ),
+                            reinterpret_cast<const void *>(offset)
+                        );
+
+                        glEnableVertexAttribArray(location);
+                        glVertexAttribDivisor(location, 1);
+                    };
+
+            defineInstanceAttribute(
+                2,
+                3,
+                offsetof(VoxelInstance, center)
+            );
+
+            defineInstanceAttribute(
+                3,
+                3,
+                offsetof(VoxelInstance, size)
+            );
+
+            defineInstanceAttribute(
+                4,
+                3,
+                offsetof(VoxelInstance, color)
+            );
+
+            defineInstanceAttribute(
+                5,
+                4,
+                offsetof(VoxelInstance, emissive)
+            );
+        };
+
+        createGeometryBuffers(
+            voxelGeometry_,
+            voxelVertexArray_,
+            voxelVertexBuffer_,
             voxelIndexBuffer_
         );
 
-        glBufferData(
-            GL_ELEMENT_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(
-                voxelGeometry_.indices.size() *
-                sizeof(std::uint32_t)
-            ),
-            voxelGeometry_.indices.data(),
-            GL_STATIC_DRAW
-        );
-
-        glBindBuffer(
-            GL_ARRAY_BUFFER,
-            instanceBuffer_
-        );
-
-        const auto defineInstanceAttribute =
-                [](
-                    const unsigned int location,
-                    const int components,
-                    const std::size_t offset
-                ) {
-                    glVertexAttribPointer(
-                        location,
-                        components,
-                        GL_FLOAT,
-                        GL_FALSE,
-                        static_cast<int>(
-                            sizeof(VoxelInstance)
-                        ),
-                        reinterpret_cast<const void *>(offset)
-                    );
-
-                    glEnableVertexAttribArray(location);
-                    glVertexAttribDivisor(location, 1);
-                };
-
-        defineInstanceAttribute(
-            2,
-            3,
-            offsetof(VoxelInstance, center)
-        );
-
-        defineInstanceAttribute(
-            3,
-            3,
-            offsetof(VoxelInstance, size)
-        );
-
-        defineInstanceAttribute(
-            4,
-            3,
-            offsetof(VoxelInstance, color)
-        );
-
-        defineInstanceAttribute(
-            5,
-            4,
-            offsetof(VoxelInstance, emissive)
+        createGeometryBuffers(
+            floorColumnGeometry_,
+            floorColumnVertexArray_,
+            floorColumnVertexBuffer_,
+            floorColumnIndexBuffer_
         );
 
         glBindVertexArray(0);
