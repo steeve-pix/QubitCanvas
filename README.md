@@ -43,12 +43,22 @@ are omitted from the solid pass. Exact matrices up to 16x16 retain a separate
 faint edge-only ghost pass so every layer stays recognizable; bucketed
 large-register matrices skip those ghosts to preserve clarity and performance.
 
-Magnitude follows a tone-shaped Inferno ramp. Colors are converted from sRGB
-to linear space before amplitude-dependent glow is applied, then a half-size
-bloom pass and linear-to-sRGB output preserve the warm gold, orange, magenta,
-and violet range without heavy tone-map compression. Restrained face lighting,
-perspective framing, depth testing, and a procedural ground grid keep cube
-tops, sides, matrix depth, and history separation readable.
+Magnitude follows a tone-shaped Inferno ramp. The inspector and both 3D modes
+normalize color against the same strongest density value in the complete
+history, so a cell keeps its violet, magenta, orange, gold, or ivory band when
+the view changes. Floor Field independently normalizes only column height
+against its selected layer, preserving readable geometry without falsifying
+the shared color scale. Colors are converted from sRGB to linear space before
+amplitude-dependent glow is applied, then a half-size bloom pass and
+linear-to-sRGB output preserve the full range without heavy tone-map
+compression.
+
+Restrained face lighting, perspective framing, and depth testing keep cube
+tops, sides, matrix depth, and history separation readable. Beneath the data,
+a clipped and beveled OpenGL plinth replaces the old flat grid quad. Floor
+Field receives a framed matrix deck with cell bays, center guides, corner
+brackets, and a subtle scan. Layer Stack receives a segmented history runway,
+matrix-width rails, and a warm selected-layer dock.
 Floor Field uses a dedicated higher-detail column mesh with a square base,
 straight walls, and a smooth fixed-radius rounded top.
 Layer Stack reserves a tight frame for the algorithm's complete density

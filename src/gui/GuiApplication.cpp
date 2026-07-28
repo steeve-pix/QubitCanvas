@@ -2255,6 +2255,7 @@ namespace quantum_sim::gui {
             framebufferHeight,
             selectedDensityLayer_,
             densityVolumeHeatAmount_,
+            static_cast<float>(ImGui::GetTime()),
             densityVolumeCamera_
         );
 

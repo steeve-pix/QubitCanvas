@@ -27,6 +27,28 @@ namespace quantum_sim::gui::density_volume {
         }
     }
 
+    double normalizeMagnitude(
+        const double magnitude,
+        const double referenceMaximum
+    ) noexcept {
+        constexpr double numericalFloor =
+                1.0e-12;
+
+        if (
+            !std::isfinite(magnitude) ||
+            !std::isfinite(referenceMaximum) ||
+            referenceMaximum <= numericalFloor
+        ) {
+            return 0.0;
+        }
+
+        return std::clamp(
+            magnitude / referenceMaximum,
+            0.0,
+            1.0
+        );
+    }
+
     Color magnitudeColor(
         const double normalizedMagnitude
     ) noexcept {

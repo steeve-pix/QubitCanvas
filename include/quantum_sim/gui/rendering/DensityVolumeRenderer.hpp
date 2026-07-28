@@ -67,6 +67,7 @@ namespace quantum_sim::gui::density_volume {
          * @param height Framebuffer height in physical pixels.
          * @param selectedLayer Layer emphasized by the synchronized views.
          * @param heatAmount User-controlled glow multiplier.
+         * @param animationTime Monotonic UI time used by subtle surface scans.
          * @param camera Camera supplying view and projection matrices.
          */
         void render(
@@ -74,6 +75,7 @@ namespace quantum_sim::gui::density_volume {
             int height,
             std::size_t selectedLayer,
             float heatAmount,
+            float animationTime,
             const CameraController &camera
         );
 
@@ -155,12 +157,19 @@ namespace quantum_sim::gui::density_volume {
         int gridProjectionUniform_{-1};
         int gridCenterUniform_{-1};
         int gridExtentUniform_{-1};
+        int gridModeUniform_{-1};
+        int gridMatrixSpanUniform_{-1};
+        int gridLayerSpacingUniform_{-1};
+        int gridFirstLayerUniform_{-1};
+        int gridSelectedLayerUniform_{-1};
+        int gridAnimationTimeUniform_{-1};
         int blurInputUniform_{-1};
         int blurHorizontalUniform_{-1};
         int compositeSceneUniform_{-1};
         int compositeBloomUniform_{-1};
         int cubeIndexCount_{};
         int floorColumnIndexCount_{};
+        int gridIndexCount_{};
         int visibleInstanceCount_{};
         int visibleGhostCount_{};
         std::size_t instanceCapacity_{};
@@ -196,7 +205,10 @@ namespace quantum_sim::gui::density_volume {
         void createGhostBuffers();
 
         /**
-         * Creates the normalized quad used by the procedural ground grid.
+         * Creates the clipped, beveled plinth used by the reference surface.
+         *
+         * Its top carries mode-aware procedural markings while real side and
+         * bevel faces give the matrix/history base visible physical depth.
          */
         void createGridBuffers();
 

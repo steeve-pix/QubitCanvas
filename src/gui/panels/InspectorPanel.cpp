@@ -849,10 +849,9 @@ namespace quantum_sim::gui {
                         densityLayer.cellAt(row, column);
 
                 const double displayMagnitude =
-                        std::clamp(
+                        density_volume::normalizeMagnitude(
                             cell.magnitude,
-                            0.0,
-                            1.0
+                            densityStack.maximumMagnitude
                         );
 
                 const ImVec2 minimum{
