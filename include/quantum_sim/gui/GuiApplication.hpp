@@ -391,8 +391,10 @@ namespace quantum_sim::gui {
         /**
          * Draws a live angle editor anchored above the selected circuit gate.
          *
-         * The overlay is a separate ImGui window, so opening it never changes
-         * the circuit layout or interrupts a double-click on the gate.
+         * The overlay is an interactive child drawn above the circuit canvas.
+         * Keeping both surfaces in the same parent gives the slider pointer
+         * ownership without changing the circuit layout or interrupting a
+         * double-click on the gate.
          *
          * @param panelPosition Circuit panel top-left corner in screen space.
          * @param panelSize Circuit panel dimensions.
