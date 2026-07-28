@@ -1362,8 +1362,6 @@ namespace quantum_sim::gui {
                 }
             }
 
-            ImGui::End();
-
             drawSelectedGateAngleEditor(
                 ImVec2{
                     workPosition.x + leftPanelWidth + gap * 2.0F,
@@ -1374,6 +1372,8 @@ namespace quantum_sim::gui {
                     circuitPanelHeight
                 }
             );
+
+            ImGui::End();
 
             if (!circuitFocusMode_) {
                 drawDensityVolumeViewport(
@@ -1861,32 +1861,20 @@ namespace quantum_sim::gui {
                         12.0F
                 );
 
-        ImGui::SetNextWindowPos(
-            ImVec2{editorX, editorY},
-            ImGuiCond_Always
-        );
-
-        ImGui::SetNextWindowSize(
-            ImVec2{editorWidth, editorHeight},
-            ImGuiCond_Always
-        );
-
-        ImGui::SetNextWindowBgAlpha(0.985F);
-
         ImGui::PushStyleVar(
             ImGuiStyleVar_WindowPadding,
             ImVec2{10.0F, 8.0F}
         );
         ImGui::PushStyleVar(
-            ImGuiStyleVar_WindowRounding,
+            ImGuiStyleVar_ChildRounding,
             5.0F
         );
         ImGui::PushStyleVar(
-            ImGuiStyleVar_WindowBorderSize,
+            ImGuiStyleVar_ChildBorderSize,
             1.0F
         );
         ImGui::PushStyleColor(
-            ImGuiCol_WindowBg,
+            ImGuiCol_ChildBg,
             ImVec4{0.020F, 0.040F, 0.064F, 0.985F}
         );
         ImGui::PushStyleColor(
@@ -1895,19 +1883,18 @@ namespace quantum_sim::gui {
         );
 
         const ImGuiWindowFlags editorFlags =
-                ImGuiWindowFlags_NoTitleBar |
-                ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoCollapse |
-                ImGuiWindowFlags_NoSavedSettings |
                 ImGuiWindowFlags_NoScrollbar |
-                ImGuiWindowFlags_NoFocusOnAppearing |
-                ImGuiWindowFlags_Tooltip;
+                ImGuiWindowFlags_NoScrollWithMouse;
 
+        // This child is a sibling of the circuit canvas inside the Circuit
+        // panel. Drawing it after the canvas keeps it on top while preserving
+        // normal ImGui pointer ownership for the interactive slider.
+        ImGui::SetCursorScreenPos(ImVec2{editorX, editorY});
         const bool editorVisible =
-                ImGui::Begin(
+                ImGui::BeginChild(
                     "##SelectedGateAngleEditor",
-                    nullptr,
+                    ImVec2{editorWidth, editorHeight},
+                    true,
                     editorFlags
                 );
 
@@ -2006,7 +1993,7 @@ namespace quantum_sim::gui {
             }
         }
 
-        ImGui::End();
+        ImGui::EndChild();
         ImGui::PopStyleColor(2);
         ImGui::PopStyleVar(3);
 
