@@ -6,6 +6,7 @@
 #include "panels/InspectorPanel.hpp"
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/debug/DebuggerSession.hpp"
+#include "quantum_sim/project/ProjectWorkspace.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "rendering/BlochSphereRenderer.hpp"
 #include "rendering/CircuitRenderer.hpp"
@@ -240,7 +241,14 @@ namespace quantum_sim::gui {
         std::string simulationBuildError_;
         std::optional<std::filesystem::path> currentProjectPath_;
         std::optional<std::filesystem::path> queuedProjectOpenPath_;
+        bool queuedProjectIsRecovery_{false};
         std::string projectStatusMessage_;
+        project::ProjectWorkspace projectWorkspace_;
+        std::vector<std::filesystem::path> recentProjectPaths_;
+        bool projectWorkspaceSessionActive_{false};
+        bool recoveryPromptPending_{false};
+        bool recoveryPopupOpened_{false};
+        double nextAutosaveAt_{0.0};
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
@@ -278,6 +286,16 @@ namespace quantum_sim::gui {
          * Loads the project path selected during the previous UI frame.
          */
         void applyQueuedProjectOpen();
+
+        /**
+         * Writes unsaved work to the separate recovery project when due.
+         */
+        void autosaveProjectIfDue();
+
+        /**
+         * Offers to restore or discard a durable recovery project.
+         */
+        void drawRecoveryPrompt();
 
         /**
          * Follows debugger navigation while preserving an explicit initial-layer selection.

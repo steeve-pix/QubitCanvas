@@ -5,6 +5,7 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/quantum/Qubit.hpp"
 #include "quantum_sim/project/ProjectFile.hpp"
+#include "quantum_sim/project/ProjectWorkspace.hpp"
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
@@ -71,6 +72,73 @@ namespace {
     }
 } //
 int main() {
+    {
+        const std::filesystem::path workspaceRoot =
+                std::filesystem::temp_directory_path() /
+                "qubit_canvas_workspace_test";
+
+        std::error_code cleanupError;
+        std::filesystem::remove_all(
+            workspaceRoot,
+            cleanupError
+        );
+
+        quantum_sim::project::ProjectWorkspace firstSession{
+            workspaceRoot
+        };
+
+        const bool firstWasUnclean =
+                firstSession.beginSession();
+
+        quantum_sim::project::ProjectWorkspace secondSession{
+            workspaceRoot
+        };
+
+        const bool secondWasUnclean =
+                secondSession.beginSession();
+
+        const std::filesystem::path recentProject =
+                workspaceRoot / "recent.qcanvas";
+
+        QuantumCircuit recentCircuit{1U};
+        const QuantumRegister recentState =
+                QuantumRegister::basisState(1U, 0U);
+
+        quantum_sim::project::ProjectFile::save(
+            recentProject,
+            recentCircuit,
+            recentState
+        );
+
+        secondSession.recordRecentProject(recentProject);
+
+        quantum_sim::project::ProjectFile::save(
+            secondSession.autosavePath(),
+            recentCircuit,
+            recentState
+        );
+
+        const bool workspaceBehavesCorrectly =
+                !firstWasUnclean &&
+                secondWasUnclean &&
+                secondSession.recoveryAvailable() &&
+                secondSession.recentProjects().size() == 1U;
+
+        secondSession.discardRecovery();
+        secondSession.endSession();
+        firstSession.endSession();
+        std::filesystem::remove_all(
+            workspaceRoot,
+            cleanupError
+        );
+
+        check(
+            workspaceBehavesCorrectly &&
+            !cleanupError,
+            "Workspace detects interrupted sessions and persists recovery and recent projects"
+        );
+    }
+
     {
         QuantumCircuit savedCircuit{3U};
         savedCircuit.addSingleQubitGate(

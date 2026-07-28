@@ -337,6 +337,28 @@ namespace quantum_sim::gui {
 
         ImGui_ImplOpenGL3_Init("#version 330");
 
+        if (!launchOptions_.hiddenWindow) {
+            const bool previousSessionWasUnclean =
+                    projectWorkspace_.beginSession();
+
+            projectWorkspaceSessionActive_ = true;
+            recentProjectPaths_ =
+                    projectWorkspace_.recentProjects();
+
+            recoveryPromptPending_ =
+                    projectWorkspace_.recoveryAvailable();
+
+            if (
+                previousSessionWasUnclean &&
+                !recoveryPromptPending_
+            ) {
+                projectStatusMessage_ =
+                        "The previous session ended unexpectedly.";
+            }
+
+            nextAutosaveAt_ = ImGui::GetTime() + 8.0;
+        }
+
         bool captureFailed = false;
 
         while (glfwWindowShouldClose(window) == GLFW_FALSE) {
@@ -357,6 +379,7 @@ namespace quantum_sim::gui {
             applyQueuedPreset();
             applyQueuedCircuitEdits();
             adoptCompletedSimulationHistory();
+            autosaveProjectIfDue();
 
             debug::DebuggerSnapshot snapshot =
                     session_.snapshot();
@@ -368,6 +391,7 @@ namespace quantum_sim::gui {
 
             drawBackdrop();
             drawTopBar(session_, snapshot);
+            drawRecoveryPrompt();
             snapshot = session_.snapshot();
             synchronizeDensityLayer(snapshot);
 
@@ -1367,6 +1391,18 @@ namespace quantum_sim::gui {
             glfwSwapBuffers(window);
         }
 
+        if (projectWorkspaceSessionActive_) {
+            nextAutosaveAt_ = 0.0;
+            autosaveProjectIfDue();
+
+            if (!circuitHasUnsavedEdits_) {
+                projectWorkspace_.discardRecovery();
+            }
+
+            projectWorkspace_.endSession();
+            projectWorkspaceSessionActive_ = false;
+        }
+
         densityVolumeRenderer_.shutdown();
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
@@ -2256,7 +2292,7 @@ namespace quantum_sim::gui {
             );
         }
 
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 860.0F);
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 946.0F);
 
         if (ImGui::Button("Open", ImVec2{72.0F, 0.0F})) {
             queuedProjectOpenPath_ =
@@ -2280,6 +2316,44 @@ namespace quantum_sim::gui {
                     ? "Save project [Ctrl+S]"
                     : projectStatusMessage_.c_str()
             );
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Recent", ImVec2{78.0F, 0.0F})) {
+            ImGui::OpenPopup("RecentProjects");
+        }
+
+        if (ImGui::BeginPopup("RecentProjects")) {
+            ImGui::TextDisabled("Recent projects");
+            ImGui::Separator();
+
+            if (recentProjectPaths_.empty()) {
+                ImGui::TextDisabled("No recent projects");
+            }
+
+            for (
+                const std::filesystem::path &path :
+                recentProjectPaths_
+            ) {
+                if (
+                    ImGui::MenuItem(
+                        path.filename().string().c_str()
+                    )
+                ) {
+                    queuedProjectOpenPath_ = path;
+                    queuedProjectIsRecovery_ = false;
+                }
+
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip(
+                        "%s",
+                        path.string().c_str()
+                    );
+                }
+            }
+
+            ImGui::EndPopup();
         }
 
         ImGui::SameLine();
@@ -4147,6 +4221,17 @@ namespace quantum_sim::gui {
                     path;
 
             circuitHasUnsavedEdits_ = false;
+            projectWorkspace_.discardRecovery();
+
+            if (projectWorkspaceSessionActive_) {
+                projectWorkspace_.recordRecentProject(
+                    path.value()
+                );
+
+                recentProjectPaths_ =
+                        projectWorkspace_.recentProjects();
+            }
+
             projectStatusMessage_ =
                     "Saved " +
                     path->filename().string();
@@ -4162,12 +4247,16 @@ namespace quantum_sim::gui {
             return;
         }
 
+        const bool isRecovery =
+                queuedProjectIsRecovery_;
+
         const std::filesystem::path path =
                 std::move(
                     queuedProjectOpenPath_.value()
                 );
 
         queuedProjectOpenPath_.reset();
+        queuedProjectIsRecovery_ = false;
 
         try {
             project::ProjectDocument document =
@@ -4185,15 +4274,34 @@ namespace quantum_sim::gui {
             presetQubitCount_ =
                     static_cast<int>(
                         circuit_.qubitCount()
-                    );
+            );
 
             resetEditorTransientState();
-            currentProjectPath_ = path;
-            circuitHasUnsavedEdits_ = false;
+            currentProjectPath_ =
+                    isRecovery
+                        ? std::nullopt
+                        : std::optional<std::filesystem::path>{
+                            path
+                        };
+
+            circuitHasUnsavedEdits_ =
+                    isRecovery;
+
             playbackPaused_ = true;
             projectStatusMessage_ =
-                    "Opened " +
-                    path.filename().string();
+                    isRecovery
+                        ? "Recovered unsaved work."
+                        : "Opened " +
+                          path.filename().string();
+
+            if (
+                !isRecovery &&
+                projectWorkspaceSessionActive_
+            ) {
+                projectWorkspace_.recordRecentProject(path);
+                recentProjectPaths_ =
+                        projectWorkspace_.recentProjects();
+            }
 
             circuitRenderer_.fitToView();
             rebuildDebuggerAfterCircuitEdit();
@@ -4202,6 +4310,89 @@ namespace quantum_sim::gui {
                     std::string{"Open failed: "} +
                     error.what();
         }
+    }
+
+    void GuiApplication::autosaveProjectIfDue() {
+        if (
+            !projectWorkspaceSessionActive_ ||
+            !circuitHasUnsavedEdits_
+        ) {
+            return;
+        }
+
+        const double now = ImGui::GetTime();
+
+        if (now < nextAutosaveAt_) {
+            return;
+        }
+
+        try {
+            project::ProjectFile::save(
+                projectWorkspace_.autosavePath(),
+                circuit_,
+                initialState_
+            );
+
+            projectStatusMessage_ =
+                    "Recovery copy updated.";
+        } catch (const std::exception &error) {
+            projectStatusMessage_ =
+                    std::string{"Autosave failed: "} +
+                    error.what();
+        }
+
+        nextAutosaveAt_ = now + 8.0;
+    }
+
+    void GuiApplication::drawRecoveryPrompt() {
+        if (
+            recoveryPromptPending_ &&
+            !recoveryPopupOpened_
+        ) {
+            ImGui::OpenPopup("Recover unsaved work");
+            recoveryPopupOpened_ = true;
+        }
+
+        if (
+            !ImGui::BeginPopupModal(
+                "Recover unsaved work",
+                nullptr,
+                ImGuiWindowFlags_AlwaysAutoResize
+            )
+        ) {
+            return;
+        }
+
+        ImGui::TextUnformatted(
+            "QubitCanvas found a recovery copy from an earlier session."
+        );
+
+        ImGui::TextDisabled(
+            "Recovering opens it as an unsaved project and leaves named files untouched."
+        );
+
+        ImGui::Spacing();
+
+        if (ImGui::Button("Recover", ImVec2{130.0F, 0.0F})) {
+            queuedProjectOpenPath_ =
+                    projectWorkspace_.autosavePath();
+
+            queuedProjectIsRecovery_ = true;
+            recoveryPromptPending_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Discard", ImVec2{130.0F, 0.0F})) {
+            projectWorkspace_.discardRecovery();
+            recoveryPromptPending_ = false;
+            projectStatusMessage_ =
+                    "Recovery copy discarded.";
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 
     void GuiApplication::recordEditorForUndo() {
