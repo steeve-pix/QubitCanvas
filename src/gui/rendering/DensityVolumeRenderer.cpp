@@ -4,11 +4,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 namespace quantum_sim::gui::density_volume {
     namespace {
@@ -19,6 +21,14 @@ namespace quantum_sim::gui::density_volume {
             Vector3 minimum;
             Vector3 maximum;
             bool valid{false};
+        };
+
+        /**
+         * One vertex in the low-profile beveled reference plinth.
+         */
+        struct ReferenceSurfaceVertex {
+            float position[3]{};
+            float normal[3]{};
         };
 
         /**
@@ -457,6 +467,7 @@ namespace quantum_sim::gui::density_volume {
         const int height,
         const std::size_t selectedLayer,
         const float heatAmount,
+        const float animationTime,
         const CameraController &camera
     ) {
         if (!initialized_) {
@@ -581,10 +592,64 @@ namespace quantum_sim::gui::density_volume {
             scene_.groundHalfExtentZ
         );
 
+        const float firstLayerPosition =
+                scene_.layerCenters.empty()
+                    ? scene_.groundCenter.x
+                    : scene_.layerCenters.front().x;
+
+        const std::size_t safeLayerCenter =
+                scene_.layerCenters.empty()
+                    ? 0U
+                    : std::min(
+                        selectedLayer,
+                        scene_.layerCenters.size() - 1U
+                    );
+
+        const float selectedLayerPosition =
+                scene_.layerCenters.empty()
+                    ? scene_.groundCenter.x
+                    : scene_.layerCenters.at(
+                        safeLayerCenter
+                    ).x;
+
+        glUniform1i(
+            gridModeUniform_,
+            sceneMode_.has_value() &&
+            sceneMode_.value() ==
+                VisualizationMode::FloorField
+                ? 1
+                : 0
+        );
+
+        glUniform1f(
+            gridMatrixSpanUniform_,
+            scene_.matrixSpan
+        );
+
+        glUniform1f(
+            gridLayerSpacingUniform_,
+            scene_.layerSpacing
+        );
+
+        glUniform1f(
+            gridFirstLayerUniform_,
+            firstLayerPosition
+        );
+
+        glUniform1f(
+            gridSelectedLayerUniform_,
+            selectedLayerPosition
+        );
+
+        glUniform1f(
+            gridAnimationTimeUniform_,
+            animationTime
+        );
+
         glBindVertexArray(gridVertexArray_);
         glDrawElements(
             GL_TRIANGLES,
-            6,
+            gridIndexCount_,
             GL_UNSIGNED_INT,
             nullptr
         );
@@ -838,6 +903,7 @@ namespace quantum_sim::gui::density_volume {
         framebufferHeight_ = 0;
         cubeIndexCount_ = 0;
         floorColumnIndexCount_ = 0;
+        gridIndexCount_ = 0;
         visibleInstanceCount_ = 0;
         visibleGhostCount_ = 0;
         instanceCapacity_ = 0U;
@@ -1149,7 +1215,8 @@ void main() {
 
         constexpr const char *gridVertexShader = R"glsl(
 #version 330 core
-layout(location = 0) in vec2 aPosition;
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aNormal;
 
 uniform mat4 uView;
 uniform mat4 uProjection;
@@ -1158,14 +1225,25 @@ uniform vec2 uGridExtent;
 
 out vec3 vWorldPosition;
 out vec2 vNormalizedPosition;
+out vec3 vNormal;
 
 void main() {
-    vNormalizedPosition = aPosition;
+    vec3 worldScale = vec3(
+        max(uGridExtent.x, 0.001),
+        1.0,
+        max(uGridExtent.y, 0.001)
+    );
+
+    vNormalizedPosition = aPosition.xz;
     vWorldPosition = uGridCenter + vec3(
         aPosition.x * uGridExtent.x,
-        0.0,
-        aPosition.y * uGridExtent.y
+        aPosition.y,
+        aPosition.z * uGridExtent.y
     );
+
+    // The inverse scale is the normal matrix for this axis-aligned plinth.
+    vNormal = normalize(aNormal / worldScale);
+
     gl_Position =
         uProjection *
         uView *
@@ -1177,6 +1255,15 @@ void main() {
 #version 330 core
 in vec3 vWorldPosition;
 in vec2 vNormalizedPosition;
+in vec3 vNormal;
+
+uniform vec3 uGridCenter;
+uniform int uMode;
+uniform float uMatrixSpan;
+uniform float uLayerSpacing;
+uniform float uFirstLayer;
+uniform float uSelectedLayer;
+uniform float uAnimationTime;
 
 layout(location = 0) out vec4 sceneColor;
 layout(location = 1) out uint pickColor;
@@ -1190,22 +1277,246 @@ float gridLine(vec2 coordinate) {
     return 1.0 - min(min(distanceToLine.x, distanceToLine.y), 1.0);
 }
 
-void main() {
-    float minor = gridLine(vWorldPosition.xz / 0.72);
-    float major = gridLine(vWorldPosition.xz / 3.60);
-    float radial = length(vNormalizedPosition);
-    float fade = 1.0 - smoothstep(0.36, 1.18, radial);
+float lineMask(float distanceValue, float halfWidth) {
+    float antialias =
+        max(fwidth(distanceValue) * 1.35, 0.0006);
 
-    vec3 floorColor = vec3(0.0022, 0.0065, 0.0145);
-    vec3 minorColor = vec3(0.020, 0.072, 0.100);
-    vec3 majorColor = vec3(0.038, 0.125, 0.160);
-    vec3 color = floorColor;
-    color += minorColor * minor * fade * 0.48;
-    color += majorColor * major * fade * 0.56;
+    return 1.0 -
+        smoothstep(
+            halfWidth,
+            halfWidth + antialias,
+            abs(distanceValue)
+        );
+}
+
+float rectangleOutline(
+    vec2 position,
+    vec2 halfExtent,
+    float halfWidth
+) {
+    float signedDistance =
+        max(
+            abs(position.x) - halfExtent.x,
+            abs(position.y) - halfExtent.y
+        );
+
+    return lineMask(signedDistance, halfWidth);
+}
+
+void main() {
+    vec3 normal = normalize(vNormal);
+    float topFace = smoothstep(0.45, 0.88, normal.y);
+    vec2 local = vWorldPosition.xz - uGridCenter.xz;
+    float edgeDistance = max(
+        abs(vNormalizedPosition.x),
+        abs(vNormalizedPosition.y)
+    );
+    float edgeFade =
+        1.0 - smoothstep(0.70, 1.01, edgeDistance);
+
+    vec3 deepStructure = vec3(0.0015, 0.0045, 0.0105);
+    vec3 bevelStructure = vec3(0.0060, 0.0200, 0.0340);
+    vec3 deckColor = vec3(0.0028, 0.0090, 0.0185);
+    vec3 etchedCyan = vec3(0.030, 0.180, 0.235);
+    vec3 frameCyan = vec3(0.055, 0.330, 0.405);
+    vec3 selectedGold = vec3(0.92, 0.34, 0.055);
+
+    vec3 color =
+        mix(
+            deepStructure,
+            bevelStructure,
+            clamp(normal.y * 0.35 + 0.30, 0.0, 1.0)
+        );
+
+    float emissiveMarking = 0.0;
+
+    if (topFace > 0.01) {
+        color = deckColor;
+
+        if (uMode == 1) {
+            // Floor Field uses a recessed matrix deck with a double frame,
+            // alternating cell bays, center axes, and a quiet scanning trace.
+            float matrixHalf =
+                max(uMatrixSpan * 0.5, 0.5);
+
+            vec2 matrixCoordinate =
+                local + vec2(matrixHalf);
+
+            float insideMatrix =
+                1.0 -
+                step(
+                    matrixHalf + 0.02,
+                    max(abs(local.x), abs(local.y))
+                );
+
+            vec2 cellIndex =
+                floor(matrixCoordinate);
+
+            float checker =
+                mod(cellIndex.x + cellIndex.y, 2.0);
+
+            color +=
+                mix(
+                    vec3(0.0015, 0.0060, 0.0120),
+                    vec3(0.0045, 0.0150, 0.0250),
+                    checker
+                ) *
+                insideMatrix;
+
+            float cells =
+                gridLine(matrixCoordinate) *
+                insideMatrix;
+
+            float innerFrame =
+                rectangleOutline(
+                    local,
+                    vec2(matrixHalf + 0.06),
+                    0.018
+                );
+
+            float outerFrame =
+                rectangleOutline(
+                    local,
+                    vec2(matrixHalf + 0.32),
+                    0.026
+                );
+
+            float centerAxes =
+                max(
+                    lineMask(local.x, 0.010),
+                    lineMask(local.y, 0.010)
+                ) *
+                insideMatrix;
+
+            float cornerReach =
+                matrixHalf + 0.54;
+
+            float cornerBrackets =
+                max(
+                    lineMask(abs(local.x) - cornerReach, 0.028) *
+                        step(matrixHalf - 0.72, abs(local.y)),
+                    lineMask(abs(local.y) - cornerReach, 0.028) *
+                        step(matrixHalf - 0.72, abs(local.x))
+                );
+
+            float scanPosition =
+                mix(
+                    -matrixHalf,
+                    matrixHalf,
+                    fract(uAnimationTime * 0.075)
+                );
+
+            float scan =
+                lineMask(local.y - scanPosition, 0.018) *
+                insideMatrix;
+
+            color += etchedCyan * cells * 0.30;
+            color += etchedCyan * centerAxes * 0.34;
+            color += frameCyan * innerFrame * 0.92;
+            color += frameCyan * outerFrame * 0.48;
+            color += frameCyan * cornerBrackets * 0.86;
+            color += selectedGold * scan * 0.22;
+            emissiveMarking =
+                max(
+                    innerFrame * 0.10 +
+                        outerFrame * 0.04,
+                    scan * 0.13
+                );
+        } else {
+            // Layer Stack reads as a history runway. Per-layer stations,
+            // matrix-width rails, and a warm selected-layer dock expose the
+            // direction and current debugger layer without extra UI text.
+            float matrixHalf =
+                max(uMatrixSpan * 0.5, 0.5);
+
+            float insideRunway =
+                1.0 -
+                step(
+                    matrixHalf + 0.08,
+                    abs(local.y)
+                );
+
+            float layerCoordinate =
+                (vWorldPosition.x - uFirstLayer) /
+                max(uLayerSpacing, 0.001);
+
+            float stations =
+                lineMask(
+                    fract(layerCoordinate + 0.5) - 0.5,
+                    0.018
+                ) *
+                insideRunway;
+
+            float matrixGuides =
+                gridLine(
+                    vec2(
+                        local.y + matrixHalf,
+                        local.y + matrixHalf
+                    )
+                ) *
+                insideRunway;
+
+            float runwayFrame =
+                lineMask(
+                    abs(local.y) - matrixHalf - 0.12,
+                    0.026
+                );
+
+            float centerRail =
+                lineMask(local.y, 0.014) *
+                insideRunway;
+
+            float selectedDock =
+                lineMask(
+                    vWorldPosition.x - uSelectedLayer,
+                    0.055
+                ) *
+                step(
+                    abs(local.y),
+                    matrixHalf + 0.36
+                );
+
+            float historyLength =
+                max(
+                    abs(uSelectedLayer - uFirstLayer),
+                    uLayerSpacing
+                );
+
+            float scanPosition =
+                uFirstLayer +
+                historyLength *
+                fract(uAnimationTime * 0.055);
+
+            float scan =
+                lineMask(
+                    vWorldPosition.x - scanPosition,
+                    0.020
+                ) *
+                insideRunway *
+                step(vWorldPosition.x, uSelectedLayer + 0.06);
+
+            color += etchedCyan * stations * 0.36;
+            color += etchedCyan * matrixGuides * 0.20;
+            color += frameCyan * runwayFrame * 0.72;
+            color += frameCyan * centerRail * 0.34;
+            color += selectedGold * selectedDock * 0.88;
+            color += selectedGold * scan * 0.16;
+            emissiveMarking =
+                max(
+                    selectedDock * 0.18,
+                    runwayFrame * 0.05
+                );
+        }
+
+        color *= mix(0.76, 1.0, edgeFade);
+    }
 
     sceneColor = vec4(color, 1.0);
     pickColor = 0U;
-    brightColor = vec4(0.0, 0.0, 0.0, 1.0);
+    brightColor = vec4(
+        color * emissiveMarking,
+        1.0
+    );
 }
 )glsl";
 
@@ -1302,6 +1613,42 @@ void main() {
                     "uGridExtent"
                 );
 
+        gridModeUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uMode"
+                );
+
+        gridMatrixSpanUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uMatrixSpan"
+                );
+
+        gridLayerSpacingUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uLayerSpacing"
+                );
+
+        gridFirstLayerUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uFirstLayer"
+                );
+
+        gridSelectedLayerUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uSelectedLayer"
+                );
+
+        gridAnimationTimeUniform_ =
+                glGetUniformLocation(
+                    gridShaderProgram_,
+                    "uAnimationTime"
+                );
+
         requireUniform(voxelViewUniform_, "uView");
         requireUniform(voxelProjectionUniform_, "uProjection");
         requireUniform(
@@ -1326,6 +1673,27 @@ void main() {
         requireUniform(gridProjectionUniform_, "uProjection");
         requireUniform(gridCenterUniform_, "uGridCenter");
         requireUniform(gridExtentUniform_, "uGridExtent");
+        requireUniform(gridModeUniform_, "uMode");
+        requireUniform(
+            gridMatrixSpanUniform_,
+            "uMatrixSpan"
+        );
+        requireUniform(
+            gridLayerSpacingUniform_,
+            "uLayerSpacing"
+        );
+        requireUniform(
+            gridFirstLayerUniform_,
+            "uFirstLayer"
+        );
+        requireUniform(
+            gridSelectedLayerUniform_,
+            "uSelectedLayer"
+        );
+        requireUniform(
+            gridAnimationTimeUniform_,
+            "uAnimationTime"
+        );
     }
 
     void Renderer::createPostProcessPrograms() {
@@ -1774,17 +2142,242 @@ void main() {
     }
 
     void Renderer::createGridBuffers() {
-        constexpr std::array<float, 8U> vertices{
-            -1.0F, -1.0F,
-             1.0F, -1.0F,
-             1.0F,  1.0F,
-            -1.0F,  1.0F
+        static_assert(
+            std::is_standard_layout_v<
+                ReferenceSurfaceVertex
+            >
+        );
+
+        // Clipped corners and real side faces keep the base readable from low
+        // camera angles. Procedural markings are applied only to the top deck.
+        constexpr std::array<
+            std::array<float, 2U>,
+            8U
+        > ring{
+            std::array{-0.88F, -1.00F},
+            std::array{ 0.88F, -1.00F},
+            std::array{ 1.00F, -0.88F},
+            std::array{ 1.00F,  0.88F},
+            std::array{ 0.88F,  1.00F},
+            std::array{-0.88F,  1.00F},
+            std::array{-1.00F,  0.88F},
+            std::array{-1.00F, -0.88F}
         };
 
-        constexpr std::array<std::uint32_t, 6U> indices{
-            0U, 1U, 2U,
-            0U, 2U, 3U
-        };
+        constexpr float innerScale =
+                0.985F;
+
+        constexpr float bevelDepth =
+                -0.055F;
+
+        constexpr float sideDepth =
+                -0.18F;
+
+        std::vector<ReferenceSurfaceVertex> vertices;
+        std::vector<std::uint32_t> indices;
+        vertices.reserve(73U);
+        indices.reserve(120U);
+
+        const auto appendVertex =
+                [&vertices](
+                    const float x,
+                    const float y,
+                    const float z,
+                    const float normalX,
+                    const float normalY,
+                    const float normalZ
+                ) {
+                    vertices.push_back(
+                        ReferenceSurfaceVertex{
+                            .position{x, y, z},
+                            .normal{
+                                normalX,
+                                normalY,
+                                normalZ
+                            }
+                        }
+                    );
+
+                    return static_cast<std::uint32_t>(
+                        vertices.size() - 1U
+                    );
+                };
+
+        const std::uint32_t topCenter =
+                appendVertex(
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    0.0F,
+                    1.0F,
+                    0.0F
+                );
+
+        std::array<std::uint32_t, ring.size()> topRing{};
+
+        for (std::size_t index = 0U; index < ring.size(); ++index) {
+            topRing[index] =
+                    appendVertex(
+                        ring[index][0] * innerScale,
+                        0.0F,
+                        ring[index][1] * innerScale,
+                        0.0F,
+                        1.0F,
+                        0.0F
+                    );
+        }
+
+        for (std::size_t index = 0U; index < ring.size(); ++index) {
+            const std::size_t next =
+                    (index + 1U) % ring.size();
+
+            indices.push_back(topCenter);
+            indices.push_back(topRing[next]);
+            indices.push_back(topRing[index]);
+        }
+
+        for (std::size_t index = 0U; index < ring.size(); ++index) {
+            const std::size_t next =
+                    (index + 1U) % ring.size();
+
+            const float edgeX =
+                    ring[next][0] - ring[index][0];
+
+            const float edgeZ =
+                    ring[next][1] - ring[index][1];
+
+            const float edgeLength =
+                    std::max(
+                        std::hypot(edgeX, edgeZ),
+                        0.001F
+                    );
+
+            const float outwardX =
+                    edgeZ / edgeLength;
+
+            const float outwardZ =
+                    -edgeX / edgeLength;
+
+            constexpr float bevelUp =
+                    0.72F;
+
+            constexpr float bevelOut =
+                    0.69F;
+
+            const std::uint32_t first =
+                    appendVertex(
+                        ring[index][0] * innerScale,
+                        0.0F,
+                        ring[index][1] * innerScale,
+                        outwardX * bevelOut,
+                        bevelUp,
+                        outwardZ * bevelOut
+                    );
+
+            appendVertex(
+                ring[next][0] * innerScale,
+                0.0F,
+                ring[next][1] * innerScale,
+                outwardX * bevelOut,
+                bevelUp,
+                outwardZ * bevelOut
+            );
+
+            appendVertex(
+                ring[next][0],
+                bevelDepth,
+                ring[next][1],
+                outwardX * bevelOut,
+                bevelUp,
+                outwardZ * bevelOut
+            );
+
+            appendVertex(
+                ring[index][0],
+                bevelDepth,
+                ring[index][1],
+                outwardX * bevelOut,
+                bevelUp,
+                outwardZ * bevelOut
+            );
+
+            indices.insert(
+                indices.end(),
+                {
+                    first,
+                    first + 2U,
+                    first + 1U,
+                    first,
+                    first + 3U,
+                    first + 2U
+                }
+            );
+
+            const std::uint32_t sideFirst =
+                    appendVertex(
+                        ring[index][0],
+                        bevelDepth,
+                        ring[index][1],
+                        outwardX,
+                        0.0F,
+                        outwardZ
+                    );
+
+            appendVertex(
+                ring[next][0],
+                bevelDepth,
+                ring[next][1],
+                outwardX,
+                0.0F,
+                outwardZ
+            );
+
+            appendVertex(
+                ring[next][0],
+                sideDepth,
+                ring[next][1],
+                outwardX,
+                0.0F,
+                outwardZ
+            );
+
+            appendVertex(
+                ring[index][0],
+                sideDepth,
+                ring[index][1],
+                outwardX,
+                0.0F,
+                outwardZ
+            );
+
+            indices.insert(
+                indices.end(),
+                {
+                    sideFirst,
+                    sideFirst + 2U,
+                    sideFirst + 1U,
+                    sideFirst,
+                    sideFirst + 3U,
+                    sideFirst + 2U
+                }
+            );
+        }
+
+        if (
+            indices.size() >
+            static_cast<std::size_t>(
+                std::numeric_limits<int>::max()
+            )
+        ) {
+            throw std::runtime_error{
+                "Density Volume reference surface exceeds OpenGL index limits."
+            };
+        }
+
+        gridIndexCount_ =
+                static_cast<int>(
+                    indices.size()
+                );
 
         glGenVertexArrays(1, &gridVertexArray_);
         glGenBuffers(1, &gridVertexBuffer_);
@@ -1799,7 +2392,8 @@ void main() {
         glBufferData(
             GL_ARRAY_BUFFER,
             static_cast<GLsizeiptr>(
-                vertices.size() * sizeof(float)
+                vertices.size() *
+                sizeof(ReferenceSurfaceVertex)
             ),
             vertices.data(),
             GL_STATIC_DRAW
@@ -1807,14 +2401,39 @@ void main() {
 
         glVertexAttribPointer(
             0,
-            2,
+            3,
             GL_FLOAT,
             GL_FALSE,
-            2 * static_cast<int>(sizeof(float)),
-            nullptr
+            static_cast<int>(
+                sizeof(ReferenceSurfaceVertex)
+            ),
+            reinterpret_cast<const void *>(
+                offsetof(
+                    ReferenceSurfaceVertex,
+                    position
+                )
+            )
         );
 
         glEnableVertexAttribArray(0);
+
+        glVertexAttribPointer(
+            1,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            static_cast<int>(
+                sizeof(ReferenceSurfaceVertex)
+            ),
+            reinterpret_cast<const void *>(
+                offsetof(
+                    ReferenceSurfaceVertex,
+                    normal
+                )
+            )
+        );
+
+        glEnableVertexAttribArray(1);
 
         glBindBuffer(
             GL_ELEMENT_ARRAY_BUFFER,

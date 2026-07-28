@@ -473,6 +473,8 @@
 
     DensityVolumeColorMap.hpp / .cpp
         Color is RGB.
+        normalizeMagnitude() maps absolute rho magnitudes against the one
+        history-wide maximum shared by Inspector, Layer Stack, and Floor Field.
         magnitudeColor() is the Inferno magnitude palette used by 2D and 3D.
         phaseColor() is the optional phase wheel. Change shared density colors
         here first so heatmap and voxels continue to correspond.
@@ -481,7 +483,8 @@
         DensityBin describes one large-register bucket.
         DensityCell stores row/column, complex value, magnitude, intensity,
         phase.
-        DensityLayer stores one exact or bucketed matrix; cellAt() reads it.
+        DensityLayer stores one exact or bucketed matrix; cellAt() reads it and
+        maximumCellMagnitude() supplies Floor Field's relative height scale.
         DensityStack stores initial + post-gate layers and a fingerprint.
         DensityModel::build() creates complete history.
         DensityModel::rebuildFrom() preserves an unaffected prefix.
@@ -522,6 +525,9 @@
         createVoxelBuffers(), createGhostBuffers(), createGridBuffers(),
         createPostProcessVertexArray(), uploadInstances(), resizeFramebuffer(),
         renderPostProcess() split GPU setup and passes.
+        createGridBuffers() builds a clipped, beveled plinth rather than a flat
+        quad. Its shader draws a matrix deck in Floor Field and a segmented
+        history runway in Layer Stack, including subtle animated scan marks.
 
     Console output: include/quantum_sim/visualization + src/visualization
     --------------------------------------------------------------------
@@ -534,7 +540,13 @@
     Practical change routes
     -----------------------
     "Change the Inferno colors"
-        DensityVolumeColorMap.cpp. Verify both Inspector heatmap and Renderer.
+        DensityVolumeColorMap.cpp. Keep normalizeMagnitude() shared and verify
+        Inspector heatmap, Layer Stack, and Floor Field together.
+
+    "Change the matrix/history reference surface"
+        DensityVolumeRenderer.cpp createGridBuffers() controls physical plinth
+        geometry; the grid shader in createScenePrograms() controls its deck,
+        runway, selected-layer dock, borders, and scan animation.
 
     "Change cube roundness or Floor Field tops"
         DensityVolumeScene.cpp geometry builders, then renderer shader only if

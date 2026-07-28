@@ -1419,6 +1419,31 @@ int main() {
             );
 
     check(
+        approximatelyEqual(
+            quantum_sim::gui::density_volume::normalizeMagnitude(
+                0.125,
+                0.5
+            ),
+            0.25
+        ) &&
+        approximatelyEqual(
+            quantum_sim::gui::density_volume::normalizeMagnitude(
+                0.5,
+                0.5
+            ),
+            1.0
+        ) &&
+        approximatelyEqual(
+            quantum_sim::gui::density_volume::normalizeMagnitude(
+                0.5,
+                0.0
+            ),
+            0.0
+        ),
+        "Density Volume views share one stable history-wide magnitude normalization"
+    );
+
+    check(
         weakInfernoColor.blue > weakInfernoColor.red &&
         weakInfernoColor.red > weakInfernoColor.green &&
         mediumInfernoColor.red > mediumInfernoColor.blue &&
@@ -1510,9 +1535,9 @@ int main() {
 
     check(
         floorPeak != nullptr &&
-        approximatelyEqual(floorPeak->magnitude, 0.52, 1.0e-5) &&
+        approximatelyEqual(floorPeak->magnitude, 0.5, 1.0e-5) &&
         approximatelyEqual(floorPeak->size.y, 4.4, 1.0e-5),
-        "Density Volume floor field normalizes height without clipping its Inferno colors"
+        "Density Volume floor field separates relative height from shared Inferno color"
     );
 
     const auto *hadamardPeak =
@@ -1559,6 +1584,32 @@ int main() {
                 0U,
                 0U
             );
+
+    check(
+        floorPeak != nullptr &&
+        hadamardPeak != nullptr &&
+        approximatelyEqual(
+            floorPeak->magnitude,
+            hadamardPeak->magnitude,
+            1.0e-5
+        ) &&
+        approximatelyEqual(
+            floorPeak->color.red,
+            hadamardPeak->color.red,
+            1.0e-5
+        ) &&
+        approximatelyEqual(
+            floorPeak->color.green,
+            hadamardPeak->color.green,
+            1.0e-5
+        ) &&
+        approximatelyEqual(
+            floorPeak->color.blue,
+            hadamardPeak->color.blue,
+            1.0e-5
+        ),
+        "Density Volume floor and stack modes assign matching colors to the same layer cell"
+    );
 
     check(
         historyScene.voxels.size() == 9U &&
