@@ -95,6 +95,8 @@ namespace {
                         nextValue();
             } else if (argument == "--final-step") {
                 options.launch.startAtFinalStep = true;
+            } else if (argument == "--floor-field") {
+                options.launch.startInFloorField = true;
             } else {
                 throw std::invalid_argument{
                     "Unknown command-line option: " +

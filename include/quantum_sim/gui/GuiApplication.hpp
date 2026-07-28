@@ -29,6 +29,7 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> gatePage;
         std::optional<std::string> armedGate;
         bool startAtFinalStep{false};
+        bool startInFloorField{false};
     };
 
     /**
