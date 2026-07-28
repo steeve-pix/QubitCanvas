@@ -1,6 +1,9 @@
 # Build directories
 build/
 cmake-build-*/
+_CPack_Packages/
+QubitCanvas-*.zip
+QubitCanvas-*.tar.gz
 
 # Compiled files
 *.o
