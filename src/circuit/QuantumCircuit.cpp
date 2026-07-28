@@ -262,7 +262,7 @@ namespace quantum_sim::circuit {
 
     std::vector<TraceStep> QuantumCircuit::executeWithTrace(
         const quantum::QuantumRegister &initialState,
-        const std::stop_token stopToken
+        const util::StopToken stopToken
     ) const {
         return executeWithTraceFrom(initialState, 0U, stopToken);
     }
@@ -270,7 +270,7 @@ namespace quantum_sim::circuit {
     std::vector<TraceStep> QuantumCircuit::executeWithTraceFrom(
         const quantum::QuantumRegister &stateBeforeFirstInstruction,
         const std::size_t firstInstructionIndex,
-        const std::stop_token stopToken
+        const util::StopToken stopToken
     ) const {
         if (stateBeforeFirstInstruction.qubitCount() != qubitCount_) {
             throw std::invalid_argument{"Register qubit count must match the circuit qubit count."};

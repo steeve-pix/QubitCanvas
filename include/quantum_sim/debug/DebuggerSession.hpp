@@ -1,11 +1,11 @@
 #pragma once
 #include <cstddef>
-#include <stop_token>
 #include <vector>
 
 #include "DebuggerSnapshot.hpp"
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
+#include "quantum_sim/util/StopToken.hpp"
 
 namespace quantum_sim::debug {
     /**
@@ -129,7 +129,7 @@ namespace quantum_sim::debug {
         void rebuild(
             const circuit::QuantumCircuit &circuit,
             const quantum::QuantumRegister &initialState,
-            std::stop_token stopToken = {}
+            util::StopToken stopToken = {}
         );
 
         /**
@@ -147,7 +147,7 @@ namespace quantum_sim::debug {
             const circuit::QuantumCircuit &circuit,
             const quantum::QuantumRegister &initialState,
             std::size_t firstChangedInstruction,
-            std::stop_token stopToken = {}
+            util::StopToken stopToken = {}
         );
 
         /**

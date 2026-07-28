@@ -1,10 +1,10 @@
 #pragma once
 
 #include "quantum_sim/debug/DebuggerSession.hpp"
+#include "quantum_sim/util/StopToken.hpp"
 
 #include <cstddef>
 #include <cstdint>
-#include <stop_token>
 #include <string>
 #include <vector>
 
@@ -95,7 +95,7 @@ namespace quantum_sim::gui::density_volume {
         [[nodiscard]] static DensityStack build(
             const debug::DebuggerSession &session,
             std::size_t maximumDimension = 16U,
-            std::stop_token stopToken = {}
+            util::StopToken stopToken = {}
         );
 
         /**
@@ -111,7 +111,7 @@ namespace quantum_sim::gui::density_volume {
             const debug::DebuggerSession &session,
             std::size_t firstChangedInstruction,
             std::size_t maximumDimension = 16U,
-            std::stop_token stopToken = {}
+            util::StopToken stopToken = {}
         );
 
         /**
