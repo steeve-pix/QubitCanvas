@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
+#include <numbers>
 #include <sstream>
 #include <string_view>
 #include <utility>
@@ -344,6 +345,9 @@ namespace quantum_sim::gui {
             projectWorkspaceSessionActive_ = true;
             recentProjectPaths_ =
                     projectWorkspace_.recentProjects();
+
+            reusableSubcircuits_ =
+                    subcircuitLibrary_.loadAll();
 
             recoveryPromptPending_ =
                     projectWorkspace_.recoveryAvailable();
@@ -1049,6 +1053,209 @@ namespace quantum_sim::gui {
                             : toolbarSelectedInstructionIndices.back() + 1U;
             }
 
+            ImGui::SameLine();
+
+            if (!canCopy) {
+                ImGui::BeginDisabled();
+            }
+
+            if (ImGui::SmallButton("Save block")) {
+                reusableSubcircuitName_.fill('\0');
+                ImGui::OpenPopup("Save reusable block");
+            }
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canCopy
+                        ? "Keep the selected gates in the reusable block library."
+                        : "Select one or more gates to save a reusable block."
+                );
+            }
+
+            if (!canCopy) {
+                ImGui::EndDisabled();
+            }
+
+            if (
+                ImGui::BeginPopupModal(
+                    "Save reusable block",
+                    nullptr,
+                    ImGuiWindowFlags_AlwaysAutoResize
+                )
+            ) {
+                ImGui::TextUnformatted(
+                    "Name the selected circuit block"
+                );
+
+                ImGui::SetNextItemWidth(320.0F);
+                ImGui::InputText(
+                    "##ReusableBlockName",
+                    reusableSubcircuitName_.data(),
+                    reusableSubcircuitName_.size()
+                );
+
+                const bool hasName =
+                        reusableSubcircuitName_.front() != '\0';
+
+                if (!hasName) {
+                    ImGui::BeginDisabled();
+                }
+
+                if (ImGui::Button("Save", ImVec2{110.0F, 0.0F})) {
+                    const auto allInstructions =
+                            circuit_.instructionSnapshots();
+
+                    std::vector<circuit::CircuitInstructionSnapshot>
+                            selectedInstructions;
+
+                    selectedInstructions.reserve(
+                        toolbarSelectedInstructionIndices.size()
+                    );
+
+                    for (
+                        const std::size_t instructionIndex :
+                        toolbarSelectedInstructionIndices
+                    ) {
+                        if (instructionIndex < allInstructions.size()) {
+                            selectedInstructions.push_back(
+                                allInstructions[instructionIndex]
+                            );
+                        }
+                    }
+
+                    try {
+                        subcircuitLibrary_.save(
+                            reusableSubcircuitName_.data(),
+                            circuit_.qubitCount(),
+                            selectedInstructions
+                        );
+
+                        reusableSubcircuits_ =
+                                subcircuitLibrary_.loadAll();
+
+                        selectedReusableSubcircuit_ = 0U;
+                        projectStatusMessage_ =
+                                "Reusable block saved.";
+                        ImGui::CloseCurrentPopup();
+                    } catch (const std::exception &error) {
+                        projectStatusMessage_ =
+                                std::string{
+                                    "Block save failed: "
+                                } +
+                                error.what();
+                    }
+                }
+
+                if (!hasName) {
+                    ImGui::EndDisabled();
+                }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("Cancel", ImVec2{110.0F, 0.0F})) {
+                    ImGui::CloseCurrentPopup();
+                }
+
+                ImGui::EndPopup();
+            }
+
+            std::optional<circuit::CircuitInstructionInfo>
+                    editableAngleInstruction;
+
+            if (
+                toolbarSelectedInstructionIndices.size() == 1U &&
+                toolbarSelectedInstructionIndex.has_value()
+            ) {
+                const auto instructionInfo =
+                        circuit_.instructionInfo();
+
+                const std::size_t selectedIndex =
+                        toolbarSelectedInstructionIndex.value();
+
+                if (selectedIndex < instructionInfo.size()) {
+                    const auto &candidate =
+                            instructionInfo[selectedIndex];
+
+                    if (
+                        candidate.angleRadians.has_value() &&
+                        usesGateParameters(candidate.name) &&
+                        candidate.name != "U" &&
+                        candidate.name != "fSim"
+                    ) {
+                        editableAngleInstruction = candidate;
+                    }
+                }
+            }
+
+            if (
+                editableAngleInstruction.has_value() &&
+                toolbarSelectedInstructionIndex.has_value()
+            ) {
+                const std::size_t selectedIndex =
+                        toolbarSelectedInstructionIndex.value();
+
+                if (
+                    inlineAngleInstructionIndex_ !=
+                    selectedIndex
+                ) {
+                    inlineAngleInstructionIndex_ =
+                            selectedIndex;
+
+                    inlineAnglePiCoefficient_ =
+                            static_cast<float>(
+                                editableAngleInstruction->
+                                    angleRadians.value() /
+                                std::numbers::pi
+                            );
+                }
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted("\xCE\xB8");
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(230.0F);
+
+                ImGui::SliderFloat(
+                    "##InlineGateAngle",
+                    &inlineAnglePiCoefficient_,
+                    -2.0F,
+                    2.0F,
+                    "%.3f \xCF\x80",
+                    ImGuiSliderFlags_AlwaysClamp
+                );
+
+                ImGui::SameLine();
+
+                if (ImGui::SmallButton("Apply angle")) {
+                    queuedInstructionAngleEdit_ =
+                            InstructionAngleEdit{
+                                selectedIndex,
+                                static_cast<double>(
+                                    inlineAnglePiCoefficient_
+                                ) *
+                                std::numbers::pi
+                            };
+                }
+
+                ImGui::SameLine();
+
+                const std::string angleMeasurement =
+                        notation::formatAngleMeasurement(
+                            static_cast<double>(
+                                inlineAnglePiCoefficient_
+                            ) *
+                            std::numbers::pi
+                        );
+
+                ImGui::TextDisabled(
+                    "%s",
+                    angleMeasurement.c_str()
+                );
+            } else {
+                inlineAngleInstructionIndex_.reset();
+            }
+
             if (showHistoryDebugInfo_) {
                 ImGui::TextDisabled(
                     "Undo: %zu   Redo: %zu",
@@ -1310,6 +1517,8 @@ namespace quantum_sim::gui {
                     selectedGate.value()
                 );
             }
+
+            drawReusableSubcircuits();
 
             ImGui::End();
 
@@ -3424,6 +3633,114 @@ namespace quantum_sim::gui {
                 state.basisStateLabel(measuredIndex);
     }
 
+    void GuiApplication::drawReusableSubcircuits() {
+        ImGui::Spacing();
+        ImGui::SeparatorText("Reusable blocks");
+
+        if (reusableSubcircuits_.empty()) {
+            ImGui::TextDisabled(
+                "Select circuit gates, then choose Save block."
+            );
+            return;
+        }
+
+        selectedReusableSubcircuit_ =
+                std::min(
+                    selectedReusableSubcircuit_,
+                    reusableSubcircuits_.size() - 1U
+                );
+
+        const project::StoredSubcircuit &selected =
+                reusableSubcircuits_[
+                    selectedReusableSubcircuit_
+                ];
+
+        ImGui::SetNextItemWidth(-1.0F);
+
+        if (
+            ImGui::BeginCombo(
+                "##ReusableBlock",
+                selected.name.c_str()
+            )
+        ) {
+            for (
+                std::size_t blockIndex = 0U;
+                blockIndex < reusableSubcircuits_.size();
+                ++blockIndex
+            ) {
+                const bool isSelected =
+                        blockIndex ==
+                        selectedReusableSubcircuit_;
+
+                if (
+                    ImGui::Selectable(
+                        reusableSubcircuits_[
+                            blockIndex
+                        ].name.c_str(),
+                        isSelected
+                    )
+                ) {
+                    selectedReusableSubcircuit_ =
+                            blockIndex;
+                }
+            }
+
+            ImGui::EndCombo();
+        }
+
+        const project::StoredSubcircuit &active =
+                reusableSubcircuits_[
+                    selectedReusableSubcircuit_
+                ];
+
+        const bool canInsert =
+                active.canInsertInto(
+                    circuit_.qubitCount()
+                ) &&
+                !pendingGate_.has_value();
+
+        if (!canInsert) {
+            ImGui::BeginDisabled();
+        }
+
+        if (
+            ImGui::Button(
+                "Insert block",
+                ImVec2{-1.0F, 0.0F}
+            )
+        ) {
+            instructionClipboard_ =
+                    active.instructions;
+
+            const std::vector<std::size_t> &selection =
+                    circuitRenderer_.
+                        selectedInstructionIndices();
+
+            queuedClipboardInsertionIndex_ =
+                    selection.empty()
+                        ? circuit_.instructionCount()
+                        : selection.back() + 1U;
+        }
+
+        if (
+            ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )
+        ) {
+            ImGui::SetTooltip(
+                canInsert
+                    ? "%zu gates authored on %zu qubits"
+                    : "This block contains an operand or register-wide operation that does not fit the current register.",
+                active.instructions.size(),
+                active.sourceQubitCount
+            );
+        }
+
+        if (!canInsert) {
+            ImGui::EndDisabled();
+        }
+    }
+
     void GuiApplication::drawBottomStatus(const debug::DebuggerSnapshot &snapshot) const {
         const ImGuiViewport *viewport =
                 ImGui::GetMainViewport();
@@ -3555,6 +3872,78 @@ namespace quantum_sim::gui {
     }
 
     void GuiApplication::applyQueuedCircuitEdits() {
+        if (queuedInstructionAngleEdit_.has_value()) {
+            const InstructionAngleEdit edit =
+                    queuedInstructionAngleEdit_.value();
+
+            queuedInstructionAngleEdit_.reset();
+
+            if (edit.instructionIndex >= circuit_.instructionCount()) {
+                return;
+            }
+
+            auto snapshots =
+                    circuit_.instructionSnapshots();
+
+            circuit::CircuitInstructionSnapshot replacement =
+                    snapshots[edit.instructionIndex];
+
+            GateParameters parameters{};
+            parameters.thetaRadians =
+                    edit.angleRadians;
+
+            if (
+                replacement.kind ==
+                circuit::CircuitInstructionKind::SingleQubit
+            ) {
+                replacement.matrix =
+                        createSingleQubitGateMatrix(
+                            replacement.name,
+                            parameters
+                        );
+            } else if (
+                replacement.kind ==
+                circuit::CircuitInstructionKind::TwoQubit
+            ) {
+                replacement.matrix =
+                        createTwoQubitGateMatrix(
+                            replacement.name,
+                            parameters
+                        );
+            } else {
+                return;
+            }
+
+            replacement.angleRadians =
+                    edit.angleRadians;
+
+            recordEditorForUndo();
+
+            if (
+                !circuit_.replaceInstructionSnapshot(
+                    edit.instructionIndex,
+                    replacement
+                )
+            ) {
+                undoHistory_.pop_back();
+                return;
+            }
+
+            circuitHasUnsavedEdits_ = true;
+            playbackPaused_ = true;
+
+            rebuildDebuggerAfterCircuitEdit(
+                edit.instructionIndex,
+                edit.instructionIndex + 1U
+            );
+
+            circuitRenderer_.selectInstruction(
+                edit.instructionIndex
+            );
+
+            return;
+        }
+
         if (queuedBlankCircuitQubitCount_.has_value()) {
             const std::size_t qubitCount =
                     queuedBlankCircuitQubitCount_.value();
@@ -4418,6 +4807,8 @@ namespace quantum_sim::gui {
         queuedInstructionDeletions_.clear();
         queuedInstructionMove_.reset();
         queuedClipboardInsertionIndex_.reset();
+        queuedInstructionAngleEdit_.reset();
+        inlineAngleInstructionIndex_.reset();
         presetAwaitingConfirmation_.reset();
         gateLibraryPanel_.clearSelection();
         circuitRenderer_.cancelPlacement();

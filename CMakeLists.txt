@@ -79,6 +79,7 @@ add_library(qubit_canvas_core
         src/debug/DebuggerSession.cpp
         src/project/ProjectFile.cpp
         src/project/ProjectWorkspace.cpp
+        src/project/SubcircuitLibrary.cpp
 )
 
 target_include_directories(qubit_canvas_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
