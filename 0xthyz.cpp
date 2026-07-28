@@ -406,6 +406,8 @@
         The density layer and probabilities stay immediately visible. Analysis,
         amplitudes, Bloch data, and navigation use collapsing headers, and none
         creates a nested scrolling child; the Inspector window owns scrolling.
+        focusQubit() updates only the Bloch target and deliberately preserves
+        the user's current Inspector scroll and expansion state.
 
     Rendering: include/quantum_sim/gui/rendering + src/gui/rendering
     ----------------------------------------------------------------

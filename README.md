@@ -190,7 +190,8 @@ the remainder of the register.
 
 The Inspector uses one outer scroll surface. Its synchronized density layer and
 qubit probabilities are immediately visible; analysis, amplitudes, Bloch
-sphere, and navigation expand only when needed.
+sphere, and navigation expand only when needed. Selecting or editing a circuit
+gate never changes the Inspector's scroll position or expanded sections.
 
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
 Compact `SW`, `iSW`, and `√SW` badges distinguish exchange variants without
