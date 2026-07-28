@@ -21,6 +21,46 @@ namespace quantum_sim::project {
                 ? std::filesystem::absolute(path)
                 : canonical;
         }
+
+        /**
+         * Reads a non-empty filesystem path from an environment variable.
+         *
+         * MSVC uses its allocating secure CRT helper; other compilers use the
+         * standard environment API. Callers receive the same owned path.
+         */
+        std::optional<std::filesystem::path> environmentPath(
+            const char *name
+        ) {
+#ifdef _MSC_VER
+            char *value = nullptr;
+            std::size_t valueLength{};
+
+            if (
+                _dupenv_s(
+                    &value,
+                    &valueLength,
+                    name
+                ) != 0 ||
+                value == nullptr ||
+                value[0] == '\0'
+            ) {
+                std::free(value);
+                return std::nullopt;
+            }
+
+            const std::filesystem::path path{value};
+            std::free(value);
+            return path;
+#else
+            const char *value = std::getenv(name);
+
+            if (value == nullptr || value[0] == '\0') {
+                return std::nullopt;
+            }
+
+            return std::filesystem::path{value};
+#endif
+        }
     }
 
     ProjectWorkspace::ProjectWorkspace()
@@ -191,23 +231,32 @@ namespace quantum_sim::project {
 
     std::filesystem::path ProjectWorkspace::defaultRoot() {
 #ifdef _WIN32
-        char *localAppData = nullptr;
-        std::size_t localAppDataLength{};
+        if (const auto root = environmentPath("LOCALAPPDATA")) {
+            return root.value() / "QubitCanvas";
+        }
 
-        if (
-            _dupenv_s(
-                &localAppData,
-                &localAppDataLength,
-                "LOCALAPPDATA"
-            ) == 0 &&
-            localAppData != nullptr
-        ) {
-            const std::filesystem::path root =
-                    std::filesystem::path{localAppData} /
-                    "QubitCanvas";
+        if (const auto root = environmentPath("APPDATA")) {
+            return root.value() / "QubitCanvas";
+        }
+#elif defined(__APPLE__)
+        if (const auto home = environmentPath("HOME")) {
+            return
+                home.value() /
+                "Library" /
+                "Application Support" /
+                "QubitCanvas";
+        }
+#else
+        if (const auto root = environmentPath("XDG_DATA_HOME")) {
+            return root.value() / "QubitCanvas";
+        }
 
-            std::free(localAppData);
-            return root;
+        if (const auto home = environmentPath("HOME")) {
+            return
+                home.value() /
+                ".local" /
+                "share" /
+                "QubitCanvas";
         }
 #endif
 

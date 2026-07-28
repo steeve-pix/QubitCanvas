@@ -74,7 +74,13 @@ namespace quantum_sim::project {
         );
 
         /**
-         * @return Platform-local directory used by the default constructor.
+         * Resolves the persistent per-user data directory for the host OS.
+         *
+         * Windows uses Local AppData, macOS uses Application Support, and
+         * Linux follows XDG_DATA_HOME with ~/.local/share as its fallback.
+         *
+         * @return Directory containing autosave, session, and recent-project
+         *         state for the current user.
          */
         [[nodiscard]] static std::filesystem::path defaultRoot();
 
