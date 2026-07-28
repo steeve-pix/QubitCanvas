@@ -1901,7 +1901,8 @@ namespace quantum_sim::gui {
                 ImGuiWindowFlags_NoCollapse |
                 ImGuiWindowFlags_NoSavedSettings |
                 ImGuiWindowFlags_NoScrollbar |
-                ImGuiWindowFlags_NoFocusOnAppearing;
+                ImGuiWindowFlags_NoFocusOnAppearing |
+                ImGuiWindowFlags_Tooltip;
 
         const bool editorVisible =
                 ImGui::Begin(
