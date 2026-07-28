@@ -175,12 +175,13 @@ OpenQASM export fails clearly when a custom full-register operation cannot be
 represented without changing its meaning.
 
 A selected parameterized gate with one retained angle exposes a stationary
-theta editor above that gate. Slider changes preview live without an Apply step,
-and one complete drag remains one undoable operation. The editor is an overlay,
-so selecting it never moves the circuit or interrupts gate double-click
-navigation. Its anchor is published after the current frame's gate interaction,
-and its tooltip display layer keeps it visible above the circuit without taking
-focus. Any selected gate range can be named with `Save block`; persistent
+theta editor above that gate. Its slider keeps pointer ownership while dragging,
+previews changes live without an Apply step, and records one complete drag as
+one undoable operation. The editor is an interactive child overlay, so selecting
+it never moves the circuit or interrupts gate double-click navigation. Its
+anchor is published after the current frame's gate interaction, and sibling
+ordering keeps it above the canvas without sacrificing slider input. Any
+selected gate range can be named with `Save block`; persistent
 blocks appear in the compact Reusable blocks chooser and can be inserted into
 compatible registers.
 

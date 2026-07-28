@@ -426,6 +426,9 @@
         the latest render without exposing ImGui types to GuiApplication state.
         draw() publishes that anchor after click/drag handling so a new
         selection can open its attached editor during the same frame.
+        GuiApplication draws the editor as a sibling child after CircuitCanvas
+        and before ending the Circuit panel. This keeps it visually above the
+        canvas while allowing the slider to own clicks and drag gestures.
         Placement API: consumeCompleted*(), completedControlledPlacement(),
         hasPendingControlQubit(), placementOperandCount(), cancelPlacement(),
         pendingInsertionIndex(), continuePlacementAfter().
