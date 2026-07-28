@@ -1,8 +1,10 @@
 #include "quantum_sim/gui/GuiApplication.hpp"
+#include "quantum_sim/gui/ExportFile.hpp"
 #include "quantum_sim/gui/NativeFileDialog.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/project/OpenQasmFile.hpp"
 #include "quantum_sim/project/ProjectFile.hpp"
 
 #define GLFW_INCLUDE_NONE
@@ -380,6 +382,7 @@ namespace quantum_sim::gui {
 
             handleGlobalShortcuts();
             applyQueuedProjectOpen();
+            applyQueuedQasmOpen();
             applyQueuedPreset();
             applyQueuedCircuitEdits();
             adoptCompletedSimulationHistory();
@@ -2529,41 +2532,7 @@ namespace quantum_sim::gui {
 
         ImGui::SameLine();
 
-        if (ImGui::Button("Recent", ImVec2{78.0F, 0.0F})) {
-            ImGui::OpenPopup("RecentProjects");
-        }
-
-        if (ImGui::BeginPopup("RecentProjects")) {
-            ImGui::TextDisabled("Recent projects");
-            ImGui::Separator();
-
-            if (recentProjectPaths_.empty()) {
-                ImGui::TextDisabled("No recent projects");
-            }
-
-            for (
-                const std::filesystem::path &path :
-                recentProjectPaths_
-            ) {
-                if (
-                    ImGui::MenuItem(
-                        path.filename().string().c_str()
-                    )
-                ) {
-                    queuedProjectOpenPath_ = path;
-                    queuedProjectIsRecovery_ = false;
-                }
-
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip(
-                        "%s",
-                        path.string().c_str()
-                    );
-                }
-            }
-
-            ImGui::EndPopup();
-        }
+        drawExchangeMenu(snapshot);
 
         ImGui::SameLine();
 
@@ -2652,6 +2621,186 @@ namespace quantum_sim::gui {
         }
 
         ImGui::End();
+    }
+
+    void GuiApplication::drawExchangeMenu(
+        const debug::DebuggerSnapshot &snapshot
+    ) {
+        if (ImGui::Button("I/O", ImVec2{78.0F, 0.0F})) {
+            ImGui::OpenPopup("CircuitExchange");
+        }
+
+        if (
+            !projectStatusMessage_.empty() &&
+            ImGui::IsItemHovered()
+        ) {
+            ImGui::SetTooltip(
+                "%s",
+                projectStatusMessage_.c_str()
+            );
+        }
+
+        if (!ImGui::BeginPopup("CircuitExchange")) {
+            return;
+        }
+
+        ImGui::TextDisabled("Interchange");
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Import OpenQASM...")) {
+            queuedQasmOpenPath_ =
+                    NativeFileDialog::openQasm();
+        }
+
+        if (ImGui::MenuItem("Export OpenQASM...")) {
+            const auto path =
+                    NativeFileDialog::saveQasm();
+
+            if (path.has_value()) {
+                try {
+                    project::OpenQasmFile::save(
+                        path.value(),
+                        circuit_
+                    );
+
+                    projectStatusMessage_ =
+                            "OpenQASM circuit exported.";
+                } catch (const std::exception &error) {
+                    projectStatusMessage_ =
+                            std::string{
+                                "OpenQASM export failed: "
+                            } +
+                            error.what();
+                }
+            }
+        }
+
+        ImGui::Separator();
+        ImGui::TextDisabled("Readable exports");
+
+        if (ImGui::MenuItem("Circuit diagram (SVG)...")) {
+            const auto path =
+                    NativeFileDialog::saveCircuitSvg();
+
+            if (path.has_value()) {
+                try {
+                    ExportFile::saveCircuitSvg(
+                        path.value(),
+                        circuit_
+                    );
+
+                    projectStatusMessage_ =
+                            "Circuit SVG exported.";
+                } catch (const std::exception &error) {
+                    projectStatusMessage_ =
+                            std::string{"SVG export failed: "} +
+                            error.what();
+                }
+            }
+        }
+
+        if (ImGui::MenuItem("Current state (CSV)...")) {
+            const auto path =
+                    NativeFileDialog::saveStateCsv();
+
+            if (path.has_value()) {
+                try {
+                    ExportFile::saveStateCsv(
+                        path.value(),
+                        snapshot.afterState.get()
+                    );
+
+                    projectStatusMessage_ =
+                            "State CSV exported.";
+                } catch (const std::exception &error) {
+                    projectStatusMessage_ =
+                            std::string{
+                                "State export failed: "
+                            } +
+                            error.what();
+                }
+            }
+        }
+
+        const bool hasDensityLayer =
+                !densityVolumeStack_.layers.empty();
+
+        if (!hasDensityLayer) {
+            ImGui::BeginDisabled();
+        }
+
+        if (
+            ImGui::MenuItem(
+                "Selected density layer (CSV)..."
+            )
+        ) {
+            const auto path =
+                    NativeFileDialog::saveDensityCsv();
+
+            if (path.has_value()) {
+                try {
+                    const std::size_t layerIndex =
+                            std::min(
+                                selectedDensityLayer_,
+                                densityVolumeStack_.
+                                    layers.size() - 1U
+                            );
+
+                    ExportFile::saveDensityCsv(
+                        path.value(),
+                        densityVolumeStack_.layers[
+                            layerIndex
+                        ]
+                    );
+
+                    projectStatusMessage_ =
+                            "Density CSV exported.";
+                } catch (const std::exception &error) {
+                    projectStatusMessage_ =
+                            std::string{
+                                "Density export failed: "
+                            } +
+                            error.what();
+                }
+            }
+        }
+
+        if (!hasDensityLayer) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::BeginMenu("Recent projects")) {
+            if (recentProjectPaths_.empty()) {
+                ImGui::TextDisabled("No recent projects");
+            }
+
+            for (
+                const std::filesystem::path &path :
+                recentProjectPaths_
+            ) {
+                if (
+                    ImGui::MenuItem(
+                        path.filename().string().c_str()
+                    )
+                ) {
+                    queuedProjectOpenPath_ = path;
+                    queuedProjectIsRecovery_ = false;
+                }
+
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip(
+                        "%s",
+                        path.string().c_str()
+                    );
+                }
+            }
+
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndPopup();
     }
 
     void GuiApplication::drawAlgorithmScripts() {
@@ -4697,6 +4846,55 @@ namespace quantum_sim::gui {
         } catch (const std::exception &error) {
             projectStatusMessage_ =
                     std::string{"Open failed: "} +
+                    error.what();
+        }
+    }
+
+    void GuiApplication::applyQueuedQasmOpen() {
+        if (!queuedQasmOpenPath_.has_value()) {
+            return;
+        }
+
+        const std::filesystem::path path =
+                std::move(
+                    queuedQasmOpenPath_.value()
+                );
+
+        queuedQasmOpenPath_.reset();
+
+        try {
+            project::ProjectDocument document =
+                    project::OpenQasmFile::load(path);
+
+            recordEditorForUndo();
+            simulationHistoryWorker_.cancel();
+
+            circuit_ =
+                    std::move(document.circuit);
+
+            initialState_ =
+                    std::move(document.initialState);
+
+            presetQubitCount_ =
+                    static_cast<int>(
+                        circuit_.qubitCount()
+                    );
+
+            resetEditorTransientState();
+            currentProjectPath_.reset();
+            circuitHasUnsavedEdits_ = true;
+            playbackPaused_ = true;
+            projectStatusMessage_ =
+                    "Imported " +
+                    path.filename().string();
+
+            circuitRenderer_.fitToView();
+            rebuildDebuggerAfterCircuitEdit();
+        } catch (const std::exception &error) {
+            projectStatusMessage_ =
+                    std::string{
+                        "OpenQASM import failed: "
+                    } +
                     error.what();
         }
     }

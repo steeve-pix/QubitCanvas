@@ -78,6 +78,7 @@ add_library(qubit_canvas_core
 
         src/debug/InteractiveCircuitDebugger.cpp
         src/debug/DebuggerSession.cpp
+        src/project/OpenQasmFile.cpp
         src/project/ProjectFile.cpp
         src/project/ProjectWorkspace.cpp
         src/project/SubcircuitLibrary.cpp
@@ -91,6 +92,7 @@ enable_project_warnings(qubit_canvas_core)
 
 # Graphical interface library
 add_library(qubit_canvas_gui STATIC
+        src/gui/ExportFile.cpp
         src/gui/GateNotation.cpp
         src/gui/NativeFileDialog.cpp
         src/gui/QuantumNotation.cpp
