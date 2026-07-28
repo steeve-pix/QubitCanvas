@@ -1,8 +1,10 @@
 #include "quantum_sim/gui/GuiApplication.hpp"
+#include "quantum_sim/gui/ExportFile.hpp"
 #include "quantum_sim/gui/NativeFileDialog.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/project/OpenQasmFile.hpp"
 #include "quantum_sim/project/ProjectFile.hpp"
 
 #define GLFW_INCLUDE_NONE
@@ -16,6 +18,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
+#include <numbers>
 #include <sstream>
 #include <string_view>
 #include <utility>
@@ -337,6 +340,31 @@ namespace quantum_sim::gui {
 
         ImGui_ImplOpenGL3_Init("#version 330");
 
+        if (!launchOptions_.hiddenWindow) {
+            const bool previousSessionWasUnclean =
+                    projectWorkspace_.beginSession();
+
+            projectWorkspaceSessionActive_ = true;
+            recentProjectPaths_ =
+                    projectWorkspace_.recentProjects();
+
+            reusableSubcircuits_ =
+                    subcircuitLibrary_.loadAll();
+
+            recoveryPromptPending_ =
+                    projectWorkspace_.recoveryAvailable();
+
+            if (
+                previousSessionWasUnclean &&
+                !recoveryPromptPending_
+            ) {
+                projectStatusMessage_ =
+                        "The previous session ended unexpectedly.";
+            }
+
+            nextAutosaveAt_ = ImGui::GetTime() + 8.0;
+        }
+
         bool captureFailed = false;
 
         while (glfwWindowShouldClose(window) == GLFW_FALSE) {
@@ -354,9 +382,11 @@ namespace quantum_sim::gui {
 
             handleGlobalShortcuts();
             applyQueuedProjectOpen();
+            applyQueuedQasmOpen();
             applyQueuedPreset();
             applyQueuedCircuitEdits();
             adoptCompletedSimulationHistory();
+            autosaveProjectIfDue();
 
             debug::DebuggerSnapshot snapshot =
                     session_.snapshot();
@@ -368,6 +398,7 @@ namespace quantum_sim::gui {
 
             drawBackdrop();
             drawTopBar(session_, snapshot);
+            drawRecoveryPrompt();
             snapshot = session_.snapshot();
             synchronizeDensityLayer(snapshot);
 
@@ -1025,6 +1056,209 @@ namespace quantum_sim::gui {
                             : toolbarSelectedInstructionIndices.back() + 1U;
             }
 
+            ImGui::SameLine();
+
+            if (!canCopy) {
+                ImGui::BeginDisabled();
+            }
+
+            if (ImGui::SmallButton("Save block")) {
+                reusableSubcircuitName_.fill('\0');
+                ImGui::OpenPopup("Save reusable block");
+            }
+
+            if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )) {
+                ImGui::SetTooltip(
+                    canCopy
+                        ? "Keep the selected gates in the reusable block library."
+                        : "Select one or more gates to save a reusable block."
+                );
+            }
+
+            if (!canCopy) {
+                ImGui::EndDisabled();
+            }
+
+            if (
+                ImGui::BeginPopupModal(
+                    "Save reusable block",
+                    nullptr,
+                    ImGuiWindowFlags_AlwaysAutoResize
+                )
+            ) {
+                ImGui::TextUnformatted(
+                    "Name the selected circuit block"
+                );
+
+                ImGui::SetNextItemWidth(320.0F);
+                ImGui::InputText(
+                    "##ReusableBlockName",
+                    reusableSubcircuitName_.data(),
+                    reusableSubcircuitName_.size()
+                );
+
+                const bool hasName =
+                        reusableSubcircuitName_.front() != '\0';
+
+                if (!hasName) {
+                    ImGui::BeginDisabled();
+                }
+
+                if (ImGui::Button("Save", ImVec2{110.0F, 0.0F})) {
+                    const auto allInstructions =
+                            circuit_.instructionSnapshots();
+
+                    std::vector<circuit::CircuitInstructionSnapshot>
+                            selectedInstructions;
+
+                    selectedInstructions.reserve(
+                        toolbarSelectedInstructionIndices.size()
+                    );
+
+                    for (
+                        const std::size_t instructionIndex :
+                        toolbarSelectedInstructionIndices
+                    ) {
+                        if (instructionIndex < allInstructions.size()) {
+                            selectedInstructions.push_back(
+                                allInstructions[instructionIndex]
+                            );
+                        }
+                    }
+
+                    try {
+                        subcircuitLibrary_.save(
+                            reusableSubcircuitName_.data(),
+                            circuit_.qubitCount(),
+                            selectedInstructions
+                        );
+
+                        reusableSubcircuits_ =
+                                subcircuitLibrary_.loadAll();
+
+                        selectedReusableSubcircuit_ = 0U;
+                        projectStatusMessage_ =
+                                "Reusable block saved.";
+                        ImGui::CloseCurrentPopup();
+                    } catch (const std::exception &error) {
+                        projectStatusMessage_ =
+                                std::string{
+                                    "Block save failed: "
+                                } +
+                                error.what();
+                    }
+                }
+
+                if (!hasName) {
+                    ImGui::EndDisabled();
+                }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("Cancel", ImVec2{110.0F, 0.0F})) {
+                    ImGui::CloseCurrentPopup();
+                }
+
+                ImGui::EndPopup();
+            }
+
+            std::optional<circuit::CircuitInstructionInfo>
+                    editableAngleInstruction;
+
+            if (
+                toolbarSelectedInstructionIndices.size() == 1U &&
+                toolbarSelectedInstructionIndex.has_value()
+            ) {
+                const auto instructionInfo =
+                        circuit_.instructionInfo();
+
+                const std::size_t selectedIndex =
+                        toolbarSelectedInstructionIndex.value();
+
+                if (selectedIndex < instructionInfo.size()) {
+                    const auto &candidate =
+                            instructionInfo[selectedIndex];
+
+                    if (
+                        candidate.angleRadians.has_value() &&
+                        usesGateParameters(candidate.name) &&
+                        candidate.name != "U" &&
+                        candidate.name != "fSim"
+                    ) {
+                        editableAngleInstruction = candidate;
+                    }
+                }
+            }
+
+            if (
+                editableAngleInstruction.has_value() &&
+                toolbarSelectedInstructionIndex.has_value()
+            ) {
+                const std::size_t selectedIndex =
+                        toolbarSelectedInstructionIndex.value();
+
+                if (
+                    inlineAngleInstructionIndex_ !=
+                    selectedIndex
+                ) {
+                    inlineAngleInstructionIndex_ =
+                            selectedIndex;
+
+                    inlineAnglePiCoefficient_ =
+                            static_cast<float>(
+                                editableAngleInstruction->
+                                    angleRadians.value() /
+                                std::numbers::pi
+                            );
+                }
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted("\xCE\xB8");
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(230.0F);
+
+                ImGui::SliderFloat(
+                    "##InlineGateAngle",
+                    &inlineAnglePiCoefficient_,
+                    -2.0F,
+                    2.0F,
+                    "%.3f \xCF\x80",
+                    ImGuiSliderFlags_AlwaysClamp
+                );
+
+                ImGui::SameLine();
+
+                if (ImGui::SmallButton("Apply angle")) {
+                    queuedInstructionAngleEdit_ =
+                            InstructionAngleEdit{
+                                selectedIndex,
+                                static_cast<double>(
+                                    inlineAnglePiCoefficient_
+                                ) *
+                                std::numbers::pi
+                            };
+                }
+
+                ImGui::SameLine();
+
+                const std::string angleMeasurement =
+                        notation::formatAngleMeasurement(
+                            static_cast<double>(
+                                inlineAnglePiCoefficient_
+                            ) *
+                            std::numbers::pi
+                        );
+
+                ImGui::TextDisabled(
+                    "%s",
+                    angleMeasurement.c_str()
+                );
+            } else {
+                inlineAngleInstructionIndex_.reset();
+            }
+
             if (showHistoryDebugInfo_) {
                 ImGui::TextDisabled(
                     "Undo: %zu   Redo: %zu",
@@ -1287,6 +1521,8 @@ namespace quantum_sim::gui {
                 );
             }
 
+            drawReusableSubcircuits();
+
             ImGui::End();
 
             drawBottomStatus(snapshot);
@@ -1365,6 +1601,18 @@ namespace quantum_sim::gui {
 
             // Present the completed frame.
             glfwSwapBuffers(window);
+        }
+
+        if (projectWorkspaceSessionActive_) {
+            nextAutosaveAt_ = 0.0;
+            autosaveProjectIfDue();
+
+            if (!circuitHasUnsavedEdits_) {
+                projectWorkspace_.discardRecovery();
+            }
+
+            projectWorkspace_.endSession();
+            projectWorkspaceSessionActive_ = false;
         }
 
         densityVolumeRenderer_.shutdown();
@@ -2256,7 +2504,7 @@ namespace quantum_sim::gui {
             );
         }
 
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 860.0F);
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 946.0F);
 
         if (ImGui::Button("Open", ImVec2{72.0F, 0.0F})) {
             queuedProjectOpenPath_ =
@@ -2281,6 +2529,10 @@ namespace quantum_sim::gui {
                     : projectStatusMessage_.c_str()
             );
         }
+
+        ImGui::SameLine();
+
+        drawExchangeMenu(snapshot);
 
         ImGui::SameLine();
 
@@ -2369,6 +2621,186 @@ namespace quantum_sim::gui {
         }
 
         ImGui::End();
+    }
+
+    void GuiApplication::drawExchangeMenu(
+        const debug::DebuggerSnapshot &snapshot
+    ) {
+        if (ImGui::Button("I/O", ImVec2{78.0F, 0.0F})) {
+            ImGui::OpenPopup("CircuitExchange");
+        }
+
+        if (
+            !projectStatusMessage_.empty() &&
+            ImGui::IsItemHovered()
+        ) {
+            ImGui::SetTooltip(
+                "%s",
+                projectStatusMessage_.c_str()
+            );
+        }
+
+        if (!ImGui::BeginPopup("CircuitExchange")) {
+            return;
+        }
+
+        ImGui::TextDisabled("Interchange");
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Import OpenQASM...")) {
+            queuedQasmOpenPath_ =
+                    NativeFileDialog::openQasm();
+        }
+
+        if (ImGui::MenuItem("Export OpenQASM...")) {
+            const auto path =
+                    NativeFileDialog::saveQasm();
+
+            if (path.has_value()) {
+                try {
+                    project::OpenQasmFile::save(
+                        path.value(),
+                        circuit_
+                    );
+
+                    projectStatusMessage_ =
+                            "OpenQASM circuit exported.";
+                } catch (const std::exception &error) {
+                    projectStatusMessage_ =
+                            std::string{
+                                "OpenQASM export failed: "
+                            } +
+                            error.what();
+                }
+            }
+        }
+
+        ImGui::Separator();
+        ImGui::TextDisabled("Readable exports");
+
+        if (ImGui::MenuItem("Circuit diagram (SVG)...")) {
+            const auto path =
+                    NativeFileDialog::saveCircuitSvg();
+
+            if (path.has_value()) {
+                try {
+                    ExportFile::saveCircuitSvg(
+                        path.value(),
+                        circuit_
+                    );
+
+                    projectStatusMessage_ =
+                            "Circuit SVG exported.";
+                } catch (const std::exception &error) {
+                    projectStatusMessage_ =
+                            std::string{"SVG export failed: "} +
+                            error.what();
+                }
+            }
+        }
+
+        if (ImGui::MenuItem("Current state (CSV)...")) {
+            const auto path =
+                    NativeFileDialog::saveStateCsv();
+
+            if (path.has_value()) {
+                try {
+                    ExportFile::saveStateCsv(
+                        path.value(),
+                        snapshot.afterState.get()
+                    );
+
+                    projectStatusMessage_ =
+                            "State CSV exported.";
+                } catch (const std::exception &error) {
+                    projectStatusMessage_ =
+                            std::string{
+                                "State export failed: "
+                            } +
+                            error.what();
+                }
+            }
+        }
+
+        const bool hasDensityLayer =
+                !densityVolumeStack_.layers.empty();
+
+        if (!hasDensityLayer) {
+            ImGui::BeginDisabled();
+        }
+
+        if (
+            ImGui::MenuItem(
+                "Selected density layer (CSV)..."
+            )
+        ) {
+            const auto path =
+                    NativeFileDialog::saveDensityCsv();
+
+            if (path.has_value()) {
+                try {
+                    const std::size_t layerIndex =
+                            std::min(
+                                selectedDensityLayer_,
+                                densityVolumeStack_.
+                                    layers.size() - 1U
+                            );
+
+                    ExportFile::saveDensityCsv(
+                        path.value(),
+                        densityVolumeStack_.layers[
+                            layerIndex
+                        ]
+                    );
+
+                    projectStatusMessage_ =
+                            "Density CSV exported.";
+                } catch (const std::exception &error) {
+                    projectStatusMessage_ =
+                            std::string{
+                                "Density export failed: "
+                            } +
+                            error.what();
+                }
+            }
+        }
+
+        if (!hasDensityLayer) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::BeginMenu("Recent projects")) {
+            if (recentProjectPaths_.empty()) {
+                ImGui::TextDisabled("No recent projects");
+            }
+
+            for (
+                const std::filesystem::path &path :
+                recentProjectPaths_
+            ) {
+                if (
+                    ImGui::MenuItem(
+                        path.filename().string().c_str()
+                    )
+                ) {
+                    queuedProjectOpenPath_ = path;
+                    queuedProjectIsRecovery_ = false;
+                }
+
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip(
+                        "%s",
+                        path.string().c_str()
+                    );
+                }
+            }
+
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndPopup();
     }
 
     void GuiApplication::drawAlgorithmScripts() {
@@ -3350,6 +3782,114 @@ namespace quantum_sim::gui {
                 state.basisStateLabel(measuredIndex);
     }
 
+    void GuiApplication::drawReusableSubcircuits() {
+        ImGui::Spacing();
+        ImGui::SeparatorText("Reusable blocks");
+
+        if (reusableSubcircuits_.empty()) {
+            ImGui::TextDisabled(
+                "Select circuit gates, then choose Save block."
+            );
+            return;
+        }
+
+        selectedReusableSubcircuit_ =
+                std::min(
+                    selectedReusableSubcircuit_,
+                    reusableSubcircuits_.size() - 1U
+                );
+
+        const project::StoredSubcircuit &selected =
+                reusableSubcircuits_[
+                    selectedReusableSubcircuit_
+                ];
+
+        ImGui::SetNextItemWidth(-1.0F);
+
+        if (
+            ImGui::BeginCombo(
+                "##ReusableBlock",
+                selected.name.c_str()
+            )
+        ) {
+            for (
+                std::size_t blockIndex = 0U;
+                blockIndex < reusableSubcircuits_.size();
+                ++blockIndex
+            ) {
+                const bool isSelected =
+                        blockIndex ==
+                        selectedReusableSubcircuit_;
+
+                if (
+                    ImGui::Selectable(
+                        reusableSubcircuits_[
+                            blockIndex
+                        ].name.c_str(),
+                        isSelected
+                    )
+                ) {
+                    selectedReusableSubcircuit_ =
+                            blockIndex;
+                }
+            }
+
+            ImGui::EndCombo();
+        }
+
+        const project::StoredSubcircuit &active =
+                reusableSubcircuits_[
+                    selectedReusableSubcircuit_
+                ];
+
+        const bool canInsert =
+                active.canInsertInto(
+                    circuit_.qubitCount()
+                ) &&
+                !pendingGate_.has_value();
+
+        if (!canInsert) {
+            ImGui::BeginDisabled();
+        }
+
+        if (
+            ImGui::Button(
+                "Insert block",
+                ImVec2{-1.0F, 0.0F}
+            )
+        ) {
+            instructionClipboard_ =
+                    active.instructions;
+
+            const std::vector<std::size_t> &selection =
+                    circuitRenderer_.
+                        selectedInstructionIndices();
+
+            queuedClipboardInsertionIndex_ =
+                    selection.empty()
+                        ? circuit_.instructionCount()
+                        : selection.back() + 1U;
+        }
+
+        if (
+            ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenDisabled
+            )
+        ) {
+            ImGui::SetTooltip(
+                canInsert
+                    ? "%zu gates authored on %zu qubits"
+                    : "This block contains an operand or register-wide operation that does not fit the current register.",
+                active.instructions.size(),
+                active.sourceQubitCount
+            );
+        }
+
+        if (!canInsert) {
+            ImGui::EndDisabled();
+        }
+    }
+
     void GuiApplication::drawBottomStatus(const debug::DebuggerSnapshot &snapshot) const {
         const ImGuiViewport *viewport =
                 ImGui::GetMainViewport();
@@ -3481,6 +4021,78 @@ namespace quantum_sim::gui {
     }
 
     void GuiApplication::applyQueuedCircuitEdits() {
+        if (queuedInstructionAngleEdit_.has_value()) {
+            const InstructionAngleEdit edit =
+                    queuedInstructionAngleEdit_.value();
+
+            queuedInstructionAngleEdit_.reset();
+
+            if (edit.instructionIndex >= circuit_.instructionCount()) {
+                return;
+            }
+
+            auto snapshots =
+                    circuit_.instructionSnapshots();
+
+            circuit::CircuitInstructionSnapshot replacement =
+                    snapshots[edit.instructionIndex];
+
+            GateParameters parameters{};
+            parameters.thetaRadians =
+                    edit.angleRadians;
+
+            if (
+                replacement.kind ==
+                circuit::CircuitInstructionKind::SingleQubit
+            ) {
+                replacement.matrix =
+                        createSingleQubitGateMatrix(
+                            replacement.name,
+                            parameters
+                        );
+            } else if (
+                replacement.kind ==
+                circuit::CircuitInstructionKind::TwoQubit
+            ) {
+                replacement.matrix =
+                        createTwoQubitGateMatrix(
+                            replacement.name,
+                            parameters
+                        );
+            } else {
+                return;
+            }
+
+            replacement.angleRadians =
+                    edit.angleRadians;
+
+            recordEditorForUndo();
+
+            if (
+                !circuit_.replaceInstructionSnapshot(
+                    edit.instructionIndex,
+                    replacement
+                )
+            ) {
+                undoHistory_.pop_back();
+                return;
+            }
+
+            circuitHasUnsavedEdits_ = true;
+            playbackPaused_ = true;
+
+            rebuildDebuggerAfterCircuitEdit(
+                edit.instructionIndex,
+                edit.instructionIndex + 1U
+            );
+
+            circuitRenderer_.selectInstruction(
+                edit.instructionIndex
+            );
+
+            return;
+        }
+
         if (queuedBlankCircuitQubitCount_.has_value()) {
             const std::size_t qubitCount =
                     queuedBlankCircuitQubitCount_.value();
@@ -4147,6 +4759,17 @@ namespace quantum_sim::gui {
                     path;
 
             circuitHasUnsavedEdits_ = false;
+            projectWorkspace_.discardRecovery();
+
+            if (projectWorkspaceSessionActive_) {
+                projectWorkspace_.recordRecentProject(
+                    path.value()
+                );
+
+                recentProjectPaths_ =
+                        projectWorkspace_.recentProjects();
+            }
+
             projectStatusMessage_ =
                     "Saved " +
                     path->filename().string();
@@ -4162,12 +4785,16 @@ namespace quantum_sim::gui {
             return;
         }
 
+        const bool isRecovery =
+                queuedProjectIsRecovery_;
+
         const std::filesystem::path path =
                 std::move(
                     queuedProjectOpenPath_.value()
                 );
 
         queuedProjectOpenPath_.reset();
+        queuedProjectIsRecovery_ = false;
 
         try {
             project::ProjectDocument document =
@@ -4185,15 +4812,34 @@ namespace quantum_sim::gui {
             presetQubitCount_ =
                     static_cast<int>(
                         circuit_.qubitCount()
-                    );
+            );
 
             resetEditorTransientState();
-            currentProjectPath_ = path;
-            circuitHasUnsavedEdits_ = false;
+            currentProjectPath_ =
+                    isRecovery
+                        ? std::nullopt
+                        : std::optional<std::filesystem::path>{
+                            path
+                        };
+
+            circuitHasUnsavedEdits_ =
+                    isRecovery;
+
             playbackPaused_ = true;
             projectStatusMessage_ =
-                    "Opened " +
-                    path.filename().string();
+                    isRecovery
+                        ? "Recovered unsaved work."
+                        : "Opened " +
+                          path.filename().string();
+
+            if (
+                !isRecovery &&
+                projectWorkspaceSessionActive_
+            ) {
+                projectWorkspace_.recordRecentProject(path);
+                recentProjectPaths_ =
+                        projectWorkspace_.recentProjects();
+            }
 
             circuitRenderer_.fitToView();
             rebuildDebuggerAfterCircuitEdit();
@@ -4202,6 +4848,138 @@ namespace quantum_sim::gui {
                     std::string{"Open failed: "} +
                     error.what();
         }
+    }
+
+    void GuiApplication::applyQueuedQasmOpen() {
+        if (!queuedQasmOpenPath_.has_value()) {
+            return;
+        }
+
+        const std::filesystem::path path =
+                std::move(
+                    queuedQasmOpenPath_.value()
+                );
+
+        queuedQasmOpenPath_.reset();
+
+        try {
+            project::ProjectDocument document =
+                    project::OpenQasmFile::load(path);
+
+            recordEditorForUndo();
+            simulationHistoryWorker_.cancel();
+
+            circuit_ =
+                    std::move(document.circuit);
+
+            initialState_ =
+                    std::move(document.initialState);
+
+            presetQubitCount_ =
+                    static_cast<int>(
+                        circuit_.qubitCount()
+                    );
+
+            resetEditorTransientState();
+            currentProjectPath_.reset();
+            circuitHasUnsavedEdits_ = true;
+            playbackPaused_ = true;
+            projectStatusMessage_ =
+                    "Imported " +
+                    path.filename().string();
+
+            circuitRenderer_.fitToView();
+            rebuildDebuggerAfterCircuitEdit();
+        } catch (const std::exception &error) {
+            projectStatusMessage_ =
+                    std::string{
+                        "OpenQASM import failed: "
+                    } +
+                    error.what();
+        }
+    }
+
+    void GuiApplication::autosaveProjectIfDue() {
+        if (
+            !projectWorkspaceSessionActive_ ||
+            !circuitHasUnsavedEdits_
+        ) {
+            return;
+        }
+
+        const double now = ImGui::GetTime();
+
+        if (now < nextAutosaveAt_) {
+            return;
+        }
+
+        try {
+            project::ProjectFile::save(
+                projectWorkspace_.autosavePath(),
+                circuit_,
+                initialState_
+            );
+
+            projectStatusMessage_ =
+                    "Recovery copy updated.";
+        } catch (const std::exception &error) {
+            projectStatusMessage_ =
+                    std::string{"Autosave failed: "} +
+                    error.what();
+        }
+
+        nextAutosaveAt_ = now + 8.0;
+    }
+
+    void GuiApplication::drawRecoveryPrompt() {
+        if (
+            recoveryPromptPending_ &&
+            !recoveryPopupOpened_
+        ) {
+            ImGui::OpenPopup("Recover unsaved work");
+            recoveryPopupOpened_ = true;
+        }
+
+        if (
+            !ImGui::BeginPopupModal(
+                "Recover unsaved work",
+                nullptr,
+                ImGuiWindowFlags_AlwaysAutoResize
+            )
+        ) {
+            return;
+        }
+
+        ImGui::TextUnformatted(
+            "QubitCanvas found a recovery copy from an earlier session."
+        );
+
+        ImGui::TextDisabled(
+            "Recovering opens it as an unsaved project and leaves named files untouched."
+        );
+
+        ImGui::Spacing();
+
+        if (ImGui::Button("Recover", ImVec2{130.0F, 0.0F})) {
+            queuedProjectOpenPath_ =
+                    projectWorkspace_.autosavePath();
+
+            queuedProjectIsRecovery_ = true;
+            recoveryPromptPending_ = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Discard", ImVec2{130.0F, 0.0F})) {
+            projectWorkspace_.discardRecovery();
+            recoveryPromptPending_ = false;
+            projectStatusMessage_ =
+                    "Recovery copy discarded.";
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 
     void GuiApplication::recordEditorForUndo() {
@@ -4227,6 +5005,8 @@ namespace quantum_sim::gui {
         queuedInstructionDeletions_.clear();
         queuedInstructionMove_.reset();
         queuedClipboardInsertionIndex_.reset();
+        queuedInstructionAngleEdit_.reset();
+        inlineAngleInstructionIndex_.reset();
         presetAwaitingConfirmation_.reset();
         gateLibraryPanel_.clearSelection();
         circuitRenderer_.cancelPlacement();

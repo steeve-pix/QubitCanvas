@@ -5,10 +5,15 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/quantum/Qubit.hpp"
 #include "quantum_sim/project/ProjectFile.hpp"
+#include "quantum_sim/project/OpenQasmFile.hpp"
+#include "quantum_sim/project/ProjectWorkspace.hpp"
+#include "quantum_sim/project/SubcircuitLibrary.hpp"
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
+#include "quantum_sim/analysis/StateMetrics.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/gui/GateNotation.hpp"
+#include "quantum_sim/gui/ExportFile.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/gui/SimulationHistoryWorker.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
@@ -23,6 +28,7 @@
 #include <iostream>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 #include <numbers>
 #include <stdexcept>
 #include <string>
@@ -71,6 +77,410 @@ namespace {
     }
 } //
 int main() {
+    {
+        const std::filesystem::path exportRoot =
+                std::filesystem::temp_directory_path() /
+                "qubit_canvas_interchange_test";
+
+        std::error_code cleanupError;
+        std::filesystem::remove_all(
+            exportRoot,
+            cleanupError
+        );
+        std::filesystem::create_directories(exportRoot);
+
+        QuantumCircuit exportedCircuit{3U};
+        exportedCircuit.addSingleQubitGate(
+            "H",
+            quantum_sim::gates::hadamardGate(),
+            0U
+        );
+        exportedCircuit.addSingleQubitGate(
+            "Rx",
+            quantum_sim::gates::rxGate(
+                std::numbers::pi / 3.0
+            ),
+            1U,
+            std::numbers::pi / 3.0
+        );
+        exportedCircuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            0U,
+            2U
+        );
+        exportedCircuit.addThreeQubitGate(
+            "CCX",
+            quantum_sim::gates::ccxGate(),
+            0U,
+            1U,
+            2U
+        );
+
+        const std::filesystem::path qasmPath =
+                exportRoot / "circuit.qasm";
+
+        quantum_sim::project::OpenQasmFile::save(
+            qasmPath,
+            exportedCircuit
+        );
+
+        const auto imported =
+                quantum_sim::project::OpenQasmFile::load(
+                    qasmPath
+                );
+
+        const QuantumRegister initial =
+                QuantumRegister::basisState(3U, 0U);
+
+        const QuantumRegister exportedState =
+                exportedCircuit.execute(initial);
+
+        const QuantumRegister importedState =
+                imported.circuit.execute(
+                    imported.initialState
+                );
+
+        bool qasmStatesMatch = true;
+
+        for (
+            std::size_t stateIndex = 0U;
+            stateIndex < exportedState.stateCount();
+            ++stateIndex
+        ) {
+            qasmStatesMatch =
+                    qasmStatesMatch &&
+                    approximatelyEqual(
+                        exportedState.amplitude(
+                            stateIndex
+                        ).real(),
+                        importedState.amplitude(
+                            stateIndex
+                        ).real()
+                    ) &&
+                    approximatelyEqual(
+                        exportedState.amplitude(
+                            stateIndex
+                        ).imaginary(),
+                        importedState.amplitude(
+                            stateIndex
+                        ).imaginary()
+                    );
+        }
+
+        const std::filesystem::path svgPath =
+                exportRoot / "circuit.svg";
+
+        const std::filesystem::path stateCsvPath =
+                exportRoot / "state.csv";
+
+        const std::filesystem::path densityCsvPath =
+                exportRoot / "density.csv";
+
+        quantum_sim::gui::ExportFile::saveCircuitSvg(
+            svgPath,
+            exportedCircuit
+        );
+
+        quantum_sim::gui::ExportFile::saveStateCsv(
+            stateCsvPath,
+            exportedState
+        );
+
+        quantum_sim::debug::DebuggerSession exportSession{
+            exportedCircuit,
+            initial
+        };
+
+        const auto exportDensity =
+                quantum_sim::gui::density_volume::DensityModel::
+                    build(exportSession);
+
+        quantum_sim::gui::ExportFile::saveDensityCsv(
+            densityCsvPath,
+            exportDensity.layers.back()
+        );
+
+        const auto readText =
+                [](const std::filesystem::path &path) {
+            std::ifstream input{path};
+            return std::string{
+                std::istreambuf_iterator<char>{input},
+                std::istreambuf_iterator<char>{}
+            };
+        };
+
+        const std::string qasmText =
+                readText(qasmPath);
+
+        const std::string svgText =
+                readText(svgPath);
+
+        const std::string stateCsvText =
+                readText(stateCsvPath);
+
+        const std::string densityCsvText =
+                readText(densityCsvPath);
+
+        check(
+            imported.circuit.instructionCount() == 4U &&
+            qasmStatesMatch &&
+            qasmText.find("rx(pi/3)") != std::string::npos &&
+            svgText.find("<svg") != std::string::npos &&
+            svgText.find("JetBrains Mono") != std::string::npos &&
+            stateCsvText.find("phase_radians") != std::string::npos &&
+            densityCsvText.find("bucketed") != std::string::npos,
+            "OpenQASM round-trips supported gates and readable exports contain their documented data"
+        );
+
+        std::filesystem::remove_all(
+            exportRoot,
+            cleanupError
+        );
+    }
+
+    {
+        QuantumCircuit bellCircuit{2U};
+        bellCircuit.addSingleQubitGate(
+            "H",
+            quantum_sim::gates::hadamardGate(),
+            0U
+        );
+        bellCircuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            0U,
+            1U
+        );
+
+        const QuantumRegister zero =
+                QuantumRegister::basisState(2U, 0U);
+
+        const QuantumRegister bell =
+                bellCircuit.execute(zero);
+
+        const auto bellMetrics =
+                quantum_sim::analysis::StateMetrics::
+                    forRegister(bell);
+
+        check(
+            approximatelyEqual(
+                quantum_sim::analysis::StateMetrics::fidelity(
+                    zero,
+                    bell
+                ),
+                0.5
+            ) &&
+            bellMetrics.size() == 2U &&
+            approximatelyEqual(
+                bellMetrics[0U].purity,
+                0.5
+            ) &&
+            approximatelyEqual(
+                bellMetrics[0U].entropyBits,
+                1.0
+            ) &&
+            approximatelyEqual(
+                bellMetrics[1U].purity,
+                0.5
+            ),
+            "State metrics identify Bell-state fidelity, local mixing, and entanglement entropy"
+        );
+
+        const auto productMetrics =
+                quantum_sim::analysis::StateMetrics::
+                    forRegister(zero);
+
+        check(
+            approximatelyEqual(
+                productMetrics[0U].purity,
+                1.0
+            ) &&
+            approximatelyEqual(
+                productMetrics[0U].entropyBits,
+                0.0
+            ),
+            "State metrics keep product-state purity and entropy exact"
+        );
+    }
+
+    {
+        const std::filesystem::path libraryRoot =
+                std::filesystem::temp_directory_path() /
+                "qubit_canvas_subcircuit_test";
+
+        std::error_code cleanupError;
+        std::filesystem::remove_all(
+            libraryRoot,
+            cleanupError
+        );
+
+        QuantumCircuit source{3U};
+        source.addSingleQubitGate(
+            "H",
+            quantum_sim::gates::hadamardGate(),
+            1U
+        );
+        source.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            1U,
+            2U
+        );
+
+        quantum_sim::project::SubcircuitLibrary library{
+            libraryRoot
+        };
+
+        library.save(
+            "Bell pair",
+            source.qubitCount(),
+            source.instructionSnapshots()
+        );
+
+        const auto blocks = library.loadAll();
+        QuantumCircuit destination{4U};
+
+        if (!blocks.empty()) {
+            for (const auto &instruction : blocks.front().instructions) {
+                destination.insertInstructionSnapshot(
+                    destination.instructionCount(),
+                    instruction
+                );
+            }
+        }
+
+        const QuantumRegister prepared =
+                destination.execute(
+                    QuantumRegister::basisState(4U, 0U)
+                );
+
+        check(
+            blocks.size() == 1U &&
+            blocks.front().name == "Bell pair" &&
+            blocks.front().canInsertInto(4U) &&
+            !blocks.front().canInsertInto(2U) &&
+            approximatelyEqual(prepared.probability(0U), 0.5) &&
+            approximatelyEqual(prepared.probability(6U), 0.5),
+            "Reusable subcircuits preserve executable snapshots and validate destination registers"
+        );
+
+        std::filesystem::remove_all(
+            libraryRoot,
+            cleanupError
+        );
+    }
+
+    {
+        QuantumCircuit editable{1U};
+        editable.addSingleQubitGate(
+            "Rx",
+            quantum_sim::gates::rxGate(
+                std::numbers::pi / 4.0
+            ),
+            0U,
+            std::numbers::pi / 4.0
+        );
+
+        auto replacement =
+                editable.instructionSnapshots().front();
+
+        replacement.angleRadians =
+                std::numbers::pi;
+
+        replacement.matrix =
+                quantum_sim::gates::rxGate(
+                    std::numbers::pi
+                );
+
+        const bool replaced =
+                editable.replaceInstructionSnapshot(
+                    0U,
+                    replacement
+                );
+
+        const QuantumRegister editedState =
+                editable.execute(
+                    QuantumRegister::basisState(1U, 0U)
+                );
+
+        check(
+            replaced &&
+            approximatelyEqual(
+                editedState.probability(1U),
+                1.0
+            ),
+            "Instruction snapshots can replace a gate without weakening validation"
+        );
+    }
+
+    {
+        const std::filesystem::path workspaceRoot =
+                std::filesystem::temp_directory_path() /
+                "qubit_canvas_workspace_test";
+
+        std::error_code cleanupError;
+        std::filesystem::remove_all(
+            workspaceRoot,
+            cleanupError
+        );
+
+        quantum_sim::project::ProjectWorkspace firstSession{
+            workspaceRoot
+        };
+
+        const bool firstWasUnclean =
+                firstSession.beginSession();
+
+        quantum_sim::project::ProjectWorkspace secondSession{
+            workspaceRoot
+        };
+
+        const bool secondWasUnclean =
+                secondSession.beginSession();
+
+        const std::filesystem::path recentProject =
+                workspaceRoot / "recent.qcanvas";
+
+        QuantumCircuit recentCircuit{1U};
+        const QuantumRegister recentState =
+                QuantumRegister::basisState(1U, 0U);
+
+        quantum_sim::project::ProjectFile::save(
+            recentProject,
+            recentCircuit,
+            recentState
+        );
+
+        secondSession.recordRecentProject(recentProject);
+
+        quantum_sim::project::ProjectFile::save(
+            secondSession.autosavePath(),
+            recentCircuit,
+            recentState
+        );
+
+        const bool workspaceBehavesCorrectly =
+                !firstWasUnclean &&
+                secondWasUnclean &&
+                secondSession.recoveryAvailable() &&
+                secondSession.recentProjects().size() == 1U;
+
+        secondSession.discardRecovery();
+        secondSession.endSession();
+        firstSession.endSession();
+        std::filesystem::remove_all(
+            workspaceRoot,
+            cleanupError
+        );
+
+        check(
+            workspaceBehavesCorrectly &&
+            !cleanupError,
+            "Workspace detects interrupted sessions and persists recovery and recent projects"
+        );
+    }
+
     {
         QuantumCircuit savedCircuit{3U};
         savedCircuit.addSingleQubitGate(

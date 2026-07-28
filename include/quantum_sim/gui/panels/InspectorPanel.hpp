@@ -116,6 +116,19 @@ namespace quantum_sim::gui {
         void drawProbabilities(const quantum::QuantumRegister &state);
 
         /**
+         * Draws fidelity and per-qubit reduced purity/entropy diagnostics.
+         *
+         * @param session Trace used to locate the preceding state.
+         * @param state Exact selected register state.
+         * @param selectedDensityLayer Selected debugger/density step number.
+         */
+        void drawStateMetrics(
+            debug::DebuggerSession &session,
+            const quantum::QuantumRegister &state,
+            std::size_t selectedDensityLayer
+        );
+
+        /**
          * Draws the synchronized 2D density-matrix layer selector.
          *
          * @param session Session updated when a post-gate layer is selected.

@@ -269,6 +269,18 @@ namespace quantum_sim::circuit {
         );
 
         /**
+         * Replaces one instruction after validating the complete snapshot.
+         *
+         * @param instructionIndex Existing instruction position.
+         * @param snapshot Lossless replacement instruction.
+         * @return False when instructionIndex is outside the circuit.
+         */
+        [[nodiscard]] bool replaceInstructionSnapshot(
+            std::size_t instructionIndex,
+            const CircuitInstructionSnapshot &snapshot
+        );
+
+        /**
          * Appends a two-qubit gate stored as a full-register instruction.
          *
          * @param name Display name for the gate.
