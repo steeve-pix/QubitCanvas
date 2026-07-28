@@ -251,6 +251,22 @@ namespace quantum_sim::gui::density_volume {
         return cells.at(row * dimension + column);
     }
 
+    double DensityLayer::maximumCellMagnitude() const noexcept {
+        double maximum{};
+
+        for (const DensityCell &cell : cells) {
+            if (std::isfinite(cell.magnitude)) {
+                maximum =
+                        std::max(
+                            maximum,
+                            cell.magnitude
+                        );
+            }
+        }
+
+        return maximum;
+    }
+
     DensityStack DensityModel::build(
         const debug::DebuggerSession &session,
         const std::size_t maximumDimension,
