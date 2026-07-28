@@ -113,6 +113,9 @@ namespace quantum_sim::gui::density_volume {
         unsigned int voxelVertexArray_{};
         unsigned int voxelVertexBuffer_{};
         unsigned int voxelIndexBuffer_{};
+        unsigned int floorColumnVertexArray_{};
+        unsigned int floorColumnVertexBuffer_{};
+        unsigned int floorColumnIndexBuffer_{};
         unsigned int instanceBuffer_{};
         unsigned int ghostVertexArray_{};
         unsigned int ghostVertexBuffer_{};
@@ -142,6 +145,7 @@ namespace quantum_sim::gui::density_volume {
         int voxelProjectionUniform_{-1};
         int voxelSelectedLayerUniform_{-1};
         int voxelHeatUniform_{-1};
+        int voxelTopRoundedColumnsUniform_{-1};
         int ghostViewUniform_{-1};
         int ghostProjectionUniform_{-1};
         int ghostSelectedLayerUniform_{-1};
@@ -154,6 +158,7 @@ namespace quantum_sim::gui::density_volume {
         int compositeSceneUniform_{-1};
         int compositeBloomUniform_{-1};
         int cubeIndexCount_{};
+        int floorColumnIndexCount_{};
         int visibleInstanceCount_{};
         int visibleGhostCount_{};
         std::size_t instanceCapacity_{};
@@ -163,6 +168,7 @@ namespace quantum_sim::gui::density_volume {
         std::optional<VisualizationMode> sceneMode_;
         InstanceScene scene_;
         VoxelGeometry voxelGeometry_;
+        VoxelGeometry floorColumnGeometry_;
         bool initialized_{false};
 
         /**
@@ -176,7 +182,8 @@ namespace quantum_sim::gui::density_volume {
         void createPostProcessPrograms();
 
         /**
-         * Uploads the shared rounded cube and defines per-instance attributes.
+         * Uploads the Layer Stack cube and Floor Field column meshes, then
+         * defines their shared per-instance attributes.
          */
         void createVoxelBuffers();
 

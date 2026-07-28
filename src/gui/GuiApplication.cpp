@@ -176,6 +176,10 @@ namespace quantum_sim::gui {
             );
         }
 
+        if (launchOptions_.startInFloorField) {
+            canvasMode_ = CanvasMode::FloorField;
+        }
+
         synchronizeDensityLayer(session_.snapshot());
     }
 
