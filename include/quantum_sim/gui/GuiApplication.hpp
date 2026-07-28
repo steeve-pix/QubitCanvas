@@ -258,6 +258,7 @@ namespace quantum_sim::gui {
         std::string simulationBuildError_;
         std::optional<std::filesystem::path> currentProjectPath_;
         std::optional<std::filesystem::path> queuedProjectOpenPath_;
+        std::optional<std::filesystem::path> queuedQasmOpenPath_;
         bool queuedProjectIsRecovery_{false};
         std::string projectStatusMessage_;
         project::ProjectWorkspace projectWorkspace_;
@@ -303,6 +304,11 @@ namespace quantum_sim::gui {
          * Loads the project path selected during the previous UI frame.
          */
         void applyQueuedProjectOpen();
+
+        /**
+         * Imports a queued OpenQASM document as an unnamed editable circuit.
+         */
+        void applyQueuedQasmOpen();
 
         /**
          * Writes unsaved work to the separate recovery project when due.
@@ -393,6 +399,13 @@ namespace quantum_sim::gui {
          * @param snapshot Current debugger state.
          */
         void drawTopBar(debug::DebuggerSession &session, const debug::DebuggerSnapshot &snapshot);
+
+        /**
+         * Draws OpenQASM, diagram, numerical export, and recent-file commands.
+         */
+        void drawExchangeMenu(
+            const debug::DebuggerSnapshot &snapshot
+        );
 
         /**
          * Draws built-in algorithm script buttons and visualization controls.
