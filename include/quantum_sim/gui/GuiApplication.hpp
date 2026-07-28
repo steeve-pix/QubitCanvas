@@ -7,6 +7,7 @@
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
 #include "quantum_sim/debug/DebuggerSession.hpp"
 #include "quantum_sim/project/ProjectWorkspace.hpp"
+#include "quantum_sim/project/SubcircuitLibrary.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "rendering/BlochSphereRenderer.hpp"
 #include "rendering/CircuitRenderer.hpp"
@@ -16,6 +17,7 @@
 
 #include <optional>
 #include <random>
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -181,6 +183,14 @@ namespace quantum_sim::gui {
             std::optional<std::filesystem::path> projectPath;
         };
 
+        /**
+         * Deferred parameter edit applied before the next simulation rebuild.
+         */
+        struct InstructionAngleEdit {
+            std::size_t instructionIndex{};
+            double angleRadians{};
+        };
+
         ImFont *jetBrainsMonoFont_{nullptr};
         ImFont *jetBrainsMonoHeadingFont_{nullptr};
         circuit::QuantumCircuit &circuit_;
@@ -204,6 +214,13 @@ namespace quantum_sim::gui {
         std::optional<InstructionMove> queuedInstructionMove_;
         std::vector<circuit::CircuitInstructionSnapshot> instructionClipboard_;
         std::optional<std::size_t> queuedClipboardInsertionIndex_;
+        std::optional<InstructionAngleEdit> queuedInstructionAngleEdit_;
+        std::optional<std::size_t> inlineAngleInstructionIndex_;
+        float inlineAnglePiCoefficient_{0.5F};
+        project::SubcircuitLibrary subcircuitLibrary_;
+        std::vector<project::StoredSubcircuit> reusableSubcircuits_;
+        std::size_t selectedReusableSubcircuit_{0U};
+        std::array<char, 64U> reusableSubcircuitName_{};
         std::optional<CircuitPreset> queuedPreset_;
         std::optional<CircuitPreset> presetAwaitingConfirmation_;
         std::optional<std::size_t> queuedBlankCircuitQubitCount_;
@@ -381,6 +398,11 @@ namespace quantum_sim::gui {
          * Draws built-in algorithm script buttons and visualization controls.
          */
         void drawAlgorithmScripts();
+
+        /**
+         * Draws the compact persistent-block chooser in the Gate Library.
+         */
+        void drawReusableSubcircuits();
 
         /**
          * Draws the compact bottom status strip.

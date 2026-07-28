@@ -6,6 +6,7 @@
 #include "quantum_sim/quantum/Qubit.hpp"
 #include "quantum_sim/project/ProjectFile.hpp"
 #include "quantum_sim/project/ProjectWorkspace.hpp"
+#include "quantum_sim/project/SubcircuitLibrary.hpp"
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
@@ -72,6 +73,116 @@ namespace {
     }
 } //
 int main() {
+    {
+        const std::filesystem::path libraryRoot =
+                std::filesystem::temp_directory_path() /
+                "qubit_canvas_subcircuit_test";
+
+        std::error_code cleanupError;
+        std::filesystem::remove_all(
+            libraryRoot,
+            cleanupError
+        );
+
+        QuantumCircuit source{3U};
+        source.addSingleQubitGate(
+            "H",
+            quantum_sim::gates::hadamardGate(),
+            1U
+        );
+        source.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            1U,
+            2U
+        );
+
+        quantum_sim::project::SubcircuitLibrary library{
+            libraryRoot
+        };
+
+        library.save(
+            "Bell pair",
+            source.qubitCount(),
+            source.instructionSnapshots()
+        );
+
+        const auto blocks = library.loadAll();
+        QuantumCircuit destination{4U};
+
+        if (!blocks.empty()) {
+            for (const auto &instruction : blocks.front().instructions) {
+                destination.insertInstructionSnapshot(
+                    destination.instructionCount(),
+                    instruction
+                );
+            }
+        }
+
+        const QuantumRegister prepared =
+                destination.execute(
+                    QuantumRegister::basisState(4U, 0U)
+                );
+
+        check(
+            blocks.size() == 1U &&
+            blocks.front().name == "Bell pair" &&
+            blocks.front().canInsertInto(4U) &&
+            !blocks.front().canInsertInto(2U) &&
+            approximatelyEqual(prepared.probability(0U), 0.5) &&
+            approximatelyEqual(prepared.probability(6U), 0.5),
+            "Reusable subcircuits preserve executable snapshots and validate destination registers"
+        );
+
+        std::filesystem::remove_all(
+            libraryRoot,
+            cleanupError
+        );
+    }
+
+    {
+        QuantumCircuit editable{1U};
+        editable.addSingleQubitGate(
+            "Rx",
+            quantum_sim::gates::rxGate(
+                std::numbers::pi / 4.0
+            ),
+            0U,
+            std::numbers::pi / 4.0
+        );
+
+        auto replacement =
+                editable.instructionSnapshots().front();
+
+        replacement.angleRadians =
+                std::numbers::pi;
+
+        replacement.matrix =
+                quantum_sim::gates::rxGate(
+                    std::numbers::pi
+                );
+
+        const bool replaced =
+                editable.replaceInstructionSnapshot(
+                    0U,
+                    replacement
+                );
+
+        const QuantumRegister editedState =
+                editable.execute(
+                    QuantumRegister::basisState(1U, 0U)
+                );
+
+        check(
+            replaced &&
+            approximatelyEqual(
+                editedState.probability(1U),
+                1.0
+            ),
+            "Instruction snapshots can replace a gate without weakening validation"
+        );
+    }
+
     {
         const std::filesystem::path workspaceRoot =
                 std::filesystem::temp_directory_path() /
