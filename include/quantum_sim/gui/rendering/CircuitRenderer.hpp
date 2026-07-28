@@ -51,6 +51,17 @@ namespace quantum_sim::gui {
     };
 
     /**
+     * Screen-space point used to attach controls to a rendered instruction.
+     *
+     * Keeping this as two plain floats avoids leaking ImGui value types into
+     * application state while still allowing an overlay to follow a gate.
+     */
+    struct InstructionScreenAnchor {
+        float x{};
+        float y{};
+    };
+
+    /**
      * ImGui draw-list renderer for the interactive circuit canvas.
      */
     class CircuitRenderer {
@@ -88,6 +99,12 @@ namespace quantum_sim::gui {
          * @return Selected instruction index, if any gate is selected.
          */
         [[nodiscard]] std::optional<std::size_t> selectedInstructionIndex() const noexcept;
+
+        /**
+         * @return Screen-space center of the selected gate from the latest draw.
+         */
+        [[nodiscard]] std::optional<InstructionScreenAnchor>
+        selectedInstructionScreenAnchor() const noexcept;
 
         /**
          * @return Sorted instruction indices in the current multi-selection.
@@ -234,6 +251,7 @@ namespace quantum_sim::gui {
                       bool hovered, bool selected, bool placementPreview);
 
         std::optional<std::size_t> selectedInstructionIndex_;
+        std::optional<InstructionScreenAnchor> selectedInstructionScreenAnchor_;
         std::vector<std::size_t> selectedInstructionIndices_;
         std::optional<std::size_t> selectionAnchorIndex_;
         std::optional<std::size_t> requestedStepJumpNumber_;

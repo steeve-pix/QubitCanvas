@@ -93,6 +93,20 @@ namespace {
             } else if (argument == "--gate") {
                 options.launch.armedGate =
                         nextValue();
+            } else if (argument == "--select-gate") {
+                const std::size_t gateNumber =
+                        static_cast<std::size_t>(
+                            std::stoul(nextValue())
+                        );
+
+                if (gateNumber == 0U) {
+                    throw std::invalid_argument{
+                        "--select-gate uses one-based gate numbers."
+                    };
+                }
+
+                options.launch.selectedInstructionIndex =
+                        gateNumber - 1U;
             } else if (argument == "--final-step") {
                 options.launch.startAtFinalStep = true;
             } else if (argument == "--floor-field") {

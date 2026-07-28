@@ -21,18 +21,14 @@ namespace quantum_sim::gui {
          *
          * @param session Debugger session that navigation controls can mutate.
          * @param snapshot Current debugger state to display.
-         * @param selectedInstructionIndex Optional circuit selection from the renderer.
          * @param densityStack Density history shared with the OpenGL viewport.
          * @param selectedDensityLayer Layer synchronized between the 2D and 3D views.
-         * @param headingFont Font used for the panel title.
          */
         void draw(
             debug::DebuggerSession &session,
             const debug::DebuggerSnapshot &snapshot,
-            std::optional<std::size_t> selectedInstructionIndex,
             const density_volume::DensityStack &densityStack,
-            std::size_t &selectedDensityLayer,
-            ImFont *headingFont
+            std::size_t &selectedDensityLayer
         );
 
         /**
@@ -47,7 +43,7 @@ namespace quantum_sim::gui {
         std::array<char, 64> amplitudeFilter_{};
         bool showOnlyLiveAmplitudes_{true};
         bool sortAmplitudesByProbability_{true};
-        int maximumVisibleAmplitudes_{96};
+        int maximumVisibleAmplitudes_{32};
         int inspectedBlochQubit_{0};
         std::optional<std::size_t> requestedProbabilityFocus_;
         bool requestInspectorTopFocus_{false};
@@ -154,19 +150,6 @@ namespace quantum_sim::gui {
          * @param state Register whose selected qubit is inspected.
          */
         void drawBlochInformation(const quantum::QuantumRegister &state);
-
-        /**
-         * Draws the inspector title and step readout.
-         *
-         * @param snapshot Current debugger state.
-         * @param selectedInstructionIndex Optional renderer selection.
-         * @param headingFont Font used for the title.
-         */
-        void drawHeader(
-            const debug::DebuggerSnapshot &snapshot,
-            std::optional<std::size_t> selectedInstructionIndex,
-            ImFont *headingFont
-        );
 
     };
 }
