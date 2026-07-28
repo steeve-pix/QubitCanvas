@@ -303,7 +303,8 @@
         CircuitPreset is the complete built-in catalog.
         CanvasMode chooses Layer Stack or Floor Field.
         EditorSnapshot is one undo/redo checkpoint.
-        InstructionAngleEdit is a deferred safe gate replacement.
+        InstructionAngleEdit is a deferred safe gate replacement; recordUndo
+        marks the first live preview in a slider gesture as its one checkpoint.
 
         GuiApplication owns every long-lived subsystem and shared UI state.
         run() owns initialization, frame order, cleanup, and hidden captures.
@@ -326,9 +327,11 @@
 
         Frame/UI:
         configureStyle(), pushApplicationFont(), popApplicationFont(),
-        handleGlobalShortcuts(), drawBackdrop(), drawDensityVolumeViewport(),
-        drawTopBar(), drawAlgorithmScripts(), drawReusableSubcircuits(),
-        drawBottomStatus(), applyPlayback().
+        handleGlobalShortcuts(), drawBackdrop(),
+        drawSelectedGateAngleEditor(), drawDensityVolumeViewport(), drawTopBar(),
+        drawAlgorithmScripts(), drawReusableSubcircuits(), drawBottomStatus(),
+        applyPlayback(). The angle editor is a gate-anchored window outside the
+        circuit layout; it previews at 25 Hz and never shifts gate hit regions.
 
         Circuit creation:
         loadPreset(), applyQueuedPreset(), createBlankCircuit(),
@@ -393,7 +396,6 @@
 
     InspectorPanel.hpp / InspectorPanel.cpp
         draw() composes the right panel and focusQubit() synchronizes sections.
-        drawHeader() shows current step context.
         drawQuantumState() chooses the exact selected debugger state.
         drawLayerStack() owns the synchronized 2D density heatmap and hover.
         drawProbabilities(), drawAmplitudes(), drawBlochInformation() inspect it.
@@ -401,6 +403,9 @@
         drawDebuggerControls(), moveToPreviousInstruction(),
         moveToNextInstruction(), restartDebugger(), navigation helpers own
         Inspector-local navigation feedback.
+        The density layer and probabilities stay immediately visible. Analysis,
+        amplitudes, Bloch data, and navigation use collapsing headers, and none
+        creates a nested scrolling child; the Inspector window owns scrolling.
 
     Rendering: include/quantum_sim/gui/rendering + src/gui/rendering
     ----------------------------------------------------------------
@@ -409,11 +414,14 @@
 
     CircuitRenderer.hpp / CircuitRenderer.cpp
         Placement records: SingleQubitPlacement, ControlledPlacement,
-        ThreeQubitPlacement, InstructionMove.
+        ThreeQubitPlacement, InstructionMove. InstructionScreenAnchor is the
+        screen-space attachment point for controls that belong to one gate.
         draw() renders wires, gates, step zero, previews, selections, tooltips,
-        drag/drop, scrolling, and queued interactions.
+        drag/drop, hidden horizontal scrolling, and queued interactions.
         Selection API: selectedInstructionIndex/Indices(), selectInstruction(),
         selectInstructions(), clearSelection(), private selection helpers.
+        selectedInstructionScreenAnchor() exposes the selected gate center from
+        the latest render without exposing ImGui types to GuiApplication state.
         Placement API: consumeCompleted*(), completedControlledPlacement(),
         hasPendingControlQubit(), placementOperandCount(), cancelPlacement(),
         pendingInsertionIndex(), continuePlacementAfter().
