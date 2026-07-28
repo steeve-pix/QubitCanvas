@@ -60,9 +60,15 @@
     Repository root
     ---------------
     CMakeLists.txt
-        Declares the C++20 core, GUI, executable, and test targets. Add new
+        Declares the C++20 core, GUI, executable, tests, install tree, macOS app
+        bundle, portable Windows runtime options, and CPack archives. Add new
         simulator/persistence sources to qubit_canvas_core. Add ImGui/OpenGL
         sources to qubit_canvas_gui. There must be only one GLAD target.
+
+    .github/workflows/build.yml
+        Builds, tests, installs, and packages Windows x64, Linux x64, macOS
+        arm64, and macOS x64. Version tags publish the generated archives as a
+        GitHub Release.
 
     README.md
         User-facing behavior, controls, build steps, capture flags, and feature
@@ -273,7 +279,8 @@
         Change projectVersion only with a deliberate migration strategy.
 
     ProjectWorkspace.hpp / ProjectWorkspace.cpp
-        ProjectWorkspace chooses LOCALAPPDATA/QubitCanvas.
+        ProjectWorkspace chooses Local AppData on Windows, Application Support
+        on macOS, and XDG_DATA_HOME or ~/.local/share on Linux.
         beginSession()/endSession() maintain the crash marker.
         autosavePath(), recoveryAvailable(), discardRecovery() manage recovery.
         recentProjects(), recordRecentProject() maintain the bounded recent list.
@@ -359,8 +366,8 @@
     NativeFileDialog.hpp / .cpp
         openProject(), saveProject(), openQasm(), saveQasm(),
         saveCircuitSvg(), saveStateCsv(), saveDensityCsv() are platform adapters.
-        Windows uses GetOpenFileNameW/GetSaveFileNameW. Other platforms return
-        nullopt until an adapter is implemented.
+        Windows uses GetOpenFileNameW/GetSaveFileNameW, macOS uses its system
+        chooser through osascript, and Linux uses zenity or kdialog.
 
     ExportFile.hpp / ExportFile.cpp
         saveCircuitSvg() writes a standalone dark JetBrains-Mono diagram.

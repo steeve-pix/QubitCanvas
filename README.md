@@ -1,5 +1,7 @@
 # QubitCanvas
 
+[![Cross-platform build](https://github.com/steeve-pix/QubitCanvas/actions/workflows/build.yml/badge.svg)](https://github.com/steeve-pix/QubitCanvas/actions/workflows/build.yml)
+
 QubitCanvas is an interactive quantum-circuit simulator and debugger written
 from scratch in C++20. It combines a state-vector simulation core with a
 JetBrains Mono desktop interface for building circuits, stepping through their
@@ -277,32 +279,113 @@ explains how those contracts fit together.
 - A C++20 compiler
 - Git
 - OpenGL 3.3 Core support
+- Ninja is recommended but not required
 
 Initialize the GLFW and Dear ImGui submodules after cloning:
 
-```powershell
+```bash
 git submodule update --init --recursive
 ```
 
-Configure and build:
+Configure a release build:
 
-```powershell
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --config Debug --target qubit_canvas qubit_canvas_tests
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
 ```
 
 Run the automated tests:
 
-```powershell
-ctest --test-dir build -C Debug --output-on-failure
+```bash
+ctest --test-dir build -C Release --output-on-failure
 ```
 
-Run the application from the build directory so the copied font assets are
-available:
+The build copies `assets/` beside the executable, including JetBrains Mono.
+Run the application from the build tree:
 
 ```powershell
 .\build\qubit_canvas.exe
 ```
+
+On Linux:
+
+```bash
+./build/qubit_canvas
+```
+
+On macOS:
+
+```bash
+open build/qubit_canvas.app
+```
+
+For a Visual Studio multi-configuration generator, the executable may instead
+be located at `build\Release\qubit_canvas.exe`.
+
+### Linux
+
+Ubuntu and compatible distributions need the X11 and OpenGL development
+packages used by GLFW:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ninja-build pkg-config xorg-dev libglu1-mesa-dev zenity
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+```
+
+The bundled GLFW build uses X11 on Linux so clean systems and CI runners do not
+need `wayland-scanner`. Open and Save use `zenity`, or `kdialog` when running a
+KDE desktop.
+
+### macOS
+
+```bash
+brew install cmake ninja
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+```
+
+CMake produces `qubit_canvas.app`. Both Apple Silicon and Intel packages are
+built by the release workflow.
+
+### Windows
+
+Release builds made with MSVC statically link the Visual C++ runtime by
+default. The packaged application therefore does not require Visual Studio or
+a separate Visual C++ redistributable installation. Use
+`-DQUBITCANVAS_WINDOWS_GUI=OFF` when a development build should retain its
+console window.
+
+### Install And Package
+
+```bash
+cmake --install build --config Release --prefix dist/QubitCanvas
+cmake --build build --target package --config Release
+```
+
+CPack produces `.zip` and `.tar.gz` archives containing the application,
+JetBrains Mono asset, README, and architecture guide. Share the complete
+archive rather than the executable alone.
+
+| CMake option | Default | Purpose |
+| --- | --- | --- |
+| `BUILD_TESTING` | `ON` | Build the deterministic simulator and GUI tests |
+| `QUBITCANVAS_STATIC_MSVC_RUNTIME` | `ON` | Make MSVC Windows releases portable |
+| `QUBITCANVAS_STATIC_MINGW_RUNTIME` | `ON` | Statically link MinGW runtime libraries |
+| `QUBITCANVAS_WINDOWS_GUI` | `ON` | Hide the extra Windows console window |
+
+### Automated Releases
+
+`.github/workflows/build.yml` builds and tests four release targets:
+Windows x64, Linux x64, macOS Apple Silicon, and macOS Intel. Every successful
+run exposes install trees and packaged archives as downloadable GitHub Actions
+artifacts. Pushing a tag such as `v0.1.0` publishes those archives on the
+matching GitHub Release.
+
+Persistent project state follows each operating system's user-data convention:
+Local AppData on Windows, `~/Library/Application Support` on macOS, and
+`$XDG_DATA_HOME` or `~/.local/share` on Linux.
 
 The executable also supports hidden framebuffer captures for unattended visual
 regression checks:
@@ -321,9 +404,6 @@ scene (with six qubits). `--gate-page 3 --gate fSim` captures the advanced gate
 catalog with `fSim` armed. `--select-gate 4` selects the fourth circuit
 instruction, which is useful for capturing the stationary angle editor on a
 parameterized gate.
-
-For a Visual Studio multi-configuration generator, the executable may instead
-be located at `build\Debug\qubit_canvas.exe`.
 
 ## Numerical Behavior
 

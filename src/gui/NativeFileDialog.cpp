@@ -1,13 +1,17 @@
 #include "quantum_sim/gui/NativeFileDialog.hpp"
 
+#include <array>
+#include <string>
+#include <string_view>
+
 #ifdef _WIN32
 #include <Windows.h>
 #include <commdlg.h>
 
 #include <algorithm>
-#include <array>
-#include <string>
-#include <string_view>
+#else
+#include <cstdio>
+#include <cstdlib>
 #endif
 
 namespace quantum_sim::gui {
@@ -88,6 +92,167 @@ namespace quantum_sim::gui {
 
             return path;
         }
+#else
+        /**
+         * Runs a desktop file-chooser command and converts its standard output
+         * into a filesystem path. Cancellation and missing tools return null.
+         */
+        std::optional<std::filesystem::path> selectedCommandPath(
+            const std::string &command
+        ) {
+            FILE *pipe = ::popen(command.c_str(), "r");
+
+            if (pipe == nullptr) {
+                return std::nullopt;
+            }
+
+            std::array<char, 4096U> buffer{};
+            std::string output;
+
+            while (
+                std::fgets(
+                    buffer.data(),
+                    static_cast<int>(buffer.size()),
+                    pipe
+                ) != nullptr
+            ) {
+                output += buffer.data();
+            }
+
+            const int status = ::pclose(pipe);
+
+            while (
+                !output.empty() &&
+                (
+                    output.back() == '\n' ||
+                    output.back() == '\r'
+                )
+            ) {
+                output.pop_back();
+            }
+
+            if (status != 0 || output.empty()) {
+                return std::nullopt;
+            }
+
+            return std::filesystem::path{output};
+        }
+
+#ifdef __APPLE__
+        std::optional<std::filesystem::path> openFile(
+            const std::string_view prompt,
+            const std::string_view
+        ) {
+            return selectedCommandPath(
+                "osascript -e 'POSIX path of "
+                "(choose file with prompt \"" +
+                std::string{prompt} +
+                "\")' 2>/dev/null"
+            );
+        }
+
+        std::optional<std::filesystem::path> saveFile(
+            const std::string_view prompt,
+            const std::string_view defaultName,
+            const std::string_view defaultExtension,
+            const std::string_view
+        ) {
+            std::optional<std::filesystem::path> path =
+                    selectedCommandPath(
+                        "osascript -e 'POSIX path of "
+                        "(choose file name with prompt \"" +
+                        std::string{prompt} +
+                        "\" default name \"" +
+                        std::string{defaultName} +
+                        "\")' 2>/dev/null"
+                    );
+
+            if (path.has_value() && !path->has_extension()) {
+                path.value() +=
+                        "." +
+                        std::string{defaultExtension};
+            }
+
+            return path;
+        }
+#else
+        bool commandAvailable(const std::string_view command) {
+            return
+                std::system(
+                    (
+                        "command -v " +
+                        std::string{command} +
+                        " >/dev/null 2>&1"
+                    ).c_str()
+                ) == 0;
+        }
+
+        std::optional<std::filesystem::path> openFile(
+            const std::string_view title,
+            const std::string_view pattern
+        ) {
+            if (commandAvailable("zenity")) {
+                return selectedCommandPath(
+                    "zenity --file-selection --title=\"" +
+                    std::string{title} +
+                    "\" --file-filter=\"Supported files | " +
+                    std::string{pattern} +
+                    "\" 2>/dev/null"
+                );
+            }
+
+            if (commandAvailable("kdialog")) {
+                return selectedCommandPath(
+                    "kdialog --getopenfilename \"$HOME\" \"" +
+                    std::string{pattern} +
+                    "|Supported files\" 2>/dev/null"
+                );
+            }
+
+            return std::nullopt;
+        }
+
+        std::optional<std::filesystem::path> saveFile(
+            const std::string_view title,
+            const std::string_view defaultName,
+            const std::string_view defaultExtension,
+            const std::string_view pattern
+        ) {
+            std::optional<std::filesystem::path> path;
+
+            if (commandAvailable("zenity")) {
+                path =
+                        selectedCommandPath(
+                            "zenity --file-selection --save "
+                            "--confirm-overwrite --title=\"" +
+                            std::string{title} +
+                            "\" --filename=\"" +
+                            std::string{defaultName} +
+                            "\" --file-filter=\"Supported files | " +
+                            std::string{pattern} +
+                            "\" 2>/dev/null"
+                        );
+            } else if (commandAvailable("kdialog")) {
+                path =
+                        selectedCommandPath(
+                            "kdialog --getsavefilename "
+                            "\"$HOME/" +
+                            std::string{defaultName} +
+                            "\" \"" +
+                            std::string{pattern} +
+                            "|Supported files\" 2>/dev/null"
+                        );
+            }
+
+            if (path.has_value() && !path->has_extension()) {
+                path.value() +=
+                        "." +
+                        std::string{defaultExtension};
+            }
+
+            return path;
+        }
+#endif
 #endif
     }
 
@@ -100,7 +265,10 @@ namespace quantum_sim::gui {
 
         return openFile(filter, L"qcanvas");
 #else
-        return std::nullopt;
+        return openFile(
+            "Open QubitCanvas project",
+            "*.qcanvas"
+        );
 #endif
     }
 
@@ -117,7 +285,12 @@ namespace quantum_sim::gui {
             L"qcanvas"
         );
 #else
-        return std::nullopt;
+        return saveFile(
+            "Save QubitCanvas project",
+            "QubitCanvas.qcanvas",
+            "qcanvas",
+            "*.qcanvas"
+        );
 #endif
     }
 
@@ -130,7 +303,10 @@ namespace quantum_sim::gui {
 
         return openFile(filter, L"qasm");
 #else
-        return std::nullopt;
+        return openFile(
+            "Open OpenQASM 3 source",
+            "*.qasm"
+        );
 #endif
     }
 
@@ -147,7 +323,12 @@ namespace quantum_sim::gui {
             L"qasm"
         );
 #else
-        return std::nullopt;
+        return saveFile(
+            "Export OpenQASM 3 source",
+            "circuit.qasm",
+            "qasm",
+            "*.qasm"
+        );
 #endif
     }
 
@@ -164,7 +345,12 @@ namespace quantum_sim::gui {
             L"svg"
         );
 #else
-        return std::nullopt;
+        return saveFile(
+            "Export circuit diagram",
+            "circuit.svg",
+            "svg",
+            "*.svg"
+        );
 #endif
     }
 
@@ -181,7 +367,12 @@ namespace quantum_sim::gui {
             L"csv"
         );
 #else
-        return std::nullopt;
+        return saveFile(
+            "Export state-vector data",
+            "state.csv",
+            "csv",
+            "*.csv"
+        );
 #endif
     }
 
@@ -198,7 +389,12 @@ namespace quantum_sim::gui {
             L"csv"
         );
 #else
-        return std::nullopt;
+        return saveFile(
+            "Export density-matrix data",
+            "density.csv",
+            "csv",
+            "*.csv"
+        );
 #endif
     }
 }
