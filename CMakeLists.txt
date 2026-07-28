@@ -60,6 +60,7 @@ target_link_libraries(
 
 # Core simulator library
 add_library(qubit_canvas_core
+        src/analysis/StateMetrics.cpp
         src/math/Complex.cpp
         src/math/ComplexVector.cpp
         src/math/ComplexMatrix.cpp
@@ -77,7 +78,10 @@ add_library(qubit_canvas_core
 
         src/debug/InteractiveCircuitDebugger.cpp
         src/debug/DebuggerSession.cpp
+        src/project/OpenQasmFile.cpp
         src/project/ProjectFile.cpp
+        src/project/ProjectWorkspace.cpp
+        src/project/SubcircuitLibrary.cpp
 )
 
 target_include_directories(qubit_canvas_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
@@ -88,6 +92,7 @@ enable_project_warnings(qubit_canvas_core)
 
 # Graphical interface library
 add_library(qubit_canvas_gui STATIC
+        src/gui/ExportFile.cpp
         src/gui/GateNotation.cpp
         src/gui/NativeFileDialog.cpp
         src/gui/QuantumNotation.cpp

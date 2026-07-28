@@ -668,6 +668,29 @@ namespace quantum_sim::circuit {
         );
     }
 
+    bool QuantumCircuit::replaceInstructionSnapshot(
+        const std::size_t instructionIndex,
+        const CircuitInstructionSnapshot &snapshot
+    ) {
+        if (instructionIndex >= instructions_.size()) {
+            return false;
+        }
+
+        // Reuse insertion validation so editing cannot install a malformed gate.
+        QuantumCircuit validatedInstruction{qubitCount_};
+        validatedInstruction.insertInstructionSnapshot(
+            0U,
+            snapshot
+        );
+
+        instructions_[instructionIndex] =
+                std::move(
+                    validatedInstruction.instructions_.front()
+                );
+
+        return true;
+    }
+
     void QuantumCircuit::addControlledGate(std::string name, math::ComplexMatrix gate, std::size_t controlQubit,
                                            std::size_t targetQubit) {
         if (controlQubit >= qubitCount_ || targetQubit >= qubitCount_) {
