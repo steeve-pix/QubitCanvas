@@ -163,9 +163,6 @@ namespace quantum_sim::gui {
     ) noexcept {
         inspectedBlochQubit_ =
                 static_cast<int>(qubit);
-        requestedProbabilityFocus_ =
-                qubit;
-        requestInspectorTopFocus_ = true;
     }
 
     void InspectorPanel::draw(
@@ -174,11 +171,6 @@ namespace quantum_sim::gui {
         const density_volume::DensityStack &densityStack,
         std::size_t &selectedDensityLayer
     ) {
-        if (requestInspectorTopFocus_) {
-            ImGui::SetScrollY(0.0F);
-            requestInspectorTopFocus_ = false;
-        }
-
         drawQuantumState(
             session,
             densityStack,
@@ -535,17 +527,12 @@ namespace quantum_sim::gui {
     void InspectorPanel::drawProbabilities(const quantum::QuantumRegister &state) {
         ImGui::Spacing();
 
-        if (requestedProbabilityFocus_.has_value()) {
-            ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-        }
-
         if (
             !ImGui::CollapsingHeader(
                 "Qubit probabilities",
                 ImGuiTreeNodeFlags_DefaultOpen
             )
         ) {
-            requestedProbabilityFocus_.reset();
             return;
         }
 
@@ -579,19 +566,6 @@ namespace quantum_sim::gui {
 
                 ImGui::TableNextRow();
 
-                const bool focusThisRow =
-                        requestedProbabilityFocus_.has_value() &&
-                        requestedProbabilityFocus_.value() == qubit;
-
-                if (focusThisRow) {
-                    ImGui::TableSetBgColor(
-                        ImGuiTableBgTarget_RowBg0,
-                        ImGui::GetColorU32(
-                            ImVec4{0.08F, 0.34F, 0.48F, 0.42F}
-                        )
-                    );
-                }
-
                 ImGui::TableSetColumnIndex(0);
                 ImGui::Text("q%zu", qubit);
 
@@ -622,18 +596,12 @@ namespace quantum_sim::gui {
 
                 ImGui::TableSetColumnIndex(2);
                 ImGui::Text("%.1f%%", zeroProbability * 100.0F);
-
-                if (focusThisRow) {
-                    ImGui::SetScrollHereY(0.5F);
-                }
             }
 
             ImGui::EndTable();
         }
 
         popInspectorTableStyle();
-
-        requestedProbabilityFocus_.reset();
     }
 
     void InspectorPanel::drawLayerStack(
