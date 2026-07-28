@@ -90,6 +90,15 @@
     cmake-build-* and build/
         Generated build trees. Never place source-of-truth code here.
 
+    Shared utilities: include/quantum_sim/util
+    ------------------------------------------
+    StopToken.hpp
+        StopSource owns a shared atomic cancellation flag.
+        StopToken is a cheap copyable view polled by circuit traces, debugger
+        rebuilds, density generation, and SimulationHistoryWorker. This avoids
+        depending on std::jthread/stop_token availability in older libc++
+        releases while preserving cooperative cancellation on every platform.
+
     Math layer: include/quantum_sim/math + src/math
     ------------------------------------------------
     Complex.hpp / Complex.cpp
@@ -355,7 +364,7 @@
 
     SimulationHistoryWorker.hpp / .cpp
         SimulationHistoryResult is one publishable generation.
-        SimulationHistoryWorker starts one persistent jthread.
+        SimulationHistoryWorker starts one persistent joined std::thread.
         request() cancels/replaces pending work and returns a generation id.
         takeCompleted() transfers the newest finished result.
         busy() supports UI disabling/status.

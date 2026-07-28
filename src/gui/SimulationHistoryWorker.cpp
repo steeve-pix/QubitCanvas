@@ -6,16 +6,20 @@
 namespace quantum_sim::gui {
     SimulationHistoryWorker::SimulationHistoryWorker()
         : worker_{
-            [this](const std::stop_token stopToken) {
-                run(stopToken);
+            [this] {
+                run(workerStopSource_.get_token());
             }
         } {
     }
 
     SimulationHistoryWorker::~SimulationHistoryWorker() {
         cancel();
-        worker_.request_stop();
+        workerStopSource_.request_stop();
         wakeCondition_.notify_all();
+
+        if (worker_.joinable()) {
+            worker_.join();
+        }
     }
 
     std::uint64_t SimulationHistoryWorker::request(
@@ -97,7 +101,7 @@ namespace quantum_sim::gui {
     }
 
     void SimulationHistoryWorker::run(
-        const std::stop_token stopToken
+        const util::StopToken stopToken
     ) {
         while (!stopToken.stop_requested()) {
             std::optional<Request> request;
@@ -106,9 +110,10 @@ namespace quantum_sim::gui {
                 std::unique_lock lock{mutex_};
                 wakeCondition_.wait(
                     lock,
-                    stopToken,
-                    [this] {
-                        return pendingRequest_.has_value();
+                    [this, &stopToken] {
+                        return
+                            stopToken.stop_requested() ||
+                            pendingRequest_.has_value();
                     }
                 );
 
@@ -134,7 +139,7 @@ namespace quantum_sim::gui {
                 density_volume::DensityStack rebuiltDensity =
                         std::move(request->previousDensity);
 
-                const std::stop_token requestStopToken =
+                const util::StopToken requestStopToken =
                         request->stopSource.get_token();
 
                 if (request->firstChangedInstruction.has_value()) {
