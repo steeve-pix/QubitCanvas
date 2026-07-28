@@ -10,6 +10,10 @@
 #include <cstddef>
 
 namespace quantum_sim::circuit {
+    const char *TraceBuildCancelled::what() const noexcept {
+        return "Circuit trace build cancelled";
+    }
+
     QuantumCircuit::QuantumCircuit(std::size_t qubitCount) : qubitCount_(qubitCount) {
         if (qubitCount == 0) {
             throw std::invalid_argument{"Can't be 0"};
@@ -253,12 +257,20 @@ namespace quantum_sim::circuit {
     std::vector<TraceStep> QuantumCircuit::executeWithTrace(
         const quantum::QuantumRegister &initialState
     ) const {
-        return executeWithTraceFrom(initialState, 0U);
+        return executeWithTrace(initialState, {});
+    }
+
+    std::vector<TraceStep> QuantumCircuit::executeWithTrace(
+        const quantum::QuantumRegister &initialState,
+        const std::stop_token stopToken
+    ) const {
+        return executeWithTraceFrom(initialState, 0U, stopToken);
     }
 
     std::vector<TraceStep> QuantumCircuit::executeWithTraceFrom(
         const quantum::QuantumRegister &stateBeforeFirstInstruction,
-        const std::size_t firstInstructionIndex
+        const std::size_t firstInstructionIndex,
+        const std::stop_token stopToken
     ) const {
         if (stateBeforeFirstInstruction.qubitCount() != qubitCount_) {
             throw std::invalid_argument{"Register qubit count must match the circuit qubit count."};
@@ -287,6 +299,10 @@ namespace quantum_sim::circuit {
             instructionIterator != instructions_.end();
             ++instructionIterator
         ) {
+            if (stopToken.stop_requested()) {
+                throw TraceBuildCancelled{};
+            }
+
             const Instruction &instruction =
                     *instructionIterator;
 

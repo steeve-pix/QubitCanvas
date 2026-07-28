@@ -89,6 +89,7 @@ enable_project_warnings(qubit_canvas_core)
 add_library(qubit_canvas_gui STATIC
         src/gui/GateNotation.cpp
         src/gui/QuantumNotation.cpp
+        src/gui/SimulationHistoryWorker.cpp
         src/gui/GuiApplication.cpp
         src/gui/panels/InspectorPanel.cpp
         src/gui/rendering/CircuitRenderer.cpp

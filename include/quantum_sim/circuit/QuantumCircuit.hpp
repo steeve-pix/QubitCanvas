@@ -4,13 +4,26 @@
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 
 #include <cstddef>
+#include <exception>
 #include <optional>
 #include <random>
+#include <stop_token>
 #include <string>
 #include <variant>
 #include <vector>
 
 namespace quantum_sim::circuit {
+    /**
+     * Signals that a trace build was deliberately cancelled by its owner.
+     */
+    class TraceBuildCancelled final : public std::exception {
+    public:
+        /**
+         * @return Stable diagnostic text for cancelled background work.
+         */
+        [[nodiscard]] const char *what() const noexcept override;
+    };
+
     /**
      * One executed instruction and the register state immediately after it.
      */
@@ -194,7 +207,22 @@ namespace quantum_sim::circuit {
          */
         [[nodiscard]] std::vector<TraceStep> executeWithTraceFrom(
             const quantum::QuantumRegister &stateBeforeFirstInstruction,
-            std::size_t firstInstructionIndex
+            std::size_t firstInstructionIndex,
+            std::stop_token stopToken = {}
+        ) const;
+
+        /**
+         * Executes the circuit while allowing background callers to cancel
+         * between instructions.
+         *
+         * @param initialState Register whose qubit count must match this circuit.
+         * @param stopToken Cooperative cancellation token.
+         * @return Trace steps in instruction order.
+         * @throws TraceBuildCancelled when cancellation is requested.
+         */
+        [[nodiscard]] std::vector<TraceStep> executeWithTrace(
+            const quantum::QuantumRegister &initialState,
+            std::stop_token stopToken
         ) const;
 
         /**
