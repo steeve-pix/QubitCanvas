@@ -57,6 +57,21 @@ namespace quantum_sim::circuit {
     };
 
     /**
+     * Lossless public copy of one executable circuit instruction.
+     *
+     * Project persistence and editor clipboard operations use this structure
+     * without exposing the circuit's private execution variant.
+     */
+    struct CircuitInstructionSnapshot {
+        CircuitInstructionKind kind;
+        std::string name;
+        std::vector<std::size_t> operands;
+        std::optional<double> angleRadians;
+        std::optional<math::ComplexMatrix> matrix;
+        std::optional<math::ComplexVector> reflectionAxis;
+    };
+
+    /**
      * Ordered list of quantum instructions executed against a fixed-size register.
      */
     class QuantumCircuit final {
@@ -229,6 +244,29 @@ namespace quantum_sim::circuit {
          * @return Display metadata for all instructions in order.
          */
         [[nodiscard]] std::vector<CircuitInstructionInfo> instructionInfo() const;
+
+        /**
+         * Copies every executable instruction without losing matrix data.
+         *
+         * @return Instructions in circuit order.
+         */
+        [[nodiscard]] std::vector<CircuitInstructionSnapshot>
+        instructionSnapshots() const;
+
+        /**
+         * Inserts a previously exported instruction.
+         *
+         * Matrix dimensions, unitarity, reflection normalization, and operand
+         * bounds are validated through the same paths as ordinary gate edits.
+         *
+         * @param instructionIndex Insert position; values past the end append.
+         * @param snapshot Lossless instruction data to insert.
+         * @throws std::invalid_argument when required data is missing or invalid.
+         */
+        void insertInstructionSnapshot(
+            std::size_t instructionIndex,
+            const CircuitInstructionSnapshot &snapshot
+        );
 
         /**
          * Appends a two-qubit gate stored as a full-register instruction.

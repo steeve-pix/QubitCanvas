@@ -4,6 +4,7 @@
 #include "quantum_sim/math/ComplexVector.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
 #include "quantum_sim/quantum/Qubit.hpp"
+#include "quantum_sim/project/ProjectFile.hpp"
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
@@ -21,6 +22,7 @@
 #include <sstream>
 #include <iostream>
 #include <cmath>
+#include <filesystem>
 #include <numbers>
 #include <stdexcept>
 #include <string>
@@ -69,6 +71,112 @@ namespace {
     }
 } //
 int main() {
+    {
+        QuantumCircuit savedCircuit{3U};
+        savedCircuit.addSingleQubitGate(
+            "H",
+            quantum_sim::gates::hadamardGate(),
+            0U
+        );
+        savedCircuit.addSingleQubitGate(
+            "Rx",
+            quantum_sim::gates::rxGate(
+                std::numbers::pi / 3.0
+            ),
+            1U,
+            std::numbers::pi / 3.0
+        );
+        savedCircuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            0U,
+            2U
+        );
+        savedCircuit.addThreeQubitGate(
+            "CCX",
+            quantum_sim::gates::ccxGate(),
+            0U,
+            1U,
+            2U
+        );
+
+        std::vector<Complex> reflectionValues(8U);
+        reflectionValues[5U] = Complex{1.0, 0.0};
+
+        savedCircuit.addReflection(
+            "Saved reflection",
+            ComplexVector{std::move(reflectionValues)},
+            2U
+        );
+
+        const QuantumRegister savedInitialState =
+                QuantumRegister::basisState(3U, 0U);
+
+        const std::filesystem::path projectPath =
+                std::filesystem::temp_directory_path() /
+                "qubit_canvas_project_round_trip.qcanvas";
+
+        quantum_sim::project::ProjectFile::save(
+            projectPath,
+            savedCircuit,
+            savedInitialState
+        );
+
+        const quantum_sim::project::ProjectDocument loadedProject =
+                quantum_sim::project::ProjectFile::load(
+                    projectPath
+                );
+
+        std::error_code removeError;
+        std::filesystem::remove(projectPath, removeError);
+
+        const QuantumRegister savedFinalState =
+                savedCircuit.execute(savedInitialState);
+
+        const QuantumRegister loadedFinalState =
+                loadedProject.circuit.execute(
+                    loadedProject.initialState
+                );
+
+        bool statesMatch =
+                savedFinalState.stateCount() ==
+                loadedFinalState.stateCount();
+
+        for (
+            std::size_t stateIndex = 0U;
+            statesMatch &&
+            stateIndex < savedFinalState.stateCount();
+            ++stateIndex
+        ) {
+            statesMatch =
+                    approximatelyEqual(
+                        savedFinalState.amplitude(stateIndex).real(),
+                        loadedFinalState.amplitude(stateIndex).real()
+                    ) &&
+                    approximatelyEqual(
+                        savedFinalState.amplitude(stateIndex).imaginary(),
+                        loadedFinalState.amplitude(stateIndex).imaginary()
+                    );
+        }
+
+        const auto loadedInstructions =
+                loadedProject.circuit.instructionSnapshots();
+
+        check(
+            loadedProject.circuit.qubitCount() == 3U &&
+            loadedInstructions.size() == 5U &&
+            loadedInstructions[1U].angleRadians.has_value() &&
+            approximatelyEqual(
+                loadedInstructions[1U].angleRadians.value(),
+                std::numbers::pi / 3.0
+            ) &&
+            loadedInstructions.back().reflectionAxis.has_value() &&
+            statesMatch &&
+            !removeError,
+            "Project files preserve initial state, gate matrices, angles, operands, and reflections"
+        );
+    }
+
     {
         QuantumCircuit cancellableCircuit{1U};
         cancellableCircuit.addSingleQubitGate(

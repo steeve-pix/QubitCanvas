@@ -1,7 +1,9 @@
 #include "quantum_sim/gui/GuiApplication.hpp"
+#include "quantum_sim/gui/NativeFileDialog.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
+#include "quantum_sim/project/ProjectFile.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <glad/gl.h>
@@ -342,6 +344,7 @@ namespace quantum_sim::gui {
             pushApplicationFont();
 
             handleGlobalShortcuts();
+            applyQueuedProjectOpen();
             applyQueuedPreset();
             applyQueuedCircuitEdits();
             adoptCompletedSimulationHistory();
@@ -1265,6 +1268,23 @@ namespace quantum_sim::gui {
         }
 
         if (
+            io.KeyCtrl &&
+            ImGui::IsKeyPressed(ImGuiKey_O, false)
+        ) {
+            queuedProjectOpenPath_ =
+                    NativeFileDialog::openProject();
+            return;
+        }
+
+        if (
+            io.KeyCtrl &&
+            ImGui::IsKeyPressed(ImGuiKey_S, false)
+        ) {
+            saveProject();
+            return;
+        }
+
+        if (
             ImGui::IsKeyPressed(ImGuiKey_Escape, false) &&
             (
                 pendingGate_.has_value() ||
@@ -1858,7 +1878,42 @@ namespace quantum_sim::gui {
             );
         }
 
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 690.0F);
+        if (currentProjectPath_.has_value()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled(
+                "%s%s",
+                currentProjectPath_->stem().string().c_str(),
+                circuitHasUnsavedEdits_ ? "*" : ""
+            );
+        }
+
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - 860.0F);
+
+        if (ImGui::Button("Open", ImVec2{72.0F, 0.0F})) {
+            queuedProjectOpenPath_ =
+                    NativeFileDialog::openProject();
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Open project [Ctrl+O]");
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Save", ImVec2{72.0F, 0.0F})) {
+            saveProject();
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "%s",
+                projectStatusMessage_.empty()
+                    ? "Save project [Ctrl+S]"
+                    : projectStatusMessage_.c_str()
+            );
+        }
+
+        ImGui::SameLine();
 
         const auto modeButton =
                 [&](const char *label, const CanvasMode mode) {
@@ -2568,9 +2623,11 @@ namespace quantum_sim::gui {
                 quantum::QuantumRegister::basisState(
                     circuit_.qubitCount(),
                     0
-                );
+        );
 
         resetEditorTransientState();
+        currentProjectPath_.reset();
+        projectStatusMessage_.clear();
         circuitHasUnsavedEdits_ = false;
         playbackPaused_ = true;
 
@@ -2618,6 +2675,8 @@ namespace quantum_sim::gui {
                 );
 
         resetEditorTransientState();
+        currentProjectPath_.reset();
+        projectStatusMessage_.clear();
         circuitHasUnsavedEdits_ = false;
         playbackPaused_ = true;
         rebuildDebuggerAfterCircuitEdit();
@@ -3320,7 +3379,8 @@ namespace quantum_sim::gui {
             EditorSnapshot{
                 circuit_,
                 initialState_,
-                circuitHasUnsavedEdits_
+                circuitHasUnsavedEdits_,
+                currentProjectPath_
             }
         );
 
@@ -3338,6 +3398,9 @@ namespace quantum_sim::gui {
 
         circuitHasUnsavedEdits_ =
                 restored.hasUnsavedEdits;
+
+        currentProjectPath_ =
+                std::move(restored.projectPath);
 
         presetQubitCount_ =
                 static_cast<int>(
@@ -3369,7 +3432,8 @@ namespace quantum_sim::gui {
             EditorSnapshot{
                 circuit_,
                 initialState_,
-                circuitHasUnsavedEdits_
+                circuitHasUnsavedEdits_,
+                currentProjectPath_
             }
         );
 
@@ -3387,6 +3451,9 @@ namespace quantum_sim::gui {
 
         circuitHasUnsavedEdits_ =
                 restored.hasUnsavedEdits;
+
+        currentProjectPath_ =
+                std::move(restored.projectPath);
 
         presetQubitCount_ =
                 static_cast<int>(
@@ -3605,12 +3672,94 @@ namespace quantum_sim::gui {
         );
     }
 
+    void GuiApplication::saveProject() {
+        std::optional<std::filesystem::path> path =
+                currentProjectPath_;
+
+        if (!path.has_value()) {
+            path =
+                    NativeFileDialog::saveProject();
+        }
+
+        if (!path.has_value()) {
+            return;
+        }
+
+        try {
+            project::ProjectFile::save(
+                path.value(),
+                circuit_,
+                initialState_
+            );
+
+            currentProjectPath_ =
+                    path;
+
+            circuitHasUnsavedEdits_ = false;
+            projectStatusMessage_ =
+                    "Saved " +
+                    path->filename().string();
+        } catch (const std::exception &error) {
+            projectStatusMessage_ =
+                    std::string{"Save failed: "} +
+                    error.what();
+        }
+    }
+
+    void GuiApplication::applyQueuedProjectOpen() {
+        if (!queuedProjectOpenPath_.has_value()) {
+            return;
+        }
+
+        const std::filesystem::path path =
+                std::move(
+                    queuedProjectOpenPath_.value()
+                );
+
+        queuedProjectOpenPath_.reset();
+
+        try {
+            project::ProjectDocument document =
+                    project::ProjectFile::load(path);
+
+            recordEditorForUndo();
+            simulationHistoryWorker_.cancel();
+
+            circuit_ =
+                    std::move(document.circuit);
+
+            initialState_ =
+                    std::move(document.initialState);
+
+            presetQubitCount_ =
+                    static_cast<int>(
+                        circuit_.qubitCount()
+                    );
+
+            resetEditorTransientState();
+            currentProjectPath_ = path;
+            circuitHasUnsavedEdits_ = false;
+            playbackPaused_ = true;
+            projectStatusMessage_ =
+                    "Opened " +
+                    path.filename().string();
+
+            circuitRenderer_.fitToView();
+            rebuildDebuggerAfterCircuitEdit();
+        } catch (const std::exception &error) {
+            projectStatusMessage_ =
+                    std::string{"Open failed: "} +
+                    error.what();
+        }
+    }
+
     void GuiApplication::recordEditorForUndo() {
         undoHistory_.push_back(
             EditorSnapshot{
                 circuit_,
                 initialState_,
-                circuitHasUnsavedEdits_
+                circuitHasUnsavedEdits_,
+                currentProjectPath_
             }
         );
         redoHistory_.clear();
