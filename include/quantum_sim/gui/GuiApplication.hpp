@@ -34,6 +34,7 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> algorithmPage;
         std::optional<std::size_t> gatePage;
         std::optional<std::string> armedGate;
+        std::optional<std::size_t> selectedInstructionIndex;
         bool startAtFinalStep{false};
         bool startInFloorField{false};
         bool isolateDensityLayer{false};
@@ -189,6 +190,7 @@ namespace quantum_sim::gui {
         struct InstructionAngleEdit {
             std::size_t instructionIndex{};
             double angleRadians{};
+            bool recordUndo{true};
         };
 
         ImFont *jetBrainsMonoFont_{nullptr};
@@ -217,6 +219,8 @@ namespace quantum_sim::gui {
         std::optional<InstructionAngleEdit> queuedInstructionAngleEdit_;
         std::optional<std::size_t> inlineAngleInstructionIndex_;
         float inlineAnglePiCoefficient_{0.5F};
+        bool inlineAngleEditActive_{false};
+        double nextInlineAnglePreviewAt_{0.0};
         project::SubcircuitLibrary subcircuitLibrary_;
         std::vector<project::StoredSubcircuit> reusableSubcircuits_;
         std::size_t selectedReusableSubcircuit_{0U};
@@ -383,6 +387,20 @@ namespace quantum_sim::gui {
          * Draws the application background behind the docked panels.
          */
         void drawBackdrop() const;
+
+        /**
+         * Draws a live angle editor anchored above the selected circuit gate.
+         *
+         * The overlay is a separate ImGui window, so opening it never changes
+         * the circuit layout or interrupts a double-click on the gate.
+         *
+         * @param panelPosition Circuit panel top-left corner in screen space.
+         * @param panelSize Circuit panel dimensions.
+         */
+        void drawSelectedGateAngleEditor(
+            const ImVec2 &panelPosition,
+            const ImVec2 &panelSize
+        );
 
         /**
          * Displays the OpenGL framebuffer texture in the center Density Volume panel.
