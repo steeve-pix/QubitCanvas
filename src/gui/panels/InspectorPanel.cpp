@@ -171,17 +171,13 @@ namespace quantum_sim::gui {
     void InspectorPanel::draw(
         debug::DebuggerSession &session,
         const debug::DebuggerSnapshot &snapshot,
-        std::optional<std::size_t> selectedInstructionIndex,
         const density_volume::DensityStack &densityStack,
-        std::size_t &selectedDensityLayer,
-        ImFont *headingFont
+        std::size_t &selectedDensityLayer
     ) {
         if (requestInspectorTopFocus_) {
             ImGui::SetScrollY(0.0F);
             requestInspectorTopFocus_ = false;
         }
-
-        drawHeader(snapshot, selectedInstructionIndex, headingFont);
 
         drawQuantumState(
             session,
@@ -253,7 +249,10 @@ namespace quantum_sim::gui {
         const debug::DebuggerSnapshot &snapshot
     ) {
         ImGui::Spacing();
-        ImGui::SeparatorText("Debugger Controls");
+
+        if (!ImGui::CollapsingHeader("Navigation")) {
+            return;
+        }
 
         const float availableButtonWidth =
                 ImGui::GetContentRegionAvail().x;
@@ -367,9 +366,6 @@ namespace quantum_sim::gui {
         const density_volume::DensityStack &densityStack,
         std::size_t &selectedDensityLayer
     ) {
-        ImGui::Spacing();
-        ImGui::SeparatorText("Quantum State");
-
         drawLayerStack(
             session,
             densityStack,
@@ -403,7 +399,10 @@ namespace quantum_sim::gui {
         const std::size_t selectedDensityLayer
     ) {
         ImGui::Spacing();
-        ImGui::TextDisabled("State analysis");
+
+        if (!ImGui::CollapsingHeader("State analysis")) {
+            return;
+        }
 
         const quantum::QuantumRegister *previousState =
                 &session.initialState();
@@ -468,18 +467,6 @@ namespace quantum_sim::gui {
             metrics.size()
         );
 
-        const bool useBoundedRegion =
-                metrics.size() > 4U;
-
-        if (useBoundedRegion) {
-            ImGui::BeginChild(
-                "StateMetricRegion",
-                ImVec2{0.0F, 190.0F},
-                false,
-                ImGuiWindowFlags_AlwaysVerticalScrollbar
-            );
-        }
-
         pushInspectorTableStyle();
 
         if (
@@ -538,10 +525,6 @@ namespace quantum_sim::gui {
 
         popInspectorTableStyle();
 
-        if (useBoundedRegion) {
-            ImGui::EndChild();
-        }
-
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip(
                 "S(q:rest) is the selected qubit's von Neumann entanglement entropy."
@@ -550,18 +533,20 @@ namespace quantum_sim::gui {
     }
 
     void InspectorPanel::drawProbabilities(const quantum::QuantumRegister &state) {
-        ImGui::TextDisabled("Qubit probabilities");
+        ImGui::Spacing();
 
-        const bool useBoundedRegion =
-                state.qubitCount() > 4U;
+        if (requestedProbabilityFocus_.has_value()) {
+            ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+        }
 
-        if (useBoundedRegion) {
-            ImGui::BeginChild(
-                "QubitProbabilityRegion",
-                ImVec2{0.0F, 188.0F},
-                false,
-                ImGuiWindowFlags_AlwaysVerticalScrollbar
-            );
+        if (
+            !ImGui::CollapsingHeader(
+                "Qubit probabilities",
+                ImGuiTreeNodeFlags_DefaultOpen
+            )
+        ) {
+            requestedProbabilityFocus_.reset();
+            return;
         }
 
         pushInspectorTableStyle();
@@ -638,7 +623,7 @@ namespace quantum_sim::gui {
                 ImGui::TableSetColumnIndex(2);
                 ImGui::Text("%.1f%%", zeroProbability * 100.0F);
 
-                if (focusThisRow && useBoundedRegion) {
+                if (focusThisRow) {
                     ImGui::SetScrollHereY(0.5F);
                 }
             }
@@ -647,10 +632,6 @@ namespace quantum_sim::gui {
         }
 
         popInspectorTableStyle();
-
-        if (useBoundedRegion) {
-            ImGui::EndChild();
-        }
 
         requestedProbabilityFocus_.reset();
     }
@@ -1186,7 +1167,11 @@ namespace quantum_sim::gui {
     }
 
     void InspectorPanel::drawAmplitudes(const quantum::QuantumRegister &state) {
-        ImGui::TextDisabled("\xCF\x88 amplitudes");
+        ImGui::Spacing();
+
+        if (!ImGui::CollapsingHeader("\xCF\x88 amplitudes")) {
+            return;
+        }
 
         ImGui::SetNextItemWidth(-1.0F);
         ImGui::InputText(
@@ -1266,18 +1251,6 @@ namespace quantum_sim::gui {
             entries.size()
         );
 
-        const float tableHeight =
-                std::min(
-                    280.0F,
-                    60.0F + static_cast<float>(visibleCount) * 24.0F
-                );
-
-        ImGui::BeginChild(
-            "AmplitudeTableScroller",
-            ImVec2{0.0F, tableHeight},
-            false
-        );
-
         pushInspectorTableStyle();
 
         if (
@@ -1288,8 +1261,7 @@ namespace quantum_sim::gui {
                 ImGuiTableFlags_BordersInnerV |
                 ImGuiTableFlags_BordersInnerH |
                 ImGuiTableFlags_BordersOuter |
-                ImGuiTableFlags_PadOuterX |
-                ImGuiTableFlags_ScrollY
+                ImGuiTableFlags_PadOuterX
             )
         ) {
             ImGui::TableSetupColumn(
@@ -1390,7 +1362,6 @@ namespace quantum_sim::gui {
         }
 
         popInspectorTableStyle();
-        ImGui::EndChild();
     }
 
     void InspectorPanel::drawBlochInformation(const quantum::QuantumRegister &state) {
@@ -1406,7 +1377,10 @@ namespace quantum_sim::gui {
                 );
 
         ImGui::Spacing();
-        ImGui::SeparatorText("Bloch Sphere");
+
+        if (!ImGui::CollapsingHeader("Bloch sphere")) {
+            return;
+        }
 
         if (state.qubitCount() > 1) {
             const std::string preview =
@@ -1516,40 +1490,6 @@ namespace quantum_sim::gui {
             ImGui::TextDisabled(
                 "Reduced view of q%d",
                 inspectedBlochQubit_
-            );
-        }
-    }
-
-    void InspectorPanel::drawHeader(const debug::DebuggerSnapshot &snapshot,
-                                    std::optional<std::size_t> selectedInstructionIndex, ImFont *headingFont) {
-        if (headingFont != nullptr) {
-            ImGui::PushFont(headingFont);
-        }
-
-        ImGui::TextUnformatted("Inspector");
-
-        if (headingFont != nullptr) {
-            ImGui::PopFont();
-        }
-
-        ImGui::Text(
-            "Step %zu / %zu",
-            snapshot.currentStepNumber,
-            snapshot.stepCount
-        );
-
-        if (snapshot.currentStepNumber == 0U) {
-            ImGui::TextDisabled(
-                "Showing the untouched initial register."
-            );
-        } else if (selectedInstructionIndex.has_value()) {
-            ImGui::TextDisabled(
-                "Showing state after instruction %zu.",
-                selectedInstructionIndex.value() + 1U
-            );
-        } else {
-            ImGui::TextDisabled(
-                "Showing state after the current debugger step."
             );
         }
     }

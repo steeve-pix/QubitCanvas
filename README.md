@@ -19,7 +19,7 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 - Hover documentation with matrices for every gate in the gate library.
 - Native `.qcanvas` project save/open with `Ctrl+S` and `Ctrl+O`.
 - Timed recovery copies, interrupted-session recovery, and recent projects.
-- Inline single-angle gate editing and persistent reusable circuit blocks.
+- Gate-anchored live angle editing and persistent reusable circuit blocks.
 - Fidelity, reduced purity, and qubit-versus-rest entanglement entropy.
 - OpenQASM 3 import/export, standalone circuit SVG, and state/density CSV export.
 - Exact quantum notation for familiar fractions, radicals, complex values, and
@@ -174,17 +174,23 @@ circuit export, and exact state-vector or selected-density-layer CSV exports.
 OpenQASM export fails clearly when a custom full-register operation cannot be
 represented without changing its meaning.
 
-A selected parameterized gate with one retained angle exposes an inline theta
-editor in the circuit toolbar. Applying the angle is one undoable operation and
-rebuilds only the affected history suffix. Any selected gate range can be named
-with `Save block`; persistent blocks appear in the compact Reusable blocks
-chooser and can be inserted into compatible registers.
+A selected parameterized gate with one retained angle exposes a stationary
+theta editor above that gate. Slider changes preview live without an Apply step,
+and one complete drag remains one undoable operation. The editor is an overlay,
+so selecting it never moves the circuit or interrupts gate double-click
+navigation. Any selected gate range can be named with `Save block`; persistent
+blocks appear in the compact Reusable blocks chooser and can be inserted into
+compatible registers.
 
 The Inspector State analysis section computes directly from the exact complex
 state vector. It reports fidelity to the preceding step, mean single-qubit
 purity, and base-2 von Neumann entropy for every qubit. For the simulator's pure
 global states, `S(q:rest)` is the entanglement entropy between that qubit and
 the remainder of the register.
+
+The Inspector uses one outer scroll surface. Its synchronized density layer and
+qubit probabilities are immediately visible; analysis, amplitudes, Bloch
+sphere, and navigation expand only when needed.
 
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
 Compact `SW`, `iSW`, and `√SW` badges distinguish exchange variants without
@@ -307,8 +313,10 @@ Supported capture presets are `qft`, `grover`, `w`, `dicke`, `graph`, `random`,
 `weighted`, `bit-flip`, `steane`, `shor-code`, `phase-flip`,
 `five-qubit-code`, `quantum-counting`, `amplitude-estimation`, `ripple-adder`,
 `draper-adder`, `iqp`, `surface-code`, and the `swap-routing` visual-regression
-scene (with six qubits). `--gate-page 3 --gate fSim`
-captures the advanced gate catalog with `fSim` armed.
+scene (with six qubits). `--gate-page 3 --gate fSim` captures the advanced gate
+catalog with `fSim` armed. `--select-gate 4` selects the fourth circuit
+instruction, which is useful for capturing the stationary angle editor on a
+parameterized gate.
 
 For a Visual Studio multi-configuration generator, the executable may instead
 be located at `build\Debug\qubit_canvas.exe`.

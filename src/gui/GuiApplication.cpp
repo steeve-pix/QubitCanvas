@@ -175,6 +175,16 @@ namespace quantum_sim::gui {
             );
         }
 
+        if (
+            launchOptions_.selectedInstructionIndex.has_value() &&
+            launchOptions_.selectedInstructionIndex.value() <
+                circuit_.instructionCount()
+        ) {
+            circuitRenderer_.selectInstruction(
+                launchOptions_.selectedInstructionIndex.value()
+            );
+        }
+
         if (launchOptions_.startAtFinalStep) {
             session_.moveToStepNumber(
                 session_.stepCount()
@@ -474,7 +484,12 @@ namespace quantum_sim::gui {
                 ImGuiCond_Always
             );
 
-            ImGui::Begin("Circuit");
+            ImGui::Begin(
+                "Circuit",
+                nullptr,
+                ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoScrollWithMouse
+            );
             if (pendingGate_.has_value()) {
                 const std::string &gateName =
                         pendingGate_.value();
@@ -1164,101 +1179,6 @@ namespace quantum_sim::gui {
                 ImGui::EndPopup();
             }
 
-            std::optional<circuit::CircuitInstructionInfo>
-                    editableAngleInstruction;
-
-            if (
-                toolbarSelectedInstructionIndices.size() == 1U &&
-                toolbarSelectedInstructionIndex.has_value()
-            ) {
-                const auto instructionInfo =
-                        circuit_.instructionInfo();
-
-                const std::size_t selectedIndex =
-                        toolbarSelectedInstructionIndex.value();
-
-                if (selectedIndex < instructionInfo.size()) {
-                    const auto &candidate =
-                            instructionInfo[selectedIndex];
-
-                    if (
-                        candidate.angleRadians.has_value() &&
-                        usesGateParameters(candidate.name) &&
-                        candidate.name != "U" &&
-                        candidate.name != "fSim"
-                    ) {
-                        editableAngleInstruction = candidate;
-                    }
-                }
-            }
-
-            if (
-                editableAngleInstruction.has_value() &&
-                toolbarSelectedInstructionIndex.has_value()
-            ) {
-                const std::size_t selectedIndex =
-                        toolbarSelectedInstructionIndex.value();
-
-                if (
-                    inlineAngleInstructionIndex_ !=
-                    selectedIndex
-                ) {
-                    inlineAngleInstructionIndex_ =
-                            selectedIndex;
-
-                    inlineAnglePiCoefficient_ =
-                            static_cast<float>(
-                                editableAngleInstruction->
-                                    angleRadians.value() /
-                                std::numbers::pi
-                            );
-                }
-
-                ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted("\xCE\xB8");
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(230.0F);
-
-                ImGui::SliderFloat(
-                    "##InlineGateAngle",
-                    &inlineAnglePiCoefficient_,
-                    -2.0F,
-                    2.0F,
-                    "%.3f \xCF\x80",
-                    ImGuiSliderFlags_AlwaysClamp
-                );
-
-                ImGui::SameLine();
-
-                if (ImGui::SmallButton("Apply angle")) {
-                    queuedInstructionAngleEdit_ =
-                            InstructionAngleEdit{
-                                selectedIndex,
-                                static_cast<double>(
-                                    inlineAnglePiCoefficient_
-                                ) *
-                                std::numbers::pi
-                            };
-                }
-
-                ImGui::SameLine();
-
-                const std::string angleMeasurement =
-                        notation::formatAngleMeasurement(
-                            static_cast<double>(
-                                inlineAnglePiCoefficient_
-                            ) *
-                            std::numbers::pi
-                        );
-
-                ImGui::TextDisabled(
-                    "%s",
-                    angleMeasurement.c_str()
-                );
-            } else {
-                inlineAngleInstructionIndex_.reset();
-            }
-
             if (showHistoryDebugInfo_) {
                 ImGui::TextDisabled(
                     "Undo: %zu   Redo: %zu",
@@ -1444,6 +1364,17 @@ namespace quantum_sim::gui {
 
             ImGui::End();
 
+            drawSelectedGateAngleEditor(
+                ImVec2{
+                    workPosition.x + leftPanelWidth + gap * 2.0F,
+                    workPosition.y + topBarHeight + gap
+                },
+                ImVec2{
+                    circuitPanelWidth,
+                    circuitPanelHeight
+                }
+            );
+
             if (!circuitFocusMode_) {
                 drawDensityVolumeViewport(
                     ImVec2{
@@ -1478,10 +1409,8 @@ namespace quantum_sim::gui {
                 inspectorPanel_.draw(
                     session_,
                     snapshot,
-                    selectedInstructionIndex,
                     densityVolumeStack_,
-                    selectedDensityLayer_,
-                    jetBrainsMonoHeadingFont_
+                    selectedDensityLayer_
                 );
 
                 ImGui::End();
@@ -1832,6 +1761,275 @@ namespace quantum_sim::gui {
                 1.0F
             );
         }
+    }
+
+    void GuiApplication::drawSelectedGateAngleEditor(
+        const ImVec2 &panelPosition,
+        const ImVec2 &panelSize
+    ) {
+        const std::optional<std::size_t> selectedIndex =
+                circuitRenderer_.selectedInstructionIndex();
+
+        const std::optional<InstructionScreenAnchor> anchor =
+                circuitRenderer_.selectedInstructionScreenAnchor();
+
+        const auto instructions =
+                circuit_.instructionInfo();
+
+        const bool hasEditableSelection =
+                selectedIndex.has_value() &&
+                anchor.has_value() &&
+                selectedIndex.value() < instructions.size();
+
+        if (!hasEditableSelection) {
+            inlineAngleInstructionIndex_.reset();
+            inlineAngleEditActive_ = false;
+            return;
+        }
+
+        const circuit::CircuitInstructionInfo &instruction =
+                instructions[selectedIndex.value()];
+
+        if (
+            !instruction.angleRadians.has_value() ||
+            !usesGateParameters(instruction.name) ||
+            instruction.name == "U" ||
+            instruction.name == "fSim"
+        ) {
+            inlineAngleInstructionIndex_.reset();
+            inlineAngleEditActive_ = false;
+            return;
+        }
+
+        if (inlineAngleInstructionIndex_ != selectedIndex) {
+            inlineAngleInstructionIndex_ =
+                    selectedIndex;
+
+            inlineAnglePiCoefficient_ =
+                    static_cast<float>(
+                        instruction.angleRadians.value() /
+                        std::numbers::pi
+                    );
+
+            inlineAngleEditActive_ = false;
+            nextInlineAnglePreviewAt_ = 0.0;
+        }
+
+        constexpr float preferredWidth = 344.0F;
+        constexpr float editorHeight = 82.0F;
+        constexpr float panelInset = 10.0F;
+
+        const float editorWidth =
+                std::max(
+                    230.0F,
+                    std::min(
+                        preferredWidth,
+                        panelSize.x - panelInset * 2.0F
+                    )
+                );
+
+        const float minimumX =
+                panelPosition.x + panelInset;
+
+        const float maximumX =
+                std::max(
+                    minimumX,
+                    panelPosition.x +
+                        panelSize.x -
+                        editorWidth -
+                        panelInset
+                );
+
+        const float editorX =
+                std::clamp(
+                    anchor->x - editorWidth * 0.5F,
+                    minimumX,
+                    maximumX
+                );
+
+        const float minimumY =
+                panelPosition.y +
+                ImGui::GetFrameHeight() +
+                panelInset;
+
+        const float editorY =
+                std::max(
+                    minimumY,
+                    anchor->y -
+                        editorHeight -
+                        circuitRenderer_.style().gateHalfHeight -
+                        12.0F
+                );
+
+        ImGui::SetNextWindowPos(
+            ImVec2{editorX, editorY},
+            ImGuiCond_Always
+        );
+
+        ImGui::SetNextWindowSize(
+            ImVec2{editorWidth, editorHeight},
+            ImGuiCond_Always
+        );
+
+        ImGui::SetNextWindowBgAlpha(0.985F);
+
+        ImGui::PushStyleVar(
+            ImGuiStyleVar_WindowPadding,
+            ImVec2{10.0F, 8.0F}
+        );
+        ImGui::PushStyleVar(
+            ImGuiStyleVar_WindowRounding,
+            5.0F
+        );
+        ImGui::PushStyleVar(
+            ImGuiStyleVar_WindowBorderSize,
+            1.0F
+        );
+        ImGui::PushStyleColor(
+            ImGuiCol_WindowBg,
+            ImVec4{0.020F, 0.040F, 0.064F, 0.985F}
+        );
+        ImGui::PushStyleColor(
+            ImGuiCol_Border,
+            ImVec4{0.16F, 0.47F, 0.66F, 0.95F}
+        );
+
+        const ImGuiWindowFlags editorFlags =
+                ImGuiWindowFlags_NoTitleBar |
+                ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoFocusOnAppearing;
+
+        const bool editorVisible =
+                ImGui::Begin(
+                    "##SelectedGateAngleEditor",
+                    nullptr,
+                    editorFlags
+                );
+
+        if (editorVisible) {
+            ImGui::TextColored(
+                ImVec4{0.35F, 0.80F, 1.0F, 1.0F},
+                "%s  \xCE\xB8",
+                instruction.name.c_str()
+            );
+
+            ImGui::SameLine();
+
+            const std::string angleMeasurement =
+                    notation::formatAngleMeasurement(
+                        static_cast<double>(
+                            inlineAnglePiCoefficient_
+                        ) *
+                        std::numbers::pi
+                    );
+
+            ImGui::TextDisabled(
+                "%s",
+                angleMeasurement.c_str()
+            );
+
+            ImGui::SetNextItemWidth(-1.0F);
+
+            const bool angleChanged =
+                    ImGui::SliderFloat(
+                        "##SelectedGateAngle",
+                        &inlineAnglePiCoefficient_,
+                        -2.0F,
+                        2.0F,
+                        "%.3f \xCF\x80",
+                        ImGuiSliderFlags_AlwaysClamp
+                    );
+
+            const bool editFinished =
+                    ImGui::IsItemDeactivatedAfterEdit();
+
+            const double now =
+                    ImGui::GetTime();
+
+            const bool startsUndoTransaction =
+                    angleChanged &&
+                    !inlineAngleEditActive_;
+
+            if (angleChanged) {
+                inlineAngleEditActive_ = true;
+            }
+
+            const bool previewDue =
+                    startsUndoTransaction ||
+                    now >= nextInlineAnglePreviewAt_;
+
+            if (
+                (
+                    angleChanged &&
+                    previewDue
+                ) ||
+                editFinished
+            ) {
+                bool recordUndo =
+                        startsUndoTransaction;
+
+                if (
+                    queuedInstructionAngleEdit_.has_value() &&
+                    queuedInstructionAngleEdit_->
+                        instructionIndex ==
+                        selectedIndex.value()
+                ) {
+                    recordUndo =
+                            recordUndo ||
+                            queuedInstructionAngleEdit_->
+                                recordUndo;
+                }
+
+                queuedInstructionAngleEdit_ =
+                        InstructionAngleEdit{
+                            selectedIndex.value(),
+                            static_cast<double>(
+                                inlineAnglePiCoefficient_
+                            ) *
+                            std::numbers::pi,
+                            recordUndo
+                        };
+
+                // A 25 Hz preview feels immediate while avoiding a rebuild
+                // request for every high-frequency mouse event.
+                nextInlineAnglePreviewAt_ =
+                        now + 0.04;
+            }
+
+            if (editFinished) {
+                inlineAngleEditActive_ = false;
+            }
+        }
+
+        ImGui::End();
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(3);
+
+        const float connectorX =
+                std::clamp(
+                    anchor->x,
+                    editorX + 12.0F,
+                    editorX + editorWidth - 12.0F
+                );
+
+        ImGui::GetForegroundDrawList()->AddLine(
+            ImVec2{
+                connectorX,
+                editorY + editorHeight
+            },
+            ImVec2{
+                anchor->x,
+                anchor->y -
+                    circuitRenderer_.style().gateHalfHeight -
+                    3.0F
+            },
+            IM_COL32(66, 174, 224, 190),
+            1.0F
+        );
     }
 
     void GuiApplication::drawDensityVolumeViewport(
@@ -4037,6 +4235,16 @@ namespace quantum_sim::gui {
             circuit::CircuitInstructionSnapshot replacement =
                     snapshots[edit.instructionIndex];
 
+            if (
+                replacement.angleRadians.has_value() &&
+                std::abs(
+                    replacement.angleRadians.value() -
+                    edit.angleRadians
+                ) <= 1e-12
+            ) {
+                return;
+            }
+
             GateParameters parameters{};
             parameters.thetaRadians =
                     edit.angleRadians;
@@ -4066,7 +4274,9 @@ namespace quantum_sim::gui {
             replacement.angleRadians =
                     edit.angleRadians;
 
-            recordEditorForUndo();
+            if (edit.recordUndo) {
+                recordEditorForUndo();
+            }
 
             if (
                 !circuit_.replaceInstructionSnapshot(
@@ -4074,7 +4284,10 @@ namespace quantum_sim::gui {
                     replacement
                 )
             ) {
-                undoHistory_.pop_back();
+                if (edit.recordUndo) {
+                    undoHistory_.pop_back();
+                }
+
                 return;
             }
 
@@ -5007,6 +5220,8 @@ namespace quantum_sim::gui {
         queuedClipboardInsertionIndex_.reset();
         queuedInstructionAngleEdit_.reset();
         inlineAngleInstructionIndex_.reset();
+        inlineAngleEditActive_ = false;
+        nextInlineAnglePreviewAt_ = 0.0;
         presetAwaitingConfirmation_.reset();
         gateLibraryPanel_.clearSelection();
         circuitRenderer_.cancelPlacement();
