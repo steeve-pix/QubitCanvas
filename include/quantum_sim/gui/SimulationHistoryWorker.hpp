@@ -4,6 +4,7 @@
 #include "quantum_sim/debug/DebuggerSession.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
+#include "quantum_sim/util/StopToken.hpp"
 
 #include <atomic>
 #include <condition_variable>
@@ -11,7 +12,6 @@
 #include <cstdint>
 #include <mutex>
 #include <optional>
-#include <stop_token>
 #include <string>
 #include <thread>
 
@@ -98,23 +98,26 @@ namespace quantum_sim::gui {
             std::optional<std::size_t> firstChangedInstruction;
             std::optional<std::size_t> preferredStep;
             bool followPreferredStep{false};
-            std::stop_source stopSource;
+            util::StopSource stopSource;
         };
 
         mutable std::mutex mutex_;
-        std::condition_variable_any wakeCondition_;
+        std::condition_variable wakeCondition_;
         std::optional<Request> pendingRequest_;
         std::optional<SimulationHistoryResult> completedResult_;
-        std::optional<std::stop_source> activeStopSource_;
+        std::optional<util::StopSource> activeStopSource_;
         std::atomic_bool busy_{false};
         std::uint64_t nextRequestId_{1U};
         std::uint64_t newestRequestId_{};
-        // Declared last so destruction joins the thread before shared state dies.
-        std::jthread worker_;
+        util::StopSource workerStopSource_;
+        // Declared last; the destructor joins it before member teardown.
+        std::thread worker_;
 
         /**
          * Waits for requests and builds only the newest available generation.
+         *
+         * @param stopToken Lifetime cancellation token for the worker loop.
          */
-        void run(std::stop_token stopToken);
+        void run(util::StopToken stopToken);
     };
 }

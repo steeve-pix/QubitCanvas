@@ -254,7 +254,7 @@ namespace quantum_sim::gui::density_volume {
     DensityStack DensityModel::build(
         const debug::DebuggerSession &session,
         const std::size_t maximumDimension,
-        const std::stop_token stopToken
+        const util::StopToken stopToken
     ) {
         if (maximumDimension < 2U) {
             throw std::invalid_argument{"Density Volume density dimension must be at least two."};
@@ -301,7 +301,7 @@ namespace quantum_sim::gui::density_volume {
         const debug::DebuggerSession &session,
         const std::size_t firstChangedInstruction,
         const std::size_t maximumDimension,
-        const std::stop_token stopToken
+        const util::StopToken stopToken
     ) {
         const std::size_t preservedLayerCount =
                 firstChangedInstruction + 1U;

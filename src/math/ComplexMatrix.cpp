@@ -48,7 +48,11 @@ namespace quantum_sim::math {
     }
 
     ComplexMatrix ComplexMatrix::identity(std::size_t size) {
-        ComplexMatrix matrix{size, size, std::move(std::vector(size * size, Complex{}))};
+        ComplexMatrix matrix{
+            size,
+            size,
+            std::vector(size * size, Complex{})
+        };
 
         for (std::size_t i{}; i < size; ++i) {
             matrix.values_[i * size + i] = Complex{1.0, 0.0};

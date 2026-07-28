@@ -141,7 +141,7 @@ namespace quantum_sim::debug {
 
     void DebuggerSession::rebuild(const circuit::QuantumCircuit &circuit,
                                   const quantum::QuantumRegister &initialState,
-                                  const std::stop_token stopToken) {
+                                  const util::StopToken stopToken) {
         initialState_ = initialState;
 
         // Trace and metadata are rebuilt together so indices stay aligned.
@@ -161,7 +161,7 @@ namespace quantum_sim::debug {
         const circuit::QuantumCircuit &circuit,
         const quantum::QuantumRegister &initialState,
         const std::size_t firstChangedInstruction,
-        const std::stop_token stopToken
+        const util::StopToken stopToken
     ) {
         if (
             initialState.qubitCount() != initialState_.qubitCount() ||
