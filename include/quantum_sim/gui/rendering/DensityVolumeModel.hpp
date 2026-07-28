@@ -113,5 +113,18 @@ namespace quantum_sim::gui::density_volume {
             std::size_t maximumDimension = 16U,
             std::stop_token stopToken = {}
         );
+
+        /**
+         * Derives a non-destructive complex difference between two layers.
+         *
+         * @param selected Layer treated as the current state.
+         * @param reference Earlier or comparison layer to subtract.
+         * @return Display layer containing selected - reference per cell.
+         * @throws std::invalid_argument when matrix dimensions differ.
+         */
+        [[nodiscard]] static DensityLayer difference(
+            const DensityLayer &selected,
+            const DensityLayer &reference
+        );
     };
 }

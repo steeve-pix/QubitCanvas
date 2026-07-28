@@ -63,6 +63,11 @@ Two synchronized layouts are available:
 The inspector heatmap always follows the selected 3D layer and outlines the
 cell under the pointer. Hovering either view reports row, column, magnitude,
 intensity, phase in radians, real component, and imaginary component.
+`Isolate layer` removes neighboring history from the 3D scene without changing
+the selected state. `Compare` renders the complex cell-wise difference
+`Δρ = ρ(selected) - ρ(reference)` and adds delta magnitude, real, and imaginary
+values to voxel hover details. The Inspector continues to show the unchanged
+selected density matrix.
 
 | Input | Action |
 | --- | --- |
@@ -261,7 +266,8 @@ regression checks:
 
 ```powershell
 .\build\qubit_canvas.exe --preset random --qubits 6 --algorithm-page 3 `
-  --final-step --floor-field --capture C:\captures\random-final.ppm
+  --final-step --floor-field --compare-layer 0 `
+  --capture C:\captures\random-final.ppm
 ```
 
 Supported capture presets are `qft`, `grover`, `w`, `dicke`, `graph`, `random`,
