@@ -32,7 +32,9 @@ namespace quantum_sim::gui {
         );
 
         /**
-         * Focuses probability and Bloch-sphere inspection on one qubit.
+         * Synchronizes Bloch-sphere inspection with one circuit qubit.
+         *
+         * This changes no expansion or scroll state in the Inspector.
          *
          * @param qubit Qubit index selected or edited in the circuit.
          */
@@ -45,8 +47,6 @@ namespace quantum_sim::gui {
         bool sortAmplitudesByProbability_{true};
         int maximumVisibleAmplitudes_{32};
         int inspectedBlochQubit_{0};
-        std::optional<std::size_t> requestedProbabilityFocus_;
-        bool requestInspectorTopFocus_{false};
         double navigationConfirmationUntil_{0.0};
         std::string navigationConfirmationMessage_;
 
