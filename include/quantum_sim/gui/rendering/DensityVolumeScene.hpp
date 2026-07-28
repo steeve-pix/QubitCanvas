@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace quantum_sim::gui::density_volume {
@@ -15,6 +16,16 @@ namespace quantum_sim::gui::density_volume {
     enum class VisualizationMode {
         LayerStack,
         FloorField
+    };
+
+    /**
+     * Non-destructive filters applied while constructing one render scene.
+     */
+    struct SceneViewOptions {
+        bool isolateSelectedLayer{false};
+        std::optional<std::size_t> comparisonLayer;
+
+        bool operator==(const SceneViewOptions &) const = default;
     };
 
     /**
@@ -126,12 +137,14 @@ namespace quantum_sim::gui::density_volume {
          * @param stack Shared numerical density history.
          * @param selectedLayer Selected debugger layer.
          * @param mode Requested spatial presentation.
+         * @param options Optional focused-layer or comparison conversion.
          * @return Upload-ready instance scene.
          */
         [[nodiscard]] static InstanceScene build(
             const DensityStack &stack,
             std::size_t selectedLayer,
-            VisualizationMode mode
+            VisualizationMode mode,
+            const SceneViewOptions &options = {}
         );
     };
 }

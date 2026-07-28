@@ -182,6 +182,15 @@ namespace quantum_sim::gui {
             canvasMode_ = CanvasMode::FloorField;
         }
 
+        isolateDensityLayer_ =
+                launchOptions_.isolateDensityLayer;
+
+        if (launchOptions_.comparisonDensityLayer.has_value()) {
+            compareDensityLayers_ = true;
+            comparisonDensityLayer_ =
+                    launchOptions_.comparisonDensityLayer.value();
+        }
+
         synchronizeDensityLayer(session_.snapshot());
     }
 
@@ -1591,6 +1600,133 @@ namespace quantum_sim::gui {
             ImGuiWindowFlags_NoScrollWithMouse
         );
 
+        const std::size_t layerCount =
+                densityVolumeStack_.layers.size();
+
+        if (layerCount > 0U) {
+            selectedDensityLayer_ =
+                    std::min(
+                        selectedDensityLayer_,
+                        layerCount - 1U
+                    );
+
+            comparisonDensityLayer_ =
+                    std::min(
+                        comparisonDensityLayer_,
+                        layerCount - 1U
+                    );
+        }
+
+        bool viewOptionsChanged = false;
+
+        if (canvasMode_ != CanvasMode::LayerStack) {
+            ImGui::BeginDisabled();
+        }
+
+        viewOptionsChanged =
+                ImGui::Checkbox(
+                    "Isolate layer",
+                    &isolateDensityLayer_
+                ) ||
+                viewOptionsChanged;
+
+        if (canvasMode_ != CanvasMode::LayerStack) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+
+        const bool canCompare =
+                layerCount > 1U;
+
+        if (!canCompare) {
+            ImGui::BeginDisabled();
+        }
+
+        const bool comparisonToggled =
+                ImGui::Checkbox(
+                    "Compare",
+                    &compareDensityLayers_
+                );
+
+        if (!canCompare) {
+            ImGui::EndDisabled();
+            compareDensityLayers_ = false;
+        }
+
+        if (
+            comparisonToggled &&
+            compareDensityLayers_
+        ) {
+            comparisonDensityLayer_ =
+                    selectedDensityLayer_ > 0U
+                        ? selectedDensityLayer_ - 1U
+                        : std::min<std::size_t>(
+                            1U,
+                            layerCount - 1U
+                        );
+        }
+
+        viewOptionsChanged =
+                comparisonToggled ||
+                viewOptionsChanged;
+
+        if (
+            compareDensityLayers_ &&
+            canCompare
+        ) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("reference");
+            ImGui::SameLine();
+
+            if (
+                ImGui::SmallButton("<##PreviousComparisonLayer") &&
+                comparisonDensityLayer_ > 0U
+            ) {
+                --comparisonDensityLayer_;
+                viewOptionsChanged = true;
+            }
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(150.0F);
+
+            int comparisonLayerValue =
+                    static_cast<int>(
+                        comparisonDensityLayer_
+                    );
+
+            if (
+                ImGui::SliderInt(
+                    "##ComparisonLayer",
+                    &comparisonLayerValue,
+                    0,
+                    static_cast<int>(layerCount - 1U),
+                    "layer %d"
+                )
+            ) {
+                comparisonDensityLayer_ =
+                        static_cast<std::size_t>(
+                            comparisonLayerValue
+                        );
+
+                viewOptionsChanged = true;
+            }
+
+            ImGui::SameLine();
+
+            if (
+                ImGui::SmallButton(">##NextComparisonLayer") &&
+                comparisonDensityLayer_ + 1U < layerCount
+            ) {
+                ++comparisonDensityLayer_;
+                viewOptionsChanged = true;
+            }
+        }
+
+        if (viewOptionsChanged) {
+            densityVolumeCameraFramePending_ = true;
+        }
+
         const ImVec2 available =
                 ImGui::GetContentRegionAvail();
 
@@ -1630,10 +1766,23 @@ namespace quantum_sim::gui {
                     ? density_volume::VisualizationMode::FloorField
                     : density_volume::VisualizationMode::LayerStack;
 
+        const density_volume::SceneViewOptions sceneViewOptions{
+            .isolateSelectedLayer =
+                isolateDensityLayer_ &&
+                canvasMode_ == CanvasMode::LayerStack,
+            .comparisonLayer =
+                compareDensityLayers_ && canCompare
+                    ? std::optional<std::size_t>{
+                        comparisonDensityLayer_
+                    }
+                    : std::nullopt
+        };
+
         densityVolumeRenderer_.updateScene(
             densityVolumeStack_,
             selectedDensityLayer_,
-            visualizationMode
+            visualizationMode,
+            sceneViewOptions
         );
 
         const float viewportAspect =
@@ -1806,6 +1955,28 @@ namespace quantum_sim::gui {
                         hoveredCell->column
                     );
 
+            std::optional<density_volume::DensityCell> differenceCell;
+
+            if (
+                compareDensityLayers_ &&
+                comparisonDensityLayer_ <
+                    densityVolumeStack_.layers.size()
+            ) {
+                const density_volume::DensityLayer differenceLayer =
+                        density_volume::DensityModel::difference(
+                            layer,
+                            densityVolumeStack_.layers[
+                                comparisonDensityLayer_
+                            ]
+                        );
+
+                differenceCell =
+                        differenceLayer.cellAt(
+                            hoveredCell->row,
+                            hoveredCell->column
+                        );
+            }
+
             ImGui::BeginTooltip();
             ImGui::Text(
                 "LAYER %zu / %zu",
@@ -1862,6 +2033,35 @@ namespace quantum_sim::gui {
                 "Im(\xCF\x81)     %s",
                 imaginaryText.c_str()
             );
+
+            if (differenceCell.has_value()) {
+                ImGui::Separator();
+                ImGui::Text(
+                    "\xCE\x94 from layer %zu",
+                    comparisonDensityLayer_
+                );
+
+                ImGui::Text(
+                    "|\xCE\x94\xCF\x81|      %s",
+                    notation::formatReal(
+                        differenceCell->magnitude
+                    ).c_str()
+                );
+
+                ImGui::Text(
+                    "Re(\xCE\x94\xCF\x81)    %s",
+                    notation::formatReal(
+                        differenceCell->real
+                    ).c_str()
+                );
+
+                ImGui::Text(
+                    "Im(\xCE\x94\xCF\x81)    %s",
+                    notation::formatReal(
+                        differenceCell->imaginary
+                    ).c_str()
+                );
+            }
             ImGui::EndTooltip();
 
             if (
@@ -1873,9 +2073,6 @@ namespace quantum_sim::gui {
             }
         }
 
-        const std::size_t layerCount =
-                densityVolumeStack_.layers.size();
-
         const std::size_t dimension =
                 layerCount == 0U
                     ? 0U
@@ -1883,9 +2080,14 @@ namespace quantum_sim::gui {
 
         ImGui::TextDisabled(
             "%s | LAYER %zu/%zu | \xCF\x81 %zux%zu | fixed rounded voxels",
-            canvasMode_ == CanvasMode::FloorField
-                ? "FLOOR FIELD"
-                : "LAYER STACK",
+            compareDensityLayers_ && canCompare
+                ? "\xCE\x94 DENSITY"
+                : isolateDensityLayer_ &&
+                  canvasMode_ == CanvasMode::LayerStack
+                    ? "ISOLATED LAYER"
+                    : canvasMode_ == CanvasMode::FloorField
+                        ? "FLOOR FIELD"
+                        : "LAYER STACK",
             selectedDensityLayer_,
             layerCount == 0U ? 0U : layerCount - 1U,
             dimension,

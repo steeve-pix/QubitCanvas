@@ -274,7 +274,8 @@ namespace quantum_sim::gui::density_volume {
     bool Renderer::updateScene(
         const DensityStack &stack,
         const std::size_t selectedLayer,
-        const VisualizationMode mode
+        const VisualizationMode mode,
+        const SceneViewOptions &options
     ) {
         if (!initialized_) {
             throw std::runtime_error{
@@ -285,7 +286,8 @@ namespace quantum_sim::gui::density_volume {
         const bool historyChanged =
                 sceneFingerprint_ != stack.fingerprint ||
                 !sceneMode_.has_value() ||
-                sceneMode_.value() != mode;
+                sceneMode_.value() != mode ||
+                sceneViewOptions_ != options;
 
         if (stack.layers.empty()) {
             const bool changed =
@@ -304,6 +306,7 @@ namespace quantum_sim::gui::density_volume {
             sceneFingerprint_ = stack.fingerprint;
             sceneSelectedLayer_.reset();
             sceneMode_ = mode;
+            sceneViewOptions_ = options;
             return true;
         }
 
@@ -317,15 +320,26 @@ namespace quantum_sim::gui::density_volume {
                 !sceneSelectedLayer_.has_value() ||
                 sceneSelectedLayer_.value() != safeSelectedLayer;
 
+        const bool focusedLayerScene =
+                options.isolateSelectedLayer ||
+                options.comparisonLayer.has_value();
+
         if (
             mode == VisualizationMode::LayerStack &&
-            historyChanged
+            (
+                historyChanged ||
+                (
+                    focusedLayerScene &&
+                    selectionChanged
+                )
+            )
         ) {
             scene_ =
                     SceneBuilder::build(
                         stack,
                         safeSelectedLayer,
-                        mode
+                        mode,
+                        options
                     );
 
             uploadInstances();
@@ -337,7 +351,8 @@ namespace quantum_sim::gui::density_volume {
                     SceneBuilder::build(
                         stack,
                         safeSelectedLayer,
-                        mode
+                        mode,
+                        options
                     );
 
             uploadInstances();
@@ -347,14 +362,18 @@ namespace quantum_sim::gui::density_volume {
 
         if (mode == VisualizationMode::LayerStack) {
             const std::size_t visibleSolidCount =
-                    scene_.layerEndInstanceCounts.at(
-                        safeSelectedLayer
-                    );
+                    focusedLayerScene
+                        ? scene_.voxels.size()
+                        : scene_.layerEndInstanceCounts.at(
+                            safeSelectedLayer
+                        );
 
             const std::size_t visibleGhostCount =
-                    scene_.layerEndGhostCounts.at(
-                        safeSelectedLayer
-                    );
+                    focusedLayerScene
+                        ? scene_.ghostVoxels.size()
+                        : scene_.layerEndGhostCounts.at(
+                            safeSelectedLayer
+                        );
 
             if (
                 visibleSolidCount >
@@ -385,12 +404,16 @@ namespace quantum_sim::gui::density_volume {
 
             if (visibleBounds.valid) {
                 const float firstLayerX =
-                        scene_.layerCenters.front().x;
+                        focusedLayerScene
+                            ? scene_.center.x
+                            : scene_.layerCenters.front().x;
 
                 const float selectedLayerX =
-                        scene_.layerCenters.at(
-                            safeSelectedLayer
-                        ).x;
+                        focusedLayerScene
+                            ? scene_.center.x
+                            : scene_.layerCenters.at(
+                                safeSelectedLayer
+                            ).x;
 
                 scene_.groundCenter = Vector3{
                     (firstLayerX + selectedLayerX) * 0.5F,
@@ -425,6 +448,7 @@ namespace quantum_sim::gui::density_volume {
         sceneFingerprint_ = stack.fingerprint;
         sceneSelectedLayer_ = safeSelectedLayer;
         sceneMode_ = mode;
+        sceneViewOptions_ = options;
         return true;
     }
 
@@ -821,6 +845,7 @@ namespace quantum_sim::gui::density_volume {
         sceneFingerprint_ = 0U;
         sceneSelectedLayer_.reset();
         sceneMode_.reset();
+        sceneViewOptions_ = SceneViewOptions{};
         scene_ = InstanceScene{};
         voxelGeometry_ = VoxelGeometry{};
         floorColumnGeometry_ = VoxelGeometry{};

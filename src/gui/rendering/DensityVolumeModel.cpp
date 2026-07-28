@@ -353,4 +353,73 @@ namespace quantum_sim::gui::density_volume {
 
         finalizeStackMetadata(stack);
     }
+
+    DensityLayer DensityModel::difference(
+        const DensityLayer &selected,
+        const DensityLayer &reference
+    ) {
+        if (
+            selected.dimension != reference.dimension ||
+            selected.cells.size() != reference.cells.size()
+        ) {
+            throw std::invalid_argument{
+                "Density layers must have matching dimensions for comparison."
+            };
+        }
+
+        DensityLayer differenceLayer{
+            .index = selected.index,
+            .dimension = selected.dimension,
+            .sourceStateCount = selected.sourceStateCount,
+            .bucketed = selected.bucketed || reference.bucketed,
+            .label =
+                "Difference from layer " +
+                std::to_string(reference.index),
+            .bins = selected.bins
+        };
+
+        differenceLayer.cells.reserve(
+            selected.cells.size()
+        );
+
+        for (
+            std::size_t cellIndex = 0U;
+            cellIndex < selected.cells.size();
+            ++cellIndex
+        ) {
+            const DensityCell &selectedCell =
+                    selected.cells[cellIndex];
+
+            const DensityCell &referenceCell =
+                    reference.cells[cellIndex];
+
+            const double real =
+                    selectedCell.real -
+                    referenceCell.real;
+
+            const double imaginary =
+                    selectedCell.imaginary -
+                    referenceCell.imaginary;
+
+            const double magnitude =
+                    std::hypot(real, imaginary);
+
+            differenceLayer.cells.push_back(
+                DensityCell{
+                    .row = selectedCell.row,
+                    .column = selectedCell.column,
+                    .magnitude = magnitude,
+                    .intensity = magnitude * magnitude,
+                    .phaseRadians =
+                        magnitude > 1e-12
+                            ? std::atan2(imaginary, real)
+                            : 0.0,
+                    .real = real,
+                    .imaginary = imaginary
+                }
+            );
+        }
+
+        return differenceLayer;
+    }
 }

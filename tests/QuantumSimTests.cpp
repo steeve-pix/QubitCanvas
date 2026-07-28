@@ -208,6 +208,85 @@ int main() {
     }
 
     {
+        QuantumCircuit comparisonCircuit{2U};
+        comparisonCircuit.addSingleQubitGate(
+            "H",
+            quantum_sim::gates::hadamardGate(),
+            0U
+        );
+
+        const quantum_sim::debug::DebuggerSession comparisonSession{
+            comparisonCircuit,
+            QuantumRegister::basisState(2U, 0U)
+        };
+
+        const auto comparisonStack =
+                quantum_sim::gui::density_volume::DensityModel::build(
+                    comparisonSession
+                );
+
+        const auto differenceLayer =
+                quantum_sim::gui::density_volume::DensityModel::difference(
+                    comparisonStack.layers[1U],
+                    comparisonStack.layers[0U]
+                );
+
+        check(
+            approximatelyEqual(
+                differenceLayer.cellAt(0U, 0U).real,
+                -0.5
+            ) &&
+            approximatelyEqual(
+                differenceLayer.cellAt(0U, 0U).magnitude,
+                0.5
+            ) &&
+            approximatelyEqual(
+                differenceLayer.cellAt(0U, 1U).real,
+                0.5
+            ),
+            "Density comparison preserves the complex selected-minus-reference delta"
+        );
+
+        const auto isolatedScene =
+                quantum_sim::gui::density_volume::SceneBuilder::build(
+                    comparisonStack,
+                    1U,
+                    quantum_sim::gui::density_volume::VisualizationMode::LayerStack,
+                    quantum_sim::gui::density_volume::SceneViewOptions{
+                        .isolateSelectedLayer = true
+                    }
+                );
+
+        const auto differenceScene =
+                quantum_sim::gui::density_volume::SceneBuilder::build(
+                    comparisonStack,
+                    1U,
+                    quantum_sim::gui::density_volume::VisualizationMode::LayerStack,
+                    quantum_sim::gui::density_volume::SceneViewOptions{
+                        .comparisonLayer = 0U
+                    }
+                );
+
+        const bool isolatedPicksSelectedLayer =
+                std::all_of(
+                    isolatedScene.pickRecords.begin(),
+                    isolatedScene.pickRecords.end(),
+                    [](const auto &selection) {
+                        return selection.layer == 1U;
+                    }
+                );
+
+        check(
+            !isolatedScene.voxels.empty() &&
+            isolatedPicksSelectedLayer &&
+            isolatedScene.framingMaximum.x -
+                isolatedScene.framingMinimum.x < 1.0F &&
+            !differenceScene.voxels.empty(),
+            "Density isolation and comparison build one focused vertical matrix scene"
+        );
+    }
+
+    {
         QuantumCircuit baseCircuit{1U};
         const QuantumRegister baseState =
                 QuantumRegister::basisState(1U, 0U);

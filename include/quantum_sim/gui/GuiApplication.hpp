@@ -33,6 +33,8 @@ namespace quantum_sim::gui {
         std::optional<std::string> armedGate;
         bool startAtFinalStep{false};
         bool startInFloorField{false};
+        bool isolateDensityLayer{false};
+        std::optional<std::size_t> comparisonDensityLayer;
     };
 
     /**
@@ -225,6 +227,9 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> lastDensityDebuggerStepNumber_;
         bool densityVolumePointerDragged_{false};
         bool densityVolumeCameraFramePending_{true};
+        bool isolateDensityLayer_{false};
+        bool compareDensityLayers_{false};
+        std::size_t comparisonDensityLayer_{};
         bool circuitFocusMode_{false};
         bool followManualEdits_{true};
         bool circuitHasUnsavedEdits_{false};
