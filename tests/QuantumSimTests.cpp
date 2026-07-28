@@ -20,6 +20,7 @@
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeScene.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeCameraController.hpp"
+#include "quantum_sim/util/StopToken.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -77,6 +78,31 @@ namespace {
     }
 } //
 int main() {
+    {
+        quantum_sim::util::StopSource source;
+        const quantum_sim::util::StopToken firstToken =
+                source.get_token();
+        const quantum_sim::util::StopToken copiedToken =
+                firstToken;
+        const quantum_sim::util::StopToken emptyToken;
+
+        check(
+            !firstToken.stop_requested() &&
+            !copiedToken.stop_requested() &&
+            !emptyToken.stop_requested(),
+            "Cancellation tokens start in the running state"
+        );
+
+        check(
+            source.request_stop() &&
+            !source.request_stop() &&
+            firstToken.stop_requested() &&
+            copiedToken.stop_requested() &&
+            source.stop_requested(),
+            "Cancellation requests reach every shared token once"
+        );
+    }
+
     {
         const std::filesystem::path exportRoot =
                 std::filesystem::temp_directory_path() /
@@ -595,7 +621,7 @@ int main() {
             0U
         );
 
-        std::stop_source cancelledBuild;
+        quantum_sim::util::StopSource cancelledBuild;
         cancelledBuild.request_stop();
 
         bool cancellationObserved = false;

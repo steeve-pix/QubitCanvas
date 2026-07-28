@@ -2,12 +2,12 @@
 
 #include "quantum_sim/math/ComplexMatrix.hpp"
 #include "quantum_sim/quantum/QuantumRegister.hpp"
+#include "quantum_sim/util/StopToken.hpp"
 
 #include <cstddef>
 #include <exception>
 #include <optional>
 #include <random>
-#include <stop_token>
 #include <string>
 #include <variant>
 #include <vector>
@@ -223,7 +223,7 @@ namespace quantum_sim::circuit {
         [[nodiscard]] std::vector<TraceStep> executeWithTraceFrom(
             const quantum::QuantumRegister &stateBeforeFirstInstruction,
             std::size_t firstInstructionIndex,
-            std::stop_token stopToken = {}
+            util::StopToken stopToken = {}
         ) const;
 
         /**
@@ -237,7 +237,7 @@ namespace quantum_sim::circuit {
          */
         [[nodiscard]] std::vector<TraceStep> executeWithTrace(
             const quantum::QuantumRegister &initialState,
-            std::stop_token stopToken
+            util::StopToken stopToken
         ) const;
 
         /**
