@@ -424,6 +424,8 @@
         selectInstructions(), clearSelection(), private selection helpers.
         selectedInstructionScreenAnchor() exposes the selected gate center from
         the latest render without exposing ImGui types to GuiApplication state.
+        draw() publishes that anchor after click/drag handling so a new
+        selection can open its attached editor during the same frame.
         Placement API: consumeCompleted*(), completedControlledPlacement(),
         hasPendingControlQubit(), placementOperandCount(), cancelPlacement(),
         pendingInsertionIndex(), continuePlacementAfter().

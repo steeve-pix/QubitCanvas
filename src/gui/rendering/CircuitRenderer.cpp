@@ -864,9 +864,6 @@ namespace quantum_sim::gui {
         );
 
         for (std::size_t instructionIndex = 0; instructionIndex < instructions.size(); ++instructionIndex) {
-            const circuit::CircuitInstructionInfo &instruction =
-                    instructions[instructionIndex];
-
             std::size_t displayedInstructionIndex =
                     instructionIndex + 1U;
 
@@ -878,50 +875,6 @@ namespace quantum_sim::gui {
 
             const float x =
                     firstGateX + gateSpacing * static_cast<float>(displayedInstructionIndex);
-
-            if (
-                selectedInstructionIndex_.has_value() &&
-                selectedInstructionIndex_.value() == instructionIndex
-            ) {
-                std::size_t firstOperand = qubitCount - 1U;
-                std::size_t lastOperand = 0U;
-                bool hasOperand = false;
-
-                const auto includeOperand =
-                        [&](const std::optional<std::size_t> operand) {
-                    if (!operand.has_value()) {
-                        return;
-                    }
-
-                    firstOperand =
-                            std::min(firstOperand, operand.value());
-                    lastOperand =
-                            std::max(lastOperand, operand.value());
-                    hasOperand = true;
-                };
-
-                includeOperand(instruction.targetQubit);
-                includeOperand(instruction.controlQubit);
-                includeOperand(instruction.secondaryTargetQubit);
-                includeOperand(instruction.tertiaryTargetQubit);
-
-                const float anchorQubit =
-                        hasOperand
-                            ? (
-                                static_cast<float>(firstOperand) +
-                                static_cast<float>(lastOperand)
-                            ) *
-                            0.5F
-                            : 0.0F;
-
-                selectedInstructionScreenAnchor_ =
-                        InstructionScreenAnchor{
-                            x,
-                            firstWireY +
-                                effectiveWireSpacing_ *
-                                anchorQubit
-                        };
-            }
 
             const bool highlighted =
                     snapshot.currentStepNumber ==
@@ -2897,6 +2850,73 @@ namespace quantum_sim::gui {
                 draggedInstructionIndex_.reset();
                 dragDestinationIndex_.reset();
             }
+        }
+
+        if (
+            selectedInstructionIndex_.has_value() &&
+            selectedInstructionIndex_.value() < instructions.size()
+        ) {
+            const std::size_t selectedIndex =
+                    selectedInstructionIndex_.value();
+
+            const circuit::CircuitInstructionInfo &selectedInstruction =
+                    instructions[selectedIndex];
+
+            std::size_t displayedInstructionIndex =
+                    selectedIndex + 1U;
+
+            if (
+                placementModeActive &&
+                pendingInsertionIndex_.has_value() &&
+                selectedIndex >= pendingInsertionIndex_.value()
+            ) {
+                ++displayedInstructionIndex;
+            }
+
+            std::size_t firstOperand = qubitCount - 1U;
+            std::size_t lastOperand = 0U;
+            bool hasOperand = false;
+
+            const auto includeOperand =
+                    [&](const std::optional<std::size_t> operand) {
+                if (!operand.has_value()) {
+                    return;
+                }
+
+                firstOperand =
+                        std::min(firstOperand, operand.value());
+                lastOperand =
+                        std::max(lastOperand, operand.value());
+                hasOperand = true;
+            };
+
+            includeOperand(selectedInstruction.targetQubit);
+            includeOperand(selectedInstruction.controlQubit);
+            includeOperand(selectedInstruction.secondaryTargetQubit);
+            includeOperand(selectedInstruction.tertiaryTargetQubit);
+
+            const float anchorQubit =
+                    hasOperand
+                        ? (
+                            static_cast<float>(firstOperand) +
+                            static_cast<float>(lastOperand)
+                        ) *
+                        0.5F
+                        : 0.0F;
+
+            // Publish after interaction handling so a newly clicked gate has
+            // a usable anchor during this same application frame.
+            selectedInstructionScreenAnchor_ =
+                    InstructionScreenAnchor{
+                        firstGateX +
+                            gateSpacing *
+                            static_cast<float>(
+                                displayedInstructionIndex
+                            ),
+                        firstWireY +
+                            effectiveWireSpacing_ *
+                            anchorQubit
+                    };
         }
 
         const float circuitContentWidth =
