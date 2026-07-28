@@ -9,6 +9,7 @@
 #include "quantum_sim/project/SubcircuitLibrary.hpp"
 #include "quantum_sim/visualization/ConsoleVisualizer.hpp"
 #include "quantum_sim/algorithms/QuantumAlgorithms.hpp"
+#include "quantum_sim/analysis/StateMetrics.hpp"
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/gui/GateNotation.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
@@ -73,6 +74,71 @@ namespace {
     }
 } //
 int main() {
+    {
+        QuantumCircuit bellCircuit{2U};
+        bellCircuit.addSingleQubitGate(
+            "H",
+            quantum_sim::gates::hadamardGate(),
+            0U
+        );
+        bellCircuit.addTwoQubitGate(
+            "CX",
+            quantum_sim::gates::cxGate(),
+            0U,
+            1U
+        );
+
+        const QuantumRegister zero =
+                QuantumRegister::basisState(2U, 0U);
+
+        const QuantumRegister bell =
+                bellCircuit.execute(zero);
+
+        const auto bellMetrics =
+                quantum_sim::analysis::StateMetrics::
+                    forRegister(bell);
+
+        check(
+            approximatelyEqual(
+                quantum_sim::analysis::StateMetrics::fidelity(
+                    zero,
+                    bell
+                ),
+                0.5
+            ) &&
+            bellMetrics.size() == 2U &&
+            approximatelyEqual(
+                bellMetrics[0U].purity,
+                0.5
+            ) &&
+            approximatelyEqual(
+                bellMetrics[0U].entropyBits,
+                1.0
+            ) &&
+            approximatelyEqual(
+                bellMetrics[1U].purity,
+                0.5
+            ),
+            "State metrics identify Bell-state fidelity, local mixing, and entanglement entropy"
+        );
+
+        const auto productMetrics =
+                quantum_sim::analysis::StateMetrics::
+                    forRegister(zero);
+
+        check(
+            approximatelyEqual(
+                productMetrics[0U].purity,
+                1.0
+            ) &&
+            approximatelyEqual(
+                productMetrics[0U].entropyBits,
+                0.0
+            ),
+            "State metrics keep product-state purity and entropy exact"
+        );
+    }
+
     {
         const std::filesystem::path libraryRoot =
                 std::filesystem::temp_directory_path() /

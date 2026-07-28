@@ -60,6 +60,7 @@ target_link_libraries(
 
 # Core simulator library
 add_library(qubit_canvas_core
+        src/analysis/StateMetrics.cpp
         src/math/Complex.cpp
         src/math/ComplexVector.cpp
         src/math/ComplexMatrix.cpp

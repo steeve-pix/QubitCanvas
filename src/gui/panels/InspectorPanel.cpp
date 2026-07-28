@@ -1,6 +1,7 @@
 #include "quantum_sim/gui/panels/InspectorPanel.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
+#include "quantum_sim/analysis/StateMetrics.hpp"
 
 #include "imgui.h"
 
@@ -387,8 +388,165 @@ namespace quantum_sim::gui {
         }
 
         drawProbabilities(*state);
+        drawStateMetrics(
+            session,
+            *state,
+            selectedDensityLayer
+        );
         drawAmplitudes(*state);
         drawBlochInformation(*state);
+    }
+
+    void InspectorPanel::drawStateMetrics(
+        debug::DebuggerSession &session,
+        const quantum::QuantumRegister &state,
+        const std::size_t selectedDensityLayer
+    ) {
+        ImGui::Spacing();
+        ImGui::TextDisabled("State analysis");
+
+        const quantum::QuantumRegister *previousState =
+                &session.initialState();
+
+        if (selectedDensityLayer > 1U) {
+            previousState =
+                    &session.stepAt(
+                        selectedDensityLayer - 2U
+                    ).state;
+        }
+
+        const double fidelity =
+                analysis::StateMetrics::fidelity(
+                    state,
+                    *previousState
+                );
+
+        const std::vector<analysis::QubitMetrics> metrics =
+                analysis::StateMetrics::forRegister(state);
+
+        double averagePurity{};
+        std::size_t entangledQubitCount{};
+
+        for (const auto &entry : metrics) {
+            averagePurity += entry.purity;
+
+            if (entry.entropyBits > 1e-6) {
+                ++entangledQubitCount;
+            }
+        }
+
+        averagePurity /=
+                static_cast<double>(
+                    std::max<std::size_t>(
+                        1U,
+                        metrics.size()
+                    )
+                );
+
+        ImGui::Text(
+            "F(previous) %.6f",
+            fidelity
+        );
+
+        if (selectedDensityLayer == 0U) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(initial reference)");
+        }
+
+        ImGui::Text(
+            "mean local purity %.6f",
+            averagePurity
+        );
+
+        ImGui::SameLine();
+        ImGui::TextColored(
+            entangledQubitCount > 0U
+                ? ImVec4{1.0F, 0.72F, 0.20F, 1.0F}
+                : ImVec4{0.34F, 0.82F, 0.60F, 1.0F},
+            "%zu/%zu entangled",
+            entangledQubitCount,
+            metrics.size()
+        );
+
+        const bool useBoundedRegion =
+                metrics.size() > 4U;
+
+        if (useBoundedRegion) {
+            ImGui::BeginChild(
+                "StateMetricRegion",
+                ImVec2{0.0F, 190.0F},
+                false,
+                ImGuiWindowFlags_AlwaysVerticalScrollbar
+            );
+        }
+
+        pushInspectorTableStyle();
+
+        if (
+            ImGui::BeginTable(
+                "StateMetricTable",
+                3,
+                ImGuiTableFlags_Borders |
+                ImGuiTableFlags_RowBg |
+                ImGuiTableFlags_PadOuterX
+            )
+        ) {
+            ImGui::TableSetupColumn(
+                "Qubit",
+                ImGuiTableColumnFlags_WidthFixed,
+                52.0F
+            );
+            ImGui::TableSetupColumn(
+                "Purity",
+                ImGuiTableColumnFlags_WidthStretch
+            );
+            ImGui::TableSetupColumn(
+                "S(q:rest)",
+                ImGuiTableColumnFlags_WidthStretch
+            );
+            ImGui::TableHeadersRow();
+
+            for (const auto &entry : metrics) {
+                ImGui::TableNextRow();
+
+                ImGui::TableSetColumnIndex(0);
+
+                const std::string qubitLabel =
+                        "q" +
+                        std::to_string(entry.qubit);
+
+                if (
+                    ImGui::Selectable(
+                        qubitLabel.c_str(),
+                        inspectedBlochQubit_ ==
+                            static_cast<int>(entry.qubit),
+                        ImGuiSelectableFlags_SpanAllColumns
+                    )
+                ) {
+                    focusQubit(entry.qubit);
+                }
+
+                ImGui::TableSetColumnIndex(1);
+                ImGui::Text("%.4f", entry.purity);
+
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%.4f bit", entry.entropyBits);
+            }
+
+            ImGui::EndTable();
+        }
+
+        popInspectorTableStyle();
+
+        if (useBoundedRegion) {
+            ImGui::EndChild();
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "S(q:rest) is the selected qubit's von Neumann entanglement entropy."
+            );
+        }
     }
 
     void InspectorPanel::drawProbabilities(const quantum::QuantumRegister &state) {
