@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <vector>
 
 struct ImDrawList;
 struct ImVec2;
@@ -89,6 +90,12 @@ namespace quantum_sim::gui {
         [[nodiscard]] std::optional<std::size_t> selectedInstructionIndex() const noexcept;
 
         /**
+         * @return Sorted instruction indices in the current multi-selection.
+         */
+        [[nodiscard]] const std::vector<std::size_t> &
+        selectedInstructionIndices() const noexcept;
+
+        /**
          * Returns and clears a debugger-step jump requested by double-clicking.
          *
          * @return Displayed step number, where zero is the initial state and
@@ -168,7 +175,16 @@ namespace quantum_sim::gui {
          *
          * @param instructionIndex Instruction to select.
          */
-        void selectInstruction(std::size_t instructionIndex) noexcept;
+        void selectInstruction(std::size_t instructionIndex);
+
+        /**
+         * Replaces the current selection and focuses its final instruction.
+         *
+         * @param instructionIndices Instruction indices to select.
+         */
+        void selectInstructions(
+            std::vector<std::size_t> instructionIndices
+        );
 
         /**
          * Requests horizontal focus on one displayed timeline step.
@@ -218,6 +234,8 @@ namespace quantum_sim::gui {
                       bool hovered, bool selected, bool placementPreview);
 
         std::optional<std::size_t> selectedInstructionIndex_;
+        std::vector<std::size_t> selectedInstructionIndices_;
+        std::optional<std::size_t> selectionAnchorIndex_;
         std::optional<std::size_t> requestedStepJumpNumber_;
         CircuitStyle style_;
         std::optional<std::size_t> pendingControlQubit_;
@@ -237,5 +255,26 @@ namespace quantum_sim::gui {
         float viewZoom_{1.0F};
         bool fitToWindow_{true};
         bool placementModeWasActive_{false};
+
+        /**
+         * @return True when one instruction belongs to the multi-selection.
+         */
+        [[nodiscard]] bool isInstructionSelected(
+            std::size_t instructionIndex
+        ) const noexcept;
+
+        /**
+         * Applies plain, Ctrl-toggle, or Shift-range selection semantics.
+         */
+        void updateInstructionSelection(
+            std::size_t instructionIndex
+        );
+
+        /**
+         * Makes one instruction the complete selection.
+         */
+        void setSingleInstructionSelection(
+            std::size_t instructionIndex
+        );
     };
 }

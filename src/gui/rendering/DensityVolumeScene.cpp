@@ -355,6 +355,126 @@ namespace quantum_sim::gui::density_volume {
             return scene;
         }
 
+        [[nodiscard]] InstanceScene buildIsolatedLayer(
+            const DensityLayer &layer
+        ) {
+            InstanceScene scene;
+            scene.voxels.reserve(layer.cells.size());
+            scene.ghostVoxels.reserve(layer.cells.size());
+            scene.pickRecords.reserve(layer.cells.size());
+            scene.layerEndInstanceCounts.assign(
+                layer.index + 1U,
+                0U
+            );
+            scene.layerEndGhostCounts.assign(
+                layer.index + 1U,
+                0U
+            );
+            scene.layerCenters.assign(
+                layer.index + 1U,
+                Vector3{}
+            );
+
+            const float span =
+                    matrixSpan(layer.dimension);
+
+            const float halfMatrix =
+                    static_cast<float>(
+                        layer.dimension - 1U
+                    ) *
+                    cellPitch *
+                    0.5F;
+
+            const bool showGhosts =
+                    !layer.bucketed &&
+                    layer.dimension <= 16U;
+
+            for (const DensityCell &cell : layer.cells) {
+                const float magnitude =
+                        clamp01(
+                            static_cast<float>(
+                                cell.magnitude
+                            )
+                        );
+
+                const Vector3 center{
+                    0.0F,
+                    halfMatrix -
+                        static_cast<float>(cell.row) *
+                        cellPitch,
+                    static_cast<float>(cell.column) *
+                        cellPitch -
+                        halfMatrix
+                };
+
+                constexpr Vector3 size{
+                    cubeSide,
+                    cubeSide,
+                    cubeSide
+                };
+
+                if (magnitude >= solidVisibilityThreshold) {
+                    appendSolidVoxel(
+                        scene,
+                        cell,
+                        layer.index,
+                        center,
+                        size,
+                        magnitude
+                    );
+                } else if (showGhosts) {
+                    appendGhostVoxel(
+                        scene,
+                        cell,
+                        layer.index,
+                        center,
+                        size
+                    );
+                }
+            }
+
+            scene.layerEndInstanceCounts[layer.index] =
+                    scene.voxels.size();
+
+            scene.layerEndGhostCounts[layer.index] =
+                    scene.ghostVoxels.size();
+
+            scene.center = Vector3{};
+            scene.framingMinimum = Vector3{
+                -cubeSide * 0.5F,
+                -span * 0.5F,
+                -span * 0.5F
+            };
+            scene.framingMaximum = Vector3{
+                cubeSide * 0.5F,
+                span * 0.5F,
+                span * 0.5F
+            };
+            scene.matrixSpan = span;
+            scene.layerSpacing = stackLayerGap();
+            scene.voxelSide = cubeSide;
+            scene.radius =
+                    std::sqrt(
+                        std::pow(span * 0.5F, 2.0F) *
+                        2.0F +
+                        std::pow(cubeSide * 0.5F, 2.0F)
+                    ) *
+                    1.08F;
+            scene.groundCenter = Vector3{
+                0.0F,
+                -span * 0.5F -
+                    cubeSide * 0.5F -
+                    cellPitch * 0.22F,
+                0.0F
+            };
+            scene.groundHalfExtentX =
+                    std::max(span * 0.78F, 2.5F);
+            scene.groundHalfExtentZ =
+                    std::max(span * 0.78F, 2.5F);
+
+            return scene;
+        }
+
         [[nodiscard]] InstanceScene buildFloorField(
             const DensityLayer &layer
         ) {
@@ -742,7 +862,8 @@ namespace quantum_sim::gui::density_volume {
     InstanceScene SceneBuilder::build(
         const DensityStack &stack,
         const std::size_t selectedLayer,
-        const VisualizationMode mode
+        const VisualizationMode mode,
+        const SceneViewOptions &options
     ) {
         if (stack.layers.empty()) {
             return InstanceScene{};
@@ -753,6 +874,33 @@ namespace quantum_sim::gui::density_volume {
                     selectedLayer,
                     stack.layers.size() - 1U
                 );
+
+        if (options.comparisonLayer.has_value()) {
+            const std::size_t safeReferenceLayer =
+                    std::min(
+                        options.comparisonLayer.value(),
+                        stack.layers.size() - 1U
+                    );
+
+            const DensityLayer differenceLayer =
+                    DensityModel::difference(
+                        stack.layers[safeLayer],
+                        stack.layers[safeReferenceLayer]
+                    );
+
+            return mode == VisualizationMode::LayerStack
+                       ? buildIsolatedLayer(differenceLayer)
+                       : buildFloorField(differenceLayer);
+        }
+
+        if (
+            mode == VisualizationMode::LayerStack &&
+            options.isolateSelectedLayer
+        ) {
+            return buildIsolatedLayer(
+                stack.layers[safeLayer]
+            );
+        }
 
         return mode == VisualizationMode::LayerStack
                    ? buildLayerStack(stack)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "SimulationHistoryWorker.hpp"
 #include "panels/GateLibraryPanel.hpp"
 #include "panels/InspectorPanel.hpp"
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
@@ -14,6 +15,8 @@
 
 #include <optional>
 #include <random>
+#include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -30,6 +33,8 @@ namespace quantum_sim::gui {
         std::optional<std::string> armedGate;
         bool startAtFinalStep{false};
         bool startInFloorField{false};
+        bool isolateDensityLayer{false};
+        std::optional<std::size_t> comparisonDensityLayer;
     };
 
     /**
@@ -172,6 +177,7 @@ namespace quantum_sim::gui {
             circuit::QuantumCircuit circuit;
             quantum::QuantumRegister initialState;
             bool hasUnsavedEdits{false};
+            std::optional<std::filesystem::path> projectPath;
         };
 
         ImFont *jetBrainsMonoFont_{nullptr};
@@ -184,6 +190,7 @@ namespace quantum_sim::gui {
         density_volume::Renderer densityVolumeRenderer_;
         density_volume::CameraController densityVolumeCamera_;
         density_volume::DensityStack densityVolumeStack_;
+        SimulationHistoryWorker simulationHistoryWorker_;
         GateLibraryPanel gateLibraryPanel_;
         std::optional<std::string> pendingGate_;
         std::optional<GateParameters> pendingGateParameters_;
@@ -192,8 +199,10 @@ namespace quantum_sim::gui {
         std::optional<SingleQubitPlacement> queuedSingleQubitPlacement_;
         std::optional<GateParameters> queuedSingleQubitParameters_;
         std::optional<GateParameters> queuedTwoQubitParameters_;
-        std::optional<std::size_t> queuedInstructionDeletion_;
+        std::vector<std::size_t> queuedInstructionDeletions_;
         std::optional<InstructionMove> queuedInstructionMove_;
+        std::vector<circuit::CircuitInstructionSnapshot> instructionClipboard_;
+        std::optional<std::size_t> queuedClipboardInsertionIndex_;
         std::optional<CircuitPreset> queuedPreset_;
         std::optional<CircuitPreset> presetAwaitingConfirmation_;
         std::optional<std::size_t> queuedBlankCircuitQubitCount_;
@@ -218,12 +227,20 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> lastDensityDebuggerStepNumber_;
         bool densityVolumePointerDragged_{false};
         bool densityVolumeCameraFramePending_{true};
+        bool isolateDensityLayer_{false};
+        bool compareDensityLayers_{false};
+        std::size_t comparisonDensityLayer_{};
         bool circuitFocusMode_{false};
         bool followManualEdits_{true};
         bool circuitHasUnsavedEdits_{false};
         std::optional<std::size_t> lastInspectorSelection_;
         GuiLaunchOptions launchOptions_;
         std::size_t renderedFrameCount_{0U};
+        std::uint64_t pendingSimulationRequestId_{};
+        std::string simulationBuildError_;
+        std::optional<std::filesystem::path> currentProjectPath_;
+        std::optional<std::filesystem::path> queuedProjectOpenPath_;
+        std::string projectStatusMessage_;
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
@@ -243,6 +260,24 @@ namespace quantum_sim::gui {
         void rebuildDensityVolume(
             std::optional<std::size_t> firstChangedInstruction = std::nullopt
         );
+
+        /**
+         * Atomically adopts the newest completed background history.
+         *
+         * Stale generations are ignored, and failed builds leave the last
+         * complete simulation visible while exposing a concise status error.
+         */
+        void adoptCompletedSimulationHistory();
+
+        /**
+         * Writes the current circuit to its existing path or asks for one.
+         */
+        void saveProject();
+
+        /**
+         * Loads the project path selected during the previous UI frame.
+         */
+        void applyQueuedProjectOpen();
 
         /**
          * Follows debugger navigation while preserving an explicit initial-layer selection.

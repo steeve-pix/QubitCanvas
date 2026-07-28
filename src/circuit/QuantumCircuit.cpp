@@ -10,6 +10,10 @@
 #include <cstddef>
 
 namespace quantum_sim::circuit {
+    const char *TraceBuildCancelled::what() const noexcept {
+        return "Circuit trace build cancelled";
+    }
+
     QuantumCircuit::QuantumCircuit(std::size_t qubitCount) : qubitCount_(qubitCount) {
         if (qubitCount == 0) {
             throw std::invalid_argument{"Can't be 0"};
@@ -253,12 +257,20 @@ namespace quantum_sim::circuit {
     std::vector<TraceStep> QuantumCircuit::executeWithTrace(
         const quantum::QuantumRegister &initialState
     ) const {
-        return executeWithTraceFrom(initialState, 0U);
+        return executeWithTrace(initialState, {});
+    }
+
+    std::vector<TraceStep> QuantumCircuit::executeWithTrace(
+        const quantum::QuantumRegister &initialState,
+        const std::stop_token stopToken
+    ) const {
+        return executeWithTraceFrom(initialState, 0U, stopToken);
     }
 
     std::vector<TraceStep> QuantumCircuit::executeWithTraceFrom(
         const quantum::QuantumRegister &stateBeforeFirstInstruction,
-        const std::size_t firstInstructionIndex
+        const std::size_t firstInstructionIndex,
+        const std::stop_token stopToken
     ) const {
         if (stateBeforeFirstInstruction.qubitCount() != qubitCount_) {
             throw std::invalid_argument{"Register qubit count must match the circuit qubit count."};
@@ -287,6 +299,10 @@ namespace quantum_sim::circuit {
             instructionIterator != instructions_.end();
             ++instructionIterator
         ) {
+            if (stopToken.stop_requested()) {
+                throw TraceBuildCancelled{};
+            }
+
             const Instruction &instruction =
                     *instructionIterator;
 
@@ -426,6 +442,230 @@ namespace quantum_sim::circuit {
         }
 
         return result;
+    }
+
+    std::vector<CircuitInstructionSnapshot>
+    QuantumCircuit::instructionSnapshots() const {
+        std::vector<CircuitInstructionSnapshot> result;
+        result.reserve(instructions_.size());
+
+        for (const Instruction &instruction : instructions_) {
+            std::visit(
+                [&result]<typename InstructionType>(
+                    const InstructionType &actualInstruction
+                ) {
+                    using ActualType =
+                            std::decay_t<InstructionType>;
+
+                    if constexpr (
+                        std::is_same_v<
+                            ActualType,
+                            SingleQubitInstruction
+                        >
+                    ) {
+                        result.push_back(
+                            CircuitInstructionSnapshot{
+                                .kind = CircuitInstructionKind::SingleQubit,
+                                .name = actualInstruction.name,
+                                .operands = {
+                                    actualInstruction.targetQubit
+                                },
+                                .angleRadians =
+                                    actualInstruction.angleRadians,
+                                .matrix = actualInstruction.gate
+                            }
+                        );
+                    } else if constexpr (
+                        std::is_same_v<
+                            ActualType,
+                            TwoQubitInstruction
+                        >
+                    ) {
+                        result.push_back(
+                            CircuitInstructionSnapshot{
+                                .kind = CircuitInstructionKind::TwoQubit,
+                                .name = actualInstruction.name,
+                                .operands = {
+                                    actualInstruction.firstQubit,
+                                    actualInstruction.secondQubit
+                                },
+                                .angleRadians =
+                                    actualInstruction.angleRadians,
+                                .matrix = actualInstruction.gate
+                            }
+                        );
+                    } else if constexpr (
+                        std::is_same_v<
+                            ActualType,
+                            ThreeQubitInstruction
+                        >
+                    ) {
+                        result.push_back(
+                            CircuitInstructionSnapshot{
+                                .kind = CircuitInstructionKind::ThreeQubit,
+                                .name = actualInstruction.name,
+                                .operands = {
+                                    actualInstruction.firstQubit,
+                                    actualInstruction.secondQubit,
+                                    actualInstruction.thirdQubit
+                                },
+                                .matrix = actualInstruction.gate
+                            }
+                        );
+                    } else if constexpr (
+                        std::is_same_v<
+                            ActualType,
+                            ReflectionInstruction
+                        >
+                    ) {
+                        result.push_back(
+                            CircuitInstructionSnapshot{
+                                .kind = CircuitInstructionKind::Reflection,
+                                .name = actualInstruction.name,
+                                .operands = {
+                                    actualInstruction.displayQubit
+                                },
+                                .reflectionAxis =
+                                    actualInstruction.normalizedAxis
+                            }
+                        );
+                    } else {
+                        std::vector<std::size_t> operands;
+
+                        if (
+                            actualInstruction.controlQubit.has_value() &&
+                            actualInstruction.targetQubit.has_value()
+                        ) {
+                            operands.push_back(
+                                actualInstruction.controlQubit.value()
+                            );
+
+                            operands.push_back(
+                                actualInstruction.targetQubit.value()
+                            );
+                        }
+
+                        result.push_back(
+                            CircuitInstructionSnapshot{
+                                .kind = CircuitInstructionKind::FullRegister,
+                                .name = actualInstruction.name,
+                                .operands = std::move(operands),
+                                .matrix = actualInstruction.gate
+                            }
+                        );
+                    }
+                },
+                instruction
+            );
+        }
+
+        return result;
+    }
+
+    void QuantumCircuit::insertInstructionSnapshot(
+        const std::size_t instructionIndex,
+        const CircuitInstructionSnapshot &snapshot
+    ) {
+        QuantumCircuit validatedInstruction{qubitCount_};
+
+        const auto requireOperands =
+                [&snapshot](const std::size_t count) {
+            if (snapshot.operands.size() != count) {
+                throw std::invalid_argument{
+                    "Circuit instruction has the wrong operand count."
+                };
+            }
+        };
+
+        const auto requireMatrix =
+                [&snapshot]() -> const math::ComplexMatrix & {
+            if (!snapshot.matrix.has_value()) {
+                throw std::invalid_argument{
+                    "Circuit instruction is missing its gate matrix."
+                };
+            }
+
+            return snapshot.matrix.value();
+        };
+
+        switch (snapshot.kind) {
+            case CircuitInstructionKind::SingleQubit:
+                requireOperands(1U);
+                validatedInstruction.addSingleQubitGate(
+                    snapshot.name,
+                    requireMatrix(),
+                    snapshot.operands[0],
+                    snapshot.angleRadians
+                );
+                break;
+
+            case CircuitInstructionKind::TwoQubit:
+                requireOperands(2U);
+                validatedInstruction.addTwoQubitGate(
+                    snapshot.name,
+                    requireMatrix(),
+                    snapshot.operands[0],
+                    snapshot.operands[1],
+                    snapshot.angleRadians
+                );
+                break;
+
+            case CircuitInstructionKind::ThreeQubit:
+                requireOperands(3U);
+                validatedInstruction.addThreeQubitGate(
+                    snapshot.name,
+                    requireMatrix(),
+                    snapshot.operands[0],
+                    snapshot.operands[1],
+                    snapshot.operands[2]
+                );
+                break;
+
+            case CircuitInstructionKind::Reflection:
+                requireOperands(1U);
+
+                if (!snapshot.reflectionAxis.has_value()) {
+                    throw std::invalid_argument{
+                        "Reflection instruction is missing its axis."
+                    };
+                }
+
+                validatedInstruction.addReflection(
+                    snapshot.name,
+                    snapshot.reflectionAxis.value(),
+                    snapshot.operands[0]
+                );
+                break;
+
+            case CircuitInstructionKind::FullRegister:
+                if (snapshot.operands.empty()) {
+                    validatedInstruction.addFullRegisterGate(
+                        snapshot.name,
+                        requireMatrix()
+                    );
+                } else {
+                    requireOperands(2U);
+                    validatedInstruction.addControlledGate(
+                        snapshot.name,
+                        requireMatrix(),
+                        snapshot.operands[0],
+                        snapshot.operands[1]
+                    );
+                }
+                break;
+        }
+
+        const std::size_t clampedIndex =
+                std::min(
+                    instructionIndex,
+                    instructions_.size()
+                );
+
+        instructions_.insert(
+            instructions_.begin() +
+                static_cast<std::ptrdiff_t>(clampedIndex),
+            std::move(validatedInstruction.instructions_.front())
+        );
     }
 
     void QuantumCircuit::addControlledGate(std::string name, math::ComplexMatrix gate, std::size_t controlQubit,

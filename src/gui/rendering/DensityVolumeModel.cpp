@@ -253,7 +253,8 @@ namespace quantum_sim::gui::density_volume {
 
     DensityStack DensityModel::build(
         const debug::DebuggerSession &session,
-        const std::size_t maximumDimension
+        const std::size_t maximumDimension,
+        const std::stop_token stopToken
     ) {
         if (maximumDimension < 2U) {
             throw std::invalid_argument{"Density Volume density dimension must be at least two."};
@@ -273,6 +274,10 @@ namespace quantum_sim::gui::density_volume {
         );
 
         for (std::size_t stepIndex = 0; stepIndex < session.stepCount(); ++stepIndex) {
+            if (stopToken.stop_requested()) {
+                throw circuit::TraceBuildCancelled{};
+            }
+
             const circuit::TraceStep &step =
                     session.stepAt(stepIndex);
 
@@ -295,7 +300,8 @@ namespace quantum_sim::gui::density_volume {
         DensityStack &stack,
         const debug::DebuggerSession &session,
         const std::size_t firstChangedInstruction,
-        const std::size_t maximumDimension
+        const std::size_t maximumDimension,
+        const std::stop_token stopToken
     ) {
         const std::size_t preservedLayerCount =
                 firstChangedInstruction + 1U;
@@ -308,7 +314,8 @@ namespace quantum_sim::gui::density_volume {
             stack =
                     build(
                         session,
-                        maximumDimension
+                        maximumDimension,
+                        stopToken
                     );
             return;
         }
@@ -327,6 +334,10 @@ namespace quantum_sim::gui::density_volume {
             stepIndex < session.stepCount();
             ++stepIndex
         ) {
+            if (stopToken.stop_requested()) {
+                throw circuit::TraceBuildCancelled{};
+            }
+
             const circuit::TraceStep &step =
                     session.stepAt(stepIndex);
 
@@ -341,5 +352,74 @@ namespace quantum_sim::gui::density_volume {
         }
 
         finalizeStackMetadata(stack);
+    }
+
+    DensityLayer DensityModel::difference(
+        const DensityLayer &selected,
+        const DensityLayer &reference
+    ) {
+        if (
+            selected.dimension != reference.dimension ||
+            selected.cells.size() != reference.cells.size()
+        ) {
+            throw std::invalid_argument{
+                "Density layers must have matching dimensions for comparison."
+            };
+        }
+
+        DensityLayer differenceLayer{
+            .index = selected.index,
+            .dimension = selected.dimension,
+            .sourceStateCount = selected.sourceStateCount,
+            .bucketed = selected.bucketed || reference.bucketed,
+            .label =
+                "Difference from layer " +
+                std::to_string(reference.index),
+            .bins = selected.bins
+        };
+
+        differenceLayer.cells.reserve(
+            selected.cells.size()
+        );
+
+        for (
+            std::size_t cellIndex = 0U;
+            cellIndex < selected.cells.size();
+            ++cellIndex
+        ) {
+            const DensityCell &selectedCell =
+                    selected.cells[cellIndex];
+
+            const DensityCell &referenceCell =
+                    reference.cells[cellIndex];
+
+            const double real =
+                    selectedCell.real -
+                    referenceCell.real;
+
+            const double imaginary =
+                    selectedCell.imaginary -
+                    referenceCell.imaginary;
+
+            const double magnitude =
+                    std::hypot(real, imaginary);
+
+            differenceLayer.cells.push_back(
+                DensityCell{
+                    .row = selectedCell.row,
+                    .column = selectedCell.column,
+                    .magnitude = magnitude,
+                    .intensity = magnitude * magnitude,
+                    .phaseRadians =
+                        magnitude > 1e-12
+                            ? std::atan2(imaginary, real)
+                            : 0.0,
+                    .real = real,
+                    .imaginary = imaginary
+                }
+            );
+        }
+
+        return differenceLayer;
     }
 }
