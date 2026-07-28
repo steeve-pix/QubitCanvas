@@ -140,12 +140,17 @@ namespace quantum_sim::debug {
     }
 
     void DebuggerSession::rebuild(const circuit::QuantumCircuit &circuit,
-                                  const quantum::QuantumRegister &initialState) {
+                                  const quantum::QuantumRegister &initialState,
+                                  const std::stop_token stopToken) {
         initialState_ = initialState;
 
         // Trace and metadata are rebuilt together so indices stay aligned.
         trace_ =
-                circuit.executeWithTrace(initialState_);
+                circuit.executeWithTrace(initialState_, stopToken);
+
+        if (stopToken.stop_requested()) {
+            throw circuit::TraceBuildCancelled{};
+        }
 
         instructions_ = circuit.instructionInfo();
 
@@ -155,14 +160,15 @@ namespace quantum_sim::debug {
     void DebuggerSession::rebuildFrom(
         const circuit::QuantumCircuit &circuit,
         const quantum::QuantumRegister &initialState,
-        const std::size_t firstChangedInstruction
+        const std::size_t firstChangedInstruction,
+        const std::stop_token stopToken
     ) {
         if (
             initialState.qubitCount() != initialState_.qubitCount() ||
             firstChangedInstruction > trace_.size() ||
             firstChangedInstruction > circuit.instructionCount()
         ) {
-            rebuild(circuit, initialState);
+            rebuild(circuit, initialState, stopToken);
             return;
         }
 
@@ -177,8 +183,13 @@ namespace quantum_sim::debug {
         std::vector<circuit::TraceStep> rebuiltSuffix =
                 circuit.executeWithTraceFrom(
                     stateBeforeChangedInstruction,
-                    firstChangedInstruction
+                    firstChangedInstruction,
+                    stopToken
                 );
+
+        if (stopToken.stop_requested()) {
+            throw circuit::TraceBuildCancelled{};
+        }
 
         trace_.erase(
             trace_.begin() +

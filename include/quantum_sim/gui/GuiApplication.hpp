@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "SimulationHistoryWorker.hpp"
 #include "panels/GateLibraryPanel.hpp"
 #include "panels/InspectorPanel.hpp"
 #include "quantum_sim/circuit/QuantumCircuit.hpp"
@@ -14,6 +15,7 @@
 
 #include <optional>
 #include <random>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -184,6 +186,7 @@ namespace quantum_sim::gui {
         density_volume::Renderer densityVolumeRenderer_;
         density_volume::CameraController densityVolumeCamera_;
         density_volume::DensityStack densityVolumeStack_;
+        SimulationHistoryWorker simulationHistoryWorker_;
         GateLibraryPanel gateLibraryPanel_;
         std::optional<std::string> pendingGate_;
         std::optional<GateParameters> pendingGateParameters_;
@@ -224,6 +227,8 @@ namespace quantum_sim::gui {
         std::optional<std::size_t> lastInspectorSelection_;
         GuiLaunchOptions launchOptions_;
         std::size_t renderedFrameCount_{0U};
+        std::uint64_t pendingSimulationRequestId_{};
+        std::string simulationBuildError_;
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
@@ -243,6 +248,14 @@ namespace quantum_sim::gui {
         void rebuildDensityVolume(
             std::optional<std::size_t> firstChangedInstruction = std::nullopt
         );
+
+        /**
+         * Atomically adopts the newest completed background history.
+         *
+         * Stale generations are ignored, and failed builds leave the last
+         * complete simulation visible while exposing a concise status error.
+         */
+        void adoptCompletedSimulationHistory();
 
         /**
          * Follows debugger navigation while preserving an explicit initial-layer selection.

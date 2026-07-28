@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <stop_token>
 #include <vector>
 
 #include "DebuggerSnapshot.hpp"
@@ -125,7 +126,11 @@ namespace quantum_sim::debug {
          * @param circuit Circuit to execute.
          * @param initialState Register used as the trace start.
          */
-        void rebuild(const circuit::QuantumCircuit &circuit, const quantum::QuantumRegister &initialState);
+        void rebuild(
+            const circuit::QuantumCircuit &circuit,
+            const quantum::QuantumRegister &initialState,
+            std::stop_token stopToken = {}
+        );
 
         /**
          * Recomputes only the trace suffix affected by a circuit edit.
@@ -141,7 +146,8 @@ namespace quantum_sim::debug {
         void rebuildFrom(
             const circuit::QuantumCircuit &circuit,
             const quantum::QuantumRegister &initialState,
-            std::size_t firstChangedInstruction
+            std::size_t firstChangedInstruction,
+            std::stop_token stopToken = {}
         );
 
         /**

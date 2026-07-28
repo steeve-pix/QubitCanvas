@@ -344,6 +344,7 @@ namespace quantum_sim::gui {
             handleGlobalShortcuts();
             applyQueuedPreset();
             applyQueuedCircuitEdits();
+            adoptCompletedSimulationHistory();
 
             debug::DebuggerSnapshot snapshot =
                     session_.snapshot();
@@ -1274,7 +1275,10 @@ namespace quantum_sim::gui {
             return;
         }
 
-        if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+        if (
+            ImGui::IsKeyPressed(ImGuiKey_Space, false) &&
+            !simulationHistoryWorker_.busy()
+        ) {
             playbackPaused_ =
                     !playbackPaused_;
 
@@ -1831,10 +1835,28 @@ namespace quantum_sim::gui {
 
         ImGui::SameLine();
         ImGui::TextColored(
-            ImVec4{1.0F, 0.76F, 0.18F, 1.0F},
+            simulationHistoryWorker_.busy()
+                ? ImVec4{0.34F, 0.74F, 1.0F, 1.0F}
+                : simulationBuildError_.empty()
+                    ? ImVec4{1.0F, 0.76F, 0.18F, 1.0F}
+                    : ImVec4{1.0F, 0.34F, 0.34F, 1.0F},
             "%s",
-            playbackPaused_ ? "settle" : "running"
+            simulationHistoryWorker_.busy()
+                ? "building"
+                : simulationBuildError_.empty()
+                    ? playbackPaused_ ? "settle" : "running"
+                    : "build failed"
         );
+
+        if (
+            !simulationBuildError_.empty() &&
+            ImGui::IsItemHovered()
+        ) {
+            ImGui::SetTooltip(
+                "%s",
+                simulationBuildError_.c_str()
+            );
+        }
 
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - 690.0F);
 
@@ -1879,6 +1901,10 @@ namespace quantum_sim::gui {
 
         ImGui::SameLine();
 
+        if (simulationHistoryWorker_.busy()) {
+            ImGui::BeginDisabled();
+        }
+
         if (ImGui::Button(
             playbackPaused_ ? "Play" : "Pause",
             ImVec2{98.0F, 0.0F}
@@ -1912,6 +1938,10 @@ namespace quantum_sim::gui {
 
         if (ImGui::Button("Sample", ImVec2{110.0F, 0.0F})) {
             sampleCurrentState(snapshot.afterState.get());
+        }
+
+        if (simulationHistoryWorker_.busy()) {
+            ImGui::EndDisabled();
         }
 
         ImGui::End();
@@ -2498,6 +2528,10 @@ namespace quantum_sim::gui {
         debug::DebuggerSession &session,
         const debug::DebuggerSnapshot &snapshot
     ) {
+        if (simulationHistoryWorker_.busy()) {
+            return;
+        }
+
         if (
             playbackPaused_ ||
             snapshot.stepCount == 0
@@ -3492,33 +3526,82 @@ namespace quantum_sim::gui {
         const std::optional<std::size_t> firstChangedInstruction,
         const std::optional<std::size_t> preferredStep
     ) {
-        if (firstChangedInstruction.has_value()) {
-            session_.rebuildFrom(
-                circuit_,
-                initialState_,
-                firstChangedInstruction.value()
-            );
-        } else {
-            session_.rebuild(
-                circuit_,
-                initialState_
-            );
-        }
+        const std::optional<std::size_t> safeFirstChangedInstruction =
+                simulationHistoryWorker_.busy()
+                    ? std::nullopt
+                    : firstChangedInstruction;
+
+        playbackPaused_ = true;
+        simulationBuildError_.clear();
+
+        pendingSimulationRequestId_ =
+                simulationHistoryWorker_.request(
+                    circuit_,
+                    initialState_,
+                    session_,
+                    densityVolumeStack_,
+                    safeFirstChangedInstruction,
+                    preferredStep,
+                    followManualEdits_
+                );
+    }
+
+    void GuiApplication::adoptCompletedSimulationHistory() {
+        std::optional<SimulationHistoryResult> result =
+                simulationHistoryWorker_.takeCompleted();
 
         if (
-            followManualEdits_ &&
-            preferredStep.has_value()
+            !result.has_value() ||
+            result->requestId != pendingSimulationRequestId_
+        ) {
+            return;
+        }
+
+        if (!result->error.empty()) {
+            simulationBuildError_ =
+                    std::move(result->error);
+            return;
+        }
+
+        if (!result->session.has_value()) {
+            simulationBuildError_ =
+                    "Simulation history completed without a debugger trace.";
+            return;
+        }
+
+        session_ =
+                std::move(result->session.value());
+
+        densityVolumeStack_ =
+                std::move(result->densityStack);
+
+        if (
+            result->followPreferredStep &&
+            result->preferredStep.has_value()
         ) {
             session_.moveToStepNumber(
                 std::min(
-                    preferredStep.value(),
+                    result->preferredStep.value(),
                     session_.stepCount()
                 )
             );
         }
 
-        rebuildDensityVolume(
-            firstChangedInstruction
+        if (densityVolumeStack_.layers.empty()) {
+            selectedDensityLayer_ = 0U;
+        } else {
+            selectedDensityLayer_ =
+                    std::min(
+                        session_.currentStepNumber(),
+                        densityVolumeStack_.layers.size() - 1U
+                    );
+        }
+
+        lastDensityDebuggerStepNumber_.reset();
+        densityVolumeCameraFramePending_ = true;
+        simulationBuildError_.clear();
+        synchronizeDensityLayer(
+            session_.snapshot()
         );
     }
 

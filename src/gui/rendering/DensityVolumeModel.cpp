@@ -253,7 +253,8 @@ namespace quantum_sim::gui::density_volume {
 
     DensityStack DensityModel::build(
         const debug::DebuggerSession &session,
-        const std::size_t maximumDimension
+        const std::size_t maximumDimension,
+        const std::stop_token stopToken
     ) {
         if (maximumDimension < 2U) {
             throw std::invalid_argument{"Density Volume density dimension must be at least two."};
@@ -273,6 +274,10 @@ namespace quantum_sim::gui::density_volume {
         );
 
         for (std::size_t stepIndex = 0; stepIndex < session.stepCount(); ++stepIndex) {
+            if (stopToken.stop_requested()) {
+                throw circuit::TraceBuildCancelled{};
+            }
+
             const circuit::TraceStep &step =
                     session.stepAt(stepIndex);
 
@@ -295,7 +300,8 @@ namespace quantum_sim::gui::density_volume {
         DensityStack &stack,
         const debug::DebuggerSession &session,
         const std::size_t firstChangedInstruction,
-        const std::size_t maximumDimension
+        const std::size_t maximumDimension,
+        const std::stop_token stopToken
     ) {
         const std::size_t preservedLayerCount =
                 firstChangedInstruction + 1U;
@@ -308,7 +314,8 @@ namespace quantum_sim::gui::density_volume {
             stack =
                     build(
                         session,
-                        maximumDimension
+                        maximumDimension,
+                        stopToken
                     );
             return;
         }
@@ -327,6 +334,10 @@ namespace quantum_sim::gui::density_volume {
             stepIndex < session.stepCount();
             ++stepIndex
         ) {
+            if (stopToken.stop_requested()) {
+                throw circuit::TraceBuildCancelled{};
+            }
+
             const circuit::TraceStep &step =
                     session.stepAt(stepIndex);
 

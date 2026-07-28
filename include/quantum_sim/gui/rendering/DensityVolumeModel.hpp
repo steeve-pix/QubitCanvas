@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <stop_token>
 #include <string>
 #include <vector>
 
@@ -93,7 +94,8 @@ namespace quantum_sim::gui::density_volume {
          */
         [[nodiscard]] static DensityStack build(
             const debug::DebuggerSession &session,
-            std::size_t maximumDimension = 16U
+            std::size_t maximumDimension = 16U,
+            std::stop_token stopToken = {}
         );
 
         /**
@@ -108,7 +110,8 @@ namespace quantum_sim::gui::density_volume {
             DensityStack &stack,
             const debug::DebuggerSession &session,
             std::size_t firstChangedInstruction,
-            std::size_t maximumDimension = 16U
+            std::size_t maximumDimension = 16U,
+            std::stop_token stopToken = {}
         );
     };
 }

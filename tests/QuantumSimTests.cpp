@@ -9,6 +9,7 @@
 #include "quantum_sim/debug/InteractiveCircuitDebugger.hpp"
 #include "quantum_sim/gui/GateNotation.hpp"
 #include "quantum_sim/gui/QuantumNotation.hpp"
+#include "quantum_sim/gui/SimulationHistoryWorker.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeColorMap.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeModel.hpp"
 #include "quantum_sim/gui/rendering/DensityVolumeScene.hpp"
@@ -16,6 +17,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <chrono>
 #include <sstream>
 #include <iostream>
 #include <cmath>
@@ -23,6 +25,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -66,6 +69,117 @@ namespace {
     }
 } //
 int main() {
+    {
+        QuantumCircuit cancellableCircuit{1U};
+        cancellableCircuit.addSingleQubitGate(
+            "H",
+            quantum_sim::gates::hadamardGate(),
+            0U
+        );
+
+        std::stop_source cancelledBuild;
+        cancelledBuild.request_stop();
+
+        bool cancellationObserved = false;
+
+        try {
+            static_cast<void>(
+                cancellableCircuit.executeWithTrace(
+                    QuantumRegister::basisState(1U, 0U),
+                    cancelledBuild.get_token()
+                )
+            );
+        } catch (const quantum_sim::circuit::TraceBuildCancelled &) {
+            cancellationObserved = true;
+        }
+
+        check(
+            cancellationObserved,
+            "Circuit traces cooperatively stop before cancelled background work executes"
+        );
+    }
+
+    {
+        QuantumCircuit baseCircuit{1U};
+        const QuantumRegister baseState =
+                QuantumRegister::basisState(1U, 0U);
+
+        quantum_sim::debug::DebuggerSession baseSession{
+            baseCircuit,
+            baseState
+        };
+
+        const auto baseDensity =
+                quantum_sim::gui::density_volume::DensityModel::build(
+                    baseSession
+                );
+
+        quantum_sim::gui::SimulationHistoryWorker worker;
+
+        const QuantumCircuit supersededCircuit =
+                quantum_sim::algorithms::randomCircuit(
+                    10U,
+                    0xA51CULL
+                );
+
+        static_cast<void>(
+            worker.request(
+                supersededCircuit,
+                QuantumRegister::basisState(10U, 0U),
+                baseSession,
+                baseDensity,
+                std::nullopt,
+                std::nullopt,
+                false
+            )
+        );
+
+        QuantumCircuit latestCircuit{1U};
+        latestCircuit.addSingleQubitGate(
+            "X",
+            quantum_sim::gates::xGate(),
+            0U
+        );
+
+        const std::uint64_t latestRequest =
+                worker.request(
+                    latestCircuit,
+                    baseState,
+                    baseSession,
+                    baseDensity,
+                    std::nullopt,
+                    1U,
+                    true
+                );
+
+        std::optional<quantum_sim::gui::SimulationHistoryResult> completed;
+        const auto deadline =
+                std::chrono::steady_clock::now() +
+                std::chrono::seconds{3};
+
+        while (
+            !completed.has_value() &&
+            std::chrono::steady_clock::now() < deadline
+        ) {
+            completed = worker.takeCompleted();
+
+            if (!completed.has_value()) {
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds{2}
+                );
+            }
+        }
+
+        check(
+            completed.has_value() &&
+            completed->requestId == latestRequest &&
+            completed->session.has_value() &&
+            completed->session->stepCount() == 1U &&
+            completed->error.empty(),
+            "Background history worker publishes only the newest requested circuit"
+        );
+    }
+
     const std::vector<std::string_view> builtInGateNames{
         "H", "X", "Y", "Z", "S", "Sdg", "T", "Tdg", "SX", "SXdg",
         "P", "U", "Rx", "Ry", "Rz",

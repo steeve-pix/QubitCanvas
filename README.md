@@ -115,6 +115,12 @@ that temporarily hides the visualizers, and an optional Follow edits mode that
 shows the state after each manual edit. Existing gates can be dragged to a new
 timeline position or moved one step with the adjacent arrow controls. Manual
 edits rebuild only the affected debugger and density-history suffix.
+Trace and density reconstruction run on a persistent background worker.
+Choosing another preset or editing again cancels superseded work between
+instructions and density layers; only the newest completed generation can
+replace the visible debugger state. Playback pauses while a build is active,
+and the last complete visualization remains stable until the replacement is
+ready.
 Circuit gate boxes widen within their timeline slot for long operation names,
 and hovering a placed gate always reveals its complete name.
 In the normal workspace, the circuit and Density Volume always divide the
