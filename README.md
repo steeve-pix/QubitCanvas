@@ -16,6 +16,7 @@ GLFW, Dear ImGui, GLAD, and OpenGL provide the desktop and rendering layers.
 - Step-by-step debugger with play, pause, restart, scrub, and sampling controls.
 - Synchronized circuit, density-matrix, probability, and Bloch-sphere views.
 - Hover documentation with matrices for every gate in the gate library.
+- Native `.qcanvas` project save/open with `Ctrl+S` and `Ctrl+O`.
 - Exact quantum notation for familiar fractions, radicals, complex values, and
   rational multiples of `π`, with compact decimal fallback.
 - JetBrains Mono typography throughout the interface.
@@ -140,6 +141,12 @@ scrolls its probability table to the qubit most recently selected or edited.
 Both actions, algorithm replacement, and register-size changes store complete
 Undo snapshots. Loading a preset asks for confirmation when the current circuit
 contains custom edits.
+
+The top bar opens and saves versioned `.qcanvas` project documents through the
+native file picker. Projects retain the complete normalized initial register,
+compact gate matrices, operands, exact stored angles, full-register operations,
+and reflection axes. The current project name carries an asterisk while edits
+have not been saved.
 
 `SWAP` is drawn as two crossed exchange paths rather than endpoint crosses.
 Compact `SW`, `iSW`, and `√SW` badges distinguish exchange variants without

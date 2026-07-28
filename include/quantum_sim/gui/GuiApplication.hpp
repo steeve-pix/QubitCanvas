@@ -16,6 +16,7 @@
 #include <optional>
 #include <random>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -174,6 +175,7 @@ namespace quantum_sim::gui {
             circuit::QuantumCircuit circuit;
             quantum::QuantumRegister initialState;
             bool hasUnsavedEdits{false};
+            std::optional<std::filesystem::path> projectPath;
         };
 
         ImFont *jetBrainsMonoFont_{nullptr};
@@ -229,6 +231,9 @@ namespace quantum_sim::gui {
         std::size_t renderedFrameCount_{0U};
         std::uint64_t pendingSimulationRequestId_{};
         std::string simulationBuildError_;
+        std::optional<std::filesystem::path> currentProjectPath_;
+        std::optional<std::filesystem::path> queuedProjectOpenPath_;
+        std::string projectStatusMessage_;
 
         /**
          * Rebuilds debugger state after the editable circuit changes.
@@ -256,6 +261,16 @@ namespace quantum_sim::gui {
          * complete simulation visible while exposing a concise status error.
          */
         void adoptCompletedSimulationHistory();
+
+        /**
+         * Writes the current circuit to its existing path or asks for one.
+         */
+        void saveProject();
+
+        /**
+         * Loads the project path selected during the previous UI frame.
+         */
+        void applyQueuedProjectOpen();
 
         /**
          * Follows debugger navigation while preserving an explicit initial-layer selection.
