@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <numbers>
 #include <sstream>
 #include <string_view>
@@ -1144,16 +1145,14 @@ namespace quantum_sim::gui {
                     }
 
                     try {
-                        subcircuitLibrary_.save(
+                        const std::string savedId =
+                                subcircuitLibrary_.save(
                             reusableSubcircuitName_.data(),
                             circuit_.qubitCount(),
                             selectedInstructions
                         );
 
-                        reusableSubcircuits_ =
-                                subcircuitLibrary_.loadAll();
-
-                        selectedReusableSubcircuit_ = 0U;
+                        reloadReusableSubcircuits(savedId);
                         projectStatusMessage_ =
                                 "Reusable block saved.";
                         ImGui::CloseCurrentPopup();
@@ -3969,6 +3968,50 @@ namespace quantum_sim::gui {
                 state.basisStateLabel(measuredIndex);
     }
 
+    void GuiApplication::reloadReusableSubcircuits(
+        const std::optional<std::string> &preferredId
+    ) {
+        const std::size_t previousIndex =
+                selectedReusableSubcircuit_;
+
+        reusableSubcircuits_ =
+                subcircuitLibrary_.loadAll();
+
+        if (reusableSubcircuits_.empty()) {
+            selectedReusableSubcircuit_ = 0U;
+            return;
+        }
+
+        if (preferredId.has_value()) {
+            const auto preferred = std::find_if(
+                reusableSubcircuits_.begin(),
+                reusableSubcircuits_.end(),
+                [&preferredId](
+                    const project::StoredSubcircuit &block
+                ) {
+                    return block.id == *preferredId;
+                }
+            );
+
+            if (preferred != reusableSubcircuits_.end()) {
+                selectedReusableSubcircuit_ =
+                        static_cast<std::size_t>(
+                            std::distance(
+                                reusableSubcircuits_.begin(),
+                                preferred
+                            )
+                        );
+                return;
+            }
+        }
+
+        selectedReusableSubcircuit_ =
+                std::min(
+                    previousIndex,
+                    reusableSubcircuits_.size() - 1U
+                );
+    }
+
     void GuiApplication::drawReusableSubcircuits() {
         ImGui::Spacing();
         ImGui::SeparatorText("Reusable blocks");
@@ -4008,6 +4051,10 @@ namespace quantum_sim::gui {
                         blockIndex ==
                         selectedReusableSubcircuit_;
 
+                ImGui::PushID(
+                    reusableSubcircuits_[blockIndex].id.c_str()
+                );
+
                 if (
                     ImGui::Selectable(
                         reusableSubcircuits_[
@@ -4019,6 +4066,8 @@ namespace quantum_sim::gui {
                     selectedReusableSubcircuit_ =
                             blockIndex;
                 }
+
+                ImGui::PopID();
             }
 
             ImGui::EndCombo();
@@ -4039,12 +4088,21 @@ namespace quantum_sim::gui {
             ImGui::BeginDisabled();
         }
 
-        if (
-            ImGui::Button(
-                "Insert block",
-                ImVec2{-1.0F, 0.0F}
-            )
-        ) {
+        const float actionSpacing =
+                ImGui::GetStyle().ItemSpacing.x;
+        constexpr float managementButtonWidth = 72.0F;
+        const float insertButtonWidth =
+                std::max(
+                    96.0F,
+                    ImGui::GetContentRegionAvail().x -
+                        managementButtonWidth * 2.0F -
+                        actionSpacing * 2.0F
+                );
+
+        if (ImGui::Button(
+            "Insert block",
+            ImVec2{insertButtonWidth, 0.0F}
+        )) {
             instructionClipboard_ =
                     active.instructions;
 
@@ -4074,6 +4132,229 @@ namespace quantum_sim::gui {
 
         if (!canInsert) {
             ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(
+            "Rename",
+            ImVec2{managementButtonWidth, 0.0F}
+        )) {
+            reusableSubcircuitRename_.fill('\0');
+            active.name.copy(
+                reusableSubcircuitRename_.data(),
+                reusableSubcircuitRename_.size() - 1U
+            );
+            reusableSubcircuitDialogId_ = active.id;
+            reusableSubcircuitDialogError_.clear();
+            ImGui::OpenPopup("Rename reusable block");
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Rename this personal block without changing its gates."
+            );
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button(
+            "Delete",
+            ImVec2{managementButtonWidth, 0.0F}
+        )) {
+            reusableSubcircuitDialogId_ = active.id;
+            reusableSubcircuitDialogError_.clear();
+            ImGui::OpenPopup("Delete reusable block");
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip(
+                "Permanently delete this personal block."
+            );
+        }
+
+        if (ImGui::BeginPopupModal(
+            "Rename reusable block",
+            nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize
+        )) {
+            ImGui::TextUnformatted("Block name");
+            ImGui::SetNextItemWidth(320.0F);
+
+            if (ImGui::IsWindowAppearing()) {
+                ImGui::SetKeyboardFocusHere();
+            }
+
+            const bool enterPressed = ImGui::InputText(
+                "##ReusableBlockRename",
+                reusableSubcircuitRename_.data(),
+                reusableSubcircuitRename_.size(),
+                ImGuiInputTextFlags_EnterReturnsTrue
+            );
+
+            const std::string requestedName{
+                reusableSubcircuitRename_.data()
+            };
+            const bool hasName =
+                    requestedName.find_first_not_of(" \t\r\n") !=
+                    std::string::npos;
+
+            if (!reusableSubcircuitDialogError_.empty()) {
+                ImGui::TextColored(
+                    ImVec4{1.0F, 0.45F, 0.35F, 1.0F},
+                    "%s",
+                    reusableSubcircuitDialogError_.c_str()
+                );
+            }
+
+            if (!hasName) {
+                ImGui::BeginDisabled();
+            }
+
+            const bool renamePressed = ImGui::Button(
+                "Rename",
+                ImVec2{110.0F, 0.0F}
+            );
+
+            if (!hasName) {
+                ImGui::EndDisabled();
+            }
+
+            if (
+                hasName &&
+                (enterPressed || renamePressed) &&
+                reusableSubcircuitDialogId_.has_value()
+            ) {
+                try {
+                    const std::string id =
+                            *reusableSubcircuitDialogId_;
+
+                    subcircuitLibrary_.renameBlock(
+                        id,
+                        requestedName
+                    );
+
+                    reloadReusableSubcircuits(id);
+                    projectStatusMessage_ =
+                            "Reusable block renamed.";
+                    reusableSubcircuitDialogId_.reset();
+                    reusableSubcircuitDialogError_.clear();
+                    ImGui::CloseCurrentPopup();
+                } catch (const std::exception &error) {
+                    reusableSubcircuitDialogError_ = error.what();
+                }
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button(
+                "Cancel",
+                ImVec2{110.0F, 0.0F}
+            )) {
+                reusableSubcircuitDialogId_.reset();
+                reusableSubcircuitDialogError_.clear();
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
+        if (ImGui::BeginPopupModal(
+            "Delete reusable block",
+            nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize
+        )) {
+            const auto target = std::find_if(
+                reusableSubcircuits_.begin(),
+                reusableSubcircuits_.end(),
+                [this](const project::StoredSubcircuit &block) {
+                    return reusableSubcircuitDialogId_.has_value() &&
+                           block.id == *reusableSubcircuitDialogId_;
+                }
+            );
+
+            if (target != reusableSubcircuits_.end()) {
+                ImGui::Text(
+                    "Delete \"%s\"?",
+                    target->name.c_str()
+                );
+                ImGui::TextDisabled(
+                    "%zu gates  |  %zu qubits",
+                    target->instructions.size(),
+                    target->sourceQubitCount
+                );
+                ImGui::Spacing();
+                ImGui::TextWrapped(
+                    "This removes the block from this computer. The current circuit is not changed."
+                );
+
+                if (!reusableSubcircuitDialogError_.empty()) {
+                    ImGui::TextColored(
+                        ImVec4{1.0F, 0.45F, 0.35F, 1.0F},
+                        "%s",
+                        reusableSubcircuitDialogError_.c_str()
+                    );
+                }
+
+                if (ImGui::Button(
+                    "Cancel",
+                    ImVec2{110.0F, 0.0F}
+                )) {
+                    reusableSubcircuitDialogId_.reset();
+                    reusableSubcircuitDialogError_.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+
+                ImGui::SameLine();
+                ImGui::PushStyleColor(
+                    ImGuiCol_Button,
+                    ImVec4{0.48F, 0.12F, 0.10F, 1.0F}
+                );
+                ImGui::PushStyleColor(
+                    ImGuiCol_ButtonHovered,
+                    ImVec4{0.68F, 0.17F, 0.12F, 1.0F}
+                );
+                ImGui::PushStyleColor(
+                    ImGuiCol_ButtonActive,
+                    ImVec4{0.80F, 0.22F, 0.14F, 1.0F}
+                );
+
+                const bool deletePressed = ImGui::Button(
+                    "Delete",
+                    ImVec2{110.0F, 0.0F}
+                );
+
+                ImGui::PopStyleColor(3);
+
+                if (deletePressed) {
+                    try {
+                        subcircuitLibrary_.erase(target->id);
+                        reloadReusableSubcircuits();
+                        projectStatusMessage_ =
+                                "Reusable block deleted.";
+                        reusableSubcircuitDialogId_.reset();
+                        reusableSubcircuitDialogError_.clear();
+                        ImGui::CloseCurrentPopup();
+                    } catch (const std::exception &error) {
+                        reusableSubcircuitDialogError_ = error.what();
+                    }
+                }
+            } else {
+                ImGui::TextDisabled(
+                    "This reusable block no longer exists."
+                );
+
+                if (ImGui::Button(
+                    "Close",
+                    ImVec2{110.0F, 0.0F}
+                )) {
+                    reusableSubcircuitDialogId_.reset();
+                    reusableSubcircuitDialogError_.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+
+            ImGui::EndPopup();
         }
     }
 
