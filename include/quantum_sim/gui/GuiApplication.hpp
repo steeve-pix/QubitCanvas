@@ -225,6 +225,9 @@ namespace quantum_sim::gui {
         std::vector<project::StoredSubcircuit> reusableSubcircuits_;
         std::size_t selectedReusableSubcircuit_{0U};
         std::array<char, 64U> reusableSubcircuitName_{};
+        std::array<char, 64U> reusableSubcircuitRename_{};
+        std::optional<std::string> reusableSubcircuitDialogId_;
+        std::string reusableSubcircuitDialogError_;
         std::optional<CircuitPreset> queuedPreset_;
         std::optional<CircuitPreset> presetAwaitingConfirmation_;
         std::optional<std::size_t> queuedBlankCircuitQubitCount_;
@@ -436,6 +439,16 @@ namespace quantum_sim::gui {
          * Draws the compact persistent-block chooser in the Gate Library.
          */
         void drawReusableSubcircuits();
+
+        /**
+         * Reloads personal blocks and keeps either the requested stable ID or
+         * the nearest valid list position selected.
+         *
+         * @param preferredId Stable block ID to reselect after a mutation.
+         */
+        void reloadReusableSubcircuits(
+            const std::optional<std::string> &preferredId = std::nullopt
+        );
 
         /**
          * Draws the compact bottom status strip.
