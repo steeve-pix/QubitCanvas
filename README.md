@@ -195,7 +195,12 @@ anchor is published after the current frame's gate interaction, and sibling
 ordering keeps it above the canvas without sacrificing slider input. Any
 selected gate range can be named with `Save block`; persistent
 blocks appear in the compact Reusable blocks chooser and can be inserted into
-compatible registers.
+compatible registers. The chooser also renames blocks in place and deletes an
+exact selected block after a confirmation that shows its gate and qubit counts.
+Block display names are stored separately from opaque filesystem IDs, so names
+such as `Phase:A` and `Phase?A` no longer overwrite one another on Windows.
+Older filename-named `.qcanvas` blocks remain readable and gain metadata the
+first time they are renamed or replaced.
 
 The Inspector State analysis section computes directly from the exact complex
 state vector. It reports fidelity to the preceding step, mean single-qubit
