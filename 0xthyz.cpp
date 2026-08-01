@@ -297,11 +297,19 @@
         It never interprets quantum data; ProjectFile does that.
 
     SubcircuitLibrary.hpp / SubcircuitLibrary.cpp
-        StoredSubcircuit owns name, source size, lossless snapshots.
+        StoredSubcircuit owns stable ID, display name, source size, snapshots.
         canInsertInto() protects operands and register-wide semantics.
-        SubcircuitLibrary::save() writes a selected range as .qcanvas.
+        SubcircuitLibrary::save() writes a selected range as .qcanvas and
+        returns the opaque ID used to reselect it after a library reload.
+        renameBlock() changes only the adjacent versioned .qblock name record.
+        erase() removes the exact ID's .qcanvas payload and name metadata.
         loadAll() returns valid blocks in name order and skips damaged entries.
-        safeFilename() handles platform-invalid filename characters.
+        normalizeName() trims UI whitespace without making a filename.
+        createStorageId() keeps user names out of platform-specific paths.
+        validateStorageId() prevents management calls escaping the library.
+        projectPath()/metadataPath() are the only ID-to-path conversion points.
+        Legacy blocks without .qblock metadata use their filename stem until
+        renameBlock() gives them an exact display-name record.
 
     OpenQasmFile.hpp / OpenQasmFile.cpp
         OpenQasmFile::save() emits OpenQASM 3 + stdgates and rejects loss.

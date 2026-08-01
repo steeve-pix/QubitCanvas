@@ -358,7 +358,7 @@ int main() {
             libraryRoot
         };
 
-        library.save(
+        const std::string bellBlockId = library.save(
             "Bell pair",
             source.qubitCount(),
             source.instructionSnapshots()
@@ -366,9 +366,18 @@ int main() {
 
         const auto blocks = library.loadAll();
         QuantumCircuit destination{4U};
+        const auto bellBlock = std::find_if(
+            blocks.begin(),
+            blocks.end(),
+            [&bellBlockId](
+                const quantum_sim::project::StoredSubcircuit &block
+            ) {
+                return block.id == bellBlockId;
+            }
+        );
 
-        if (!blocks.empty()) {
-            for (const auto &instruction : blocks.front().instructions) {
+        if (bellBlock != blocks.end()) {
+            for (const auto &instruction : bellBlock->instructions) {
                 destination.insertInstructionSnapshot(
                     destination.instructionCount(),
                     instruction
@@ -383,12 +392,156 @@ int main() {
 
         check(
             blocks.size() == 1U &&
-            blocks.front().name == "Bell pair" &&
-            blocks.front().canInsertInto(4U) &&
-            !blocks.front().canInsertInto(2U) &&
+            bellBlock != blocks.end() &&
+            bellBlock->name == "Bell pair" &&
+            bellBlock->canInsertInto(4U) &&
+            !bellBlock->canInsertInto(2U) &&
             approximatelyEqual(prepared.probability(0U), 0.5) &&
             approximatelyEqual(prepared.probability(6U), 0.5),
             "Reusable subcircuits preserve executable snapshots and validate destination registers"
+        );
+
+        const std::string colonId = library.save(
+            "Phase:A",
+            source.qubitCount(),
+            source.instructionSnapshots()
+        );
+        const std::string questionId = library.save(
+            "Phase?A",
+            source.qubitCount(),
+            source.instructionSnapshots()
+        );
+
+        const auto collisionBlocks = library.loadAll();
+        const bool foundColonName = std::any_of(
+            collisionBlocks.begin(),
+            collisionBlocks.end(),
+            [&colonId](
+                const quantum_sim::project::StoredSubcircuit &block
+            ) {
+                return block.id == colonId &&
+                       block.name == "Phase:A";
+            }
+        );
+        const bool foundQuestionName = std::any_of(
+            collisionBlocks.begin(),
+            collisionBlocks.end(),
+            [&questionId](
+                const quantum_sim::project::StoredSubcircuit &block
+            ) {
+                return block.id == questionId &&
+                       block.name == "Phase?A";
+            }
+        );
+
+        check(
+            colonId != questionId &&
+            collisionBlocks.size() == 3U &&
+            foundColonName &&
+            foundQuestionName,
+            "Reusable block IDs preserve distinct names that collide as filenames"
+        );
+
+        library.renameBlock(
+            colonId,
+            "  Phase / left  "
+        );
+
+        bool duplicateRenameRejected = false;
+
+        try {
+            library.renameBlock(
+                colonId,
+                "phase?a"
+            );
+        } catch (const std::invalid_argument &) {
+            duplicateRenameRejected = true;
+        }
+
+        library.erase(questionId);
+
+        const auto managedBlocks = library.loadAll();
+        const bool renamedBlockFound = std::any_of(
+            managedBlocks.begin(),
+            managedBlocks.end(),
+            [&colonId](
+                const quantum_sim::project::StoredSubcircuit &block
+            ) {
+                return block.id == colonId &&
+                       block.name == "Phase / left";
+            }
+        );
+        const bool deletedBlockGone = std::none_of(
+            managedBlocks.begin(),
+            managedBlocks.end(),
+            [&questionId](
+                const quantum_sim::project::StoredSubcircuit &block
+            ) {
+                return block.id == questionId;
+            }
+        );
+
+        check(
+            duplicateRenameRejected &&
+            renamedBlockFound &&
+            deletedBlockGone &&
+            managedBlocks.size() == 2U,
+            "Reusable blocks rename by stable ID and delete only the selected entry"
+        );
+
+        quantum_sim::project::ProjectFile::save(
+            libraryRoot / "Legacy block.qcanvas",
+            source,
+            QuantumRegister::basisState(
+                source.qubitCount(),
+                0U
+            )
+        );
+
+        const auto legacyBlocks = library.loadAll();
+        const auto legacyBlock = std::find_if(
+            legacyBlocks.begin(),
+            legacyBlocks.end(),
+            [](const quantum_sim::project::StoredSubcircuit &block) {
+                return block.id == "Legacy block" &&
+                       block.name == "Legacy block";
+            }
+        );
+
+        if (legacyBlock != legacyBlocks.end()) {
+            library.renameBlock(
+                legacyBlock->id,
+                "Legacy: migrated"
+            );
+        }
+
+        const auto migratedBlocks = library.loadAll();
+        const bool legacyMigrated = std::any_of(
+            migratedBlocks.begin(),
+            migratedBlocks.end(),
+            [](const quantum_sim::project::StoredSubcircuit &block) {
+                return block.id == "Legacy block" &&
+                       block.name == "Legacy: migrated";
+            }
+        );
+
+        check(
+            legacyBlock != legacyBlocks.end() &&
+            legacyMigrated,
+            "Legacy filename-named reusable blocks migrate without rewriting their circuit payload"
+        );
+
+        bool traversalIdRejected = false;
+
+        try {
+            library.erase("..");
+        } catch (const std::invalid_argument &) {
+            traversalIdRejected = true;
+        }
+
+        check(
+            traversalIdRejected,
+            "Reusable block management rejects IDs that could escape the personal library"
         );
 
         std::filesystem::remove_all(
